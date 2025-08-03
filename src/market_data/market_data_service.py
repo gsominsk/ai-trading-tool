@@ -621,14 +621,18 @@ class MarketDataService:
             return "No recent S/R tests"
     
     def _analyze_volume_relationship(self, candles: list) -> str:
-        """Analyze volume-price relationship."""
+        """Analyze volume-price relationship with Decimal precision."""
         if len(candles) < 3:
             return "Insufficient data"
         
-        recent_volumes = [float(c[5]) for c in candles[-3:]]
-        recent_closes = [float(c[4]) for c in candles[-3:]]
+        # Use Decimal for financial precision instead of float
+        recent_volumes = [Decimal(str(c[5])) for c in candles[-3:]]
+        recent_closes = [Decimal(str(c[4])) for c in candles[-3:]]
         
-        avg_volume = sum(recent_volumes) / len(recent_volumes)
+        # Calculate average volume using Decimal arithmetic
+        avg_volume = sum(recent_volumes) / Decimal(str(len(recent_volumes)))
+        
+        # Determine trends using Decimal comparisons
         price_trend = "up" if recent_closes[-1] > recent_closes[0] else "down"
         volume_trend = "increasing" if recent_volumes[-1] > avg_volume else "decreasing"
         
