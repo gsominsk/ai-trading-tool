@@ -286,7 +286,7 @@ class MarketDataService:
         return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
     
     def _calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> Decimal:
-        """Calculate RSI indicator with Decimal precision."""
+        """Calculate RSI indicator with Decimal precision and division by zero protection."""
         if len(df) < period + 1:
             return Decimal('50.0')  # Default neutral RSI
         
@@ -296,11 +296,27 @@ class MarketDataService:
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
         
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
+        # Get the final values
+        final_gain = gain.iloc[-1]
+        final_loss = loss.iloc[-1]
+        
+        # Handle division by zero cases
+        if final_loss == 0:
+            if final_gain == 0:
+                # No price movement at all
+                rsi_value = 50.0
+            else:
+                # Only gains, no losses (maximum RSI)
+                rsi_value = 100.0
+        elif final_gain == 0:
+            # Only losses, no gains (minimum RSI)
+            rsi_value = 0.0
+        else:
+            # Normal RSI calculation
+            rs = final_gain / final_loss
+            rsi_value = 100 - (100 / (1 + rs))
         
         # Convert to Decimal with proper precision
-        rsi_value = float(rsi.iloc[-1])
         return Decimal(str(rsi_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
     def _calculate_macd_signal(self, df: pd.DataFrame) -> str:
