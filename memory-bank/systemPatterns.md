@@ -655,3 +655,82 @@ feat: critical MarketDataService fixes + real TDD implementation
 ```
 
 ВАЖНО: Это правило дополняет Memory Bank First Pattern
+
+[2025-08-03 14:15:00] - QUALITY GATES INTEGRATION PATTERN
+
+## Quality Gates Integration Pattern
+**КРИТИЧЕСКИЙ КОМПОНЕНТ СИСТЕМЫ РАЗРАБОТКИ**
+
+### Автоматическая интеграция с существующими workflow patterns:
+
+#### 1. UPDATE_TODO_LIST INTEGRATION
+```python
+# ПЕРЕД КАЖДЫМ update_todo_list с "Completed" статусом:
+def before_update_todo_list():
+    """ОБЯЗАТЕЛЬНАЯ проверка Quality Gates"""
+    gates_status = read_quality_gates_md()
+    current_task = get_current_task()
+    workflow_type = determine_workflow_type(current_task)
+    required_gates = get_required_gates(workflow_type)
+    
+    if not all_gates_passed(required_gates):
+        block_update_with_violation_log()
+        return False
+    return True
+```
+
+#### 2. GIT WORKFLOW INTEGRATION
+```python
+# ПЕРЕД КАЖДЫМ git commit:
+def before_git_commit():
+    """БЛОКИРОВКА commit без пройденных Quality Gates"""
+    if not all_quality_gates_passed():
+        log_violation_to_active_context()
+        raise QualityGateViolation("Cannot commit without passed quality gates")
+```
+
+#### 3. ATTEMPT_COMPLETION INTEGRATION
+```python
+# ПЕРЕД КАЖДЫМ attempt_completion:
+def before_attempt_completion():
+    """ПОЛНАЯ валидация всех completed задач"""
+    completed_tasks = get_completed_tasks()
+    for task in completed_tasks:
+        if not validate_task_quality_gates(task):
+            block_completion_with_detailed_log()
+            return False
+    return True
+```
+
+#### 4. MEMORY BANK AUTO-UPDATE INTEGRATION
+```python
+# АВТОМАТИЧЕСКОЕ обновление activeContext.md:
+def auto_update_active_context(violation_type: str, task: str):
+    """Triggered при нарушении Quality Gates"""
+    timestamp = get_current_timestamp()
+    violation_entry = f"""
+[{timestamp}] - QUALITY GATE VIOLATION
+Task: {task}
+Violated Gates: {get_violated_gates()}
+Action Required: {get_required_actions()}
+Status: BLOCKED until gates passed
+"""
+    append_to_active_context(violation_entry)
+```
+
+### Quality Gates Workflow Types:
+- **NEW_FEATURE_DEVELOPMENT:** All 6 gates mandatory
+- **BUG_FIXING:** Gates 1,2,3,4,6 mandatory
+- **CODE_MAINTENANCE:** Gates 1,2,4,6 mandatory
+- **CRITICAL_HOTFIX:** Gates 1,4,6 mandatory (с последующим возвратом к полным gates)
+
+### Emergency Override Pattern:
+```python
+# ТОЛЬКО при explicit пользовательском разрешении:
+if user_says("Skip quality gates for [reason]"):
+    log_override_reason_to_memory_bank()
+    add_todo_for_gates_completion()
+    proceed_with_warnings()
+```
+
+**РЕЗУЛЬТАТ:** Полностью автоматизированная система качества с блокировкой всех completion операций до прохождения обязательных качественных ворот.
