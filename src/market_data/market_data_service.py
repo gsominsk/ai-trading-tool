@@ -565,10 +565,47 @@ class MarketDataService:
             return "sideways"
     
     def _calculate_btc_correlation(self, symbol: str, df: pd.DataFrame) -> Optional[Decimal]:
-        """Calculate correlation with BTC (placeholder - would need BTC data)."""
-        # For MVP, return a mock correlation
-        # In production, would fetch BTC data and calculate actual correlation
-        return Decimal('0.75')  # Mock positive correlation
+        """Calculate correlation with BTC using actual price data."""
+        # Skip correlation calculation for BTC itself
+        if symbol == "BTCUSDT":
+            return None
+        
+        try:
+            # Fetch BTC data for correlation calculation
+            btc_data = self._get_klines("BTCUSDT", "1h", len(df))
+            
+            # Ensure we have enough data points for meaningful correlation
+            if len(btc_data) < 10 or len(df) < 10:
+                return None
+            
+            # Align data by taking minimum length
+            min_length = min(len(df), len(btc_data))
+            symbol_prices = df['close'].tail(min_length).values
+            btc_prices = btc_data['close'].tail(min_length).values
+            
+            # Calculate Pearson correlation coefficient
+            correlation = pd.Series(symbol_prices).corr(pd.Series(btc_prices))
+            
+            # Handle NaN correlation (can happen with constant prices)
+            if pd.isna(correlation):
+                return Decimal('0.0')
+            
+            # Convert to Decimal and clamp to valid range [-1, 1]
+            correlation_decimal = Decimal(str(float(correlation))).quantize(Decimal('0.001'))
+            
+            # Ensure correlation is within valid bounds
+            if correlation_decimal > Decimal('1.0'):
+                correlation_decimal = Decimal('1.0')
+            elif correlation_decimal < Decimal('-1.0'):
+                correlation_decimal = Decimal('-1.0')
+            
+            return correlation_decimal
+            
+        except Exception as e:
+            # If BTC data fetch fails, log the issue but don't crash
+            # In production, this should use proper logging
+            print(f"Warning: Failed to calculate BTC correlation for {symbol}: {e}")
+            return None
     
     def _analyze_volume_profile(self, df: pd.DataFrame) -> str:
         """Analyze volume profile (high/normal/low)."""
