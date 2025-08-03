@@ -252,8 +252,20 @@ class MarketDataService:
             raise ValueError(f"Invalid symbol format: {symbol}. Expected XXXUSDT format")
         if len(symbol) > 12:  # Reasonable length limit
             raise ValueError(f"Symbol too long: {symbol}")
-        if not symbol.replace("USDT", "").isalpha():
-            raise ValueError(f"Invalid characters in symbol: {symbol}")
+        
+        # Extract base currency by removing only the trailing USDT
+        if symbol.count("USDT") > 1:
+            raise ValueError(f"Invalid symbol format: {symbol}. Multiple USDT occurrences not allowed")
+        
+        base_currency = symbol[:-4]  # Remove last 4 characters (USDT)
+        if not base_currency or not base_currency.isalpha() or not base_currency.isupper():
+            raise ValueError(f"Invalid base currency: '{base_currency}'. Must be uppercase letters only")
+        
+        # Validate base currency length (cryptocurrency standards)
+        if len(base_currency) < 3:
+            raise ValueError(f"Base currency too short: '{base_currency}'. Must be at least 3 characters")
+        if len(base_currency) > 5:
+            raise ValueError(f"Base currency too long: '{base_currency}'. Must be 5 characters or less")
     
     def get_enhanced_context(self, symbol: str) -> str:
         """Get enhanced market context with candlestick analysis."""

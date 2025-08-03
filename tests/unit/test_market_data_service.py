@@ -56,19 +56,72 @@ class TestMarketDataService:
             with pytest.raises(ValueError):
                 self.service._validate_symbol_input(symbol)
     
+    def _generate_sufficient_klines(self, count: int, start_price: float = 50000.0) -> list:
+        """Generate sufficient klines data for RSI/MA calculations."""
+        from datetime import datetime, timedelta
+        klines = []
+        current_price = start_price
+        current_time = int((datetime.now() - timedelta(hours=count)).timestamp() * 1000)
+        
+        for i in range(count):
+            # Realistic price changes (-1% to +1% per hour)
+            price_change = (i % 20 - 10) * 0.001  # -1% to +1%
+            new_price = current_price * (1 + price_change)
+            
+            # OHLC data
+            open_price = current_price
+            close_price = new_price
+            high_price = max(open_price, close_price) * 1.002
+            low_price = min(open_price, close_price) * 0.998
+            volume = 1000 + (i % 50) * 20
+            
+            kline = [
+                current_time + (i * 3600000),  # timestamp
+                f"{open_price:.8f}",           # open
+                f"{high_price:.8f}",           # high
+                f"{low_price:.8f}",            # low
+                f"{close_price:.8f}",          # close
+                f"{volume:.8f}",               # volume
+                current_time + (i * 3600000) + 3599999,  # close_time
+                f"{volume * close_price:.8f}",  # quote_asset_volume
+                1000 + i,                      # number_of_trades
+                f"{volume * 0.6:.8f}",         # taker_buy_base_asset_volume
+                f"{volume * close_price * 0.6:.8f}",  # taker_buy_quote_asset_volume
+                "0"                            # ignore
+            ]
+            
+            klines.append(kline)
+            current_price = new_price
+        
+        return klines
+
     @pytest.mark.unit
     @patch('requests.get')
     def test_get_market_data_structure_real_service(self, mock_get):
         """Test that get_market_data returns properly structured MarketDataSet."""
-        # Mock successful API response
-        mock_response = Mock()
-        mock_klines_data = [
-            [1640995200000, "47000.00", "48000.00", "46500.00", "47500.00", "100.0", 1640995259999, "4750000.0", 1000, "50.0", "2375000.0", "0"],
-            [1641081600000, "47500.00", "48500.00", "47000.00", "48000.00", "150.0", 1641081659999, "7200000.0", 1200, "75.0", "3600000.0", "0"]
-        ]
-        mock_response.json.return_value = mock_klines_data
-        mock_response.status_code = 200
-        mock_get.return_value = mock_response
+        # Generate sufficient mock data for all timeframes
+        daily_data = self._generate_sufficient_klines(180, 50000.0)  # 6 months
+        h4_data = self._generate_sufficient_klines(84, 50000.0)      # 2 weeks
+        h1_data = self._generate_sufficient_klines(60, 50000.0)      # 60 hours
+        
+        def mock_side_effect(*args, **kwargs):
+            params = kwargs.get('params', {})
+            interval = params.get('interval', '1h')
+            
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.raise_for_status.return_value = None
+            
+            if interval == '1d':
+                mock_response.json.return_value = daily_data
+            elif interval == '4h':
+                mock_response.json.return_value = h4_data
+            else:  # '1h'
+                mock_response.json.return_value = h1_data
+                
+            return mock_response
+        
+        mock_get.side_effect = mock_side_effect
         
         # Test the real service
         result = self.service.get_market_data("BTCUSDT")
@@ -92,14 +145,29 @@ class TestMarketDataService:
     @patch('requests.get')
     def test_decimal_precision_real_service(self, mock_get):
         """Test that real service maintains Decimal precision for financial calculations."""
-        # Mock API response with high precision data
-        mock_klines_data = [
-            [1640995200000, "50000.12345678", "51000.87654321", "49000.11111111", "50500.99999999", "1234.56789012", 1640995259999, "61728546.9217764056090136", 1000, "617.28394734", "31072823.4860882028045068", "0"]
-        ]
-        mock_response = Mock()
-        mock_response.json.return_value = mock_klines_data
-        mock_response.status_code = 200
-        mock_get.return_value = mock_response
+        # Generate sufficient mock data with high precision
+        daily_data = self._generate_sufficient_klines(180, 50000.12345678)
+        h4_data = self._generate_sufficient_klines(84, 50000.12345678)
+        h1_data = self._generate_sufficient_klines(60, 50000.12345678)
+        
+        def mock_side_effect(*args, **kwargs):
+            params = kwargs.get('params', {})
+            interval = params.get('interval', '1h')
+            
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.raise_for_status.return_value = None
+            
+            if interval == '1d':
+                mock_response.json.return_value = daily_data
+            elif interval == '4h':
+                mock_response.json.return_value = h4_data
+            else:  # '1h'
+                mock_response.json.return_value = h1_data
+                
+            return mock_response
+        
+        mock_get.side_effect = mock_side_effect
         
         # Test the service
         result = self.service.get_market_data("BTCUSDT")
@@ -314,25 +382,87 @@ class TestMarketDataService:
 class TestMarketDataServiceIntegration:
     """Integration-style tests for MarketDataService with mocked dependencies."""
     
+    def _generate_test_klines(self, count: int = 60) -> list:
+        """Generate test klines for API mock testing."""
+        from datetime import datetime, timedelta
+        klines = []
+        base_price = 50000.12345678
+        current_time = int((datetime.now() - timedelta(hours=count)).timestamp() * 1000)
+        
+        for i in range(count):
+            price = base_price * (1 + (i % 10 - 5) * 0.002)  # ±1% price variation
+            volume = 1234.56789012 + i * 10
+            
+            kline = [
+                current_time + (i * 3600000),  # timestamp
+                f"{price:.8f}",                # open
+                f"{price * 1.005:.8f}",        # high
+                f"{price * 0.995:.8f}",        # low
+                f"{price * 1.001:.8f}",        # close
+                f"{volume:.8f}",               # volume
+                current_time + (i * 3600000) + 3599999,  # close_time
+                f"{volume * price:.8f}",       # quote_asset_volume
+                1000 + i,                      # number_of_trades
+                f"{volume * 0.6:.8f}",         # taker_buy_base_asset_volume
+                f"{volume * price * 0.6:.8f}", # taker_buy_quote_asset_volume
+                "0"                            # ignore
+            ]
+            klines.append(kline)
+        
+        return klines
+
     @pytest.mark.unit
     @patch('requests.get')
     def test_binance_api_mock_response(self, mock_get):
-        """Test MarketDataService with mocked Binance API response."""
-        # Mock successful API response
+        """Test MarketDataService with correctly structured Binance API klines response."""
+        # Generate realistic klines data (Binance API format)
+        test_klines = self._generate_test_klines(60)
+        
+        # Mock successful API response with correct klines structure
         mock_response = Mock()
-        mock_response.json.return_value = {
-            "symbol": "BTCUSDT",
-            "price": "50000.12345678",
-            "volume": "1234.56789012"
-        }
+        mock_response.json.return_value = test_klines
         mock_response.status_code = 200
+        mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
-        # Test would verify API integration works correctly
+        # Test API structure validation
         assert mock_response.status_code == 200
-        data = mock_response.json()
-        assert data["symbol"] == "BTCUSDT"
-        assert Decimal(data["price"]) == Decimal("50000.12345678")
+        klines_data = mock_response.json()
+        
+        # Verify it's a list of klines (not dict with symbol/price)
+        assert isinstance(klines_data, list), "API should return list of klines"
+        assert len(klines_data) == 60, f"Expected 60 klines, got {len(klines_data)}"
+        
+        # Verify kline structure
+        sample_kline = klines_data[0]
+        assert len(sample_kline) == 12, f"Each kline should have 12 fields, got {len(sample_kline)}"
+        assert str(sample_kline[0]).isdigit(), "Timestamp should be numeric"
+        assert isinstance(sample_kline[1], str), "OHLCV should be strings"
+        
+        # Test price precision
+        open_price = Decimal(sample_kline[1])
+        assert 45000 <= open_price <= 55000, f"Price should be around base value: {open_price}"
+        
+        # Verify this structure works with MarketDataService
+        service = MarketDataService()
+        
+        # Mock all timeframe calls
+        def mock_side_effect(*args, **kwargs):
+            mock_resp = Mock()
+            mock_resp.status_code = 200
+            mock_resp.raise_for_status.return_value = None
+            mock_resp.json.return_value = test_klines
+            return mock_resp
+        
+        mock_get.side_effect = mock_side_effect
+        
+        # This should work without errors now
+        try:
+            result = service.get_market_data("BTCUSDT")
+            assert isinstance(result.rsi_14, Decimal), "RSI should be calculated as Decimal"
+            assert isinstance(result.ma_20, Decimal), "MA20 should be calculated as Decimal"
+        except Exception as e:
+            pytest.fail(f"API mock structure should allow successful MarketDataService usage: {e}")
     
     @pytest.mark.unit
     def test_caching_mechanism(self):
