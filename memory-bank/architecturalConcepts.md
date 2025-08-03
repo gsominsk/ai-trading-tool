@@ -103,3 +103,26 @@ This architectural pattern can be extended to:
 ---
 
 *This document captures architectural wisdom that transcends specific technologies and can guide system design decisions in various contexts.*
+[2025-08-03 23:54:00] - **RooCode Workflow Enforcement Architecture**
+
+## Архитектурные принципы External Enforcement
+
+### 🔑 Фундаментальная концепция
+**AI Self-Control vs External Enforcement**:
+- **Проблема**: AI не может физически заблокировать самого себя от выполнения действий
+- **Решение**: Системные блокировки на уровне RooCode с real hard blocking
+- **Реализация**: Custom modes + XML rules + fileRegex restrictions
+
+### 🛡️ Enforcement Stack
+1. **System Level**: RooCode native capabilities (.roomodes, .roo/rules/)
+2. **Tool Level**: fileRegex restrictions и pre-execution validation
+3. **Workflow Level**: Memory Bank compliance проверки
+4. **Session Level**: Automatic synchronization и monitoring
+
+### 📋 Проверенные решения
+- ✅ Custom modes с логическими fileRegex ограничениями (docs, code, memory-bank)
+- ✅ XML rules для hard blocking критических операций
+- ✅ External validation вместо AI self-discipline
+- ✅ Подтверждено тестированием: реальные блокировки работают
+
+**Архитектурная документация**: `docs/architecture/roocode-solutions/`
