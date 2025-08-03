@@ -82,6 +82,24 @@ class MarketDataSet:
     
     def to_llm_context_basic(self) -> str:
         """Convert to structured text format for LLM consumption."""
+        # Check for empty DataFrames first
+        if len(self.h1_candles) == 0:
+            return f"""
+MARKET DATA ANALYSIS FOR {self.symbol}
+Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+⚠️ NO MARKET DATA AVAILABLE
+Status: Insufficient data for analysis
+Reason: Empty price data (h1_candles)
+
+=== TECHNICAL INDICATORS ===
+RSI(14): {self.rsi_14:.2f} - {'Oversold' if self.rsi_14 < Decimal('30') else 'Overbought' if self.rsi_14 > Decimal('70') else 'Neutral'}
+MACD: {self.macd_signal.upper()}
+MA(20): ${'N/A' if self.ma_20 is None else f'{self.ma_20:.2f}'}
+MA(50): ${'N/A' if self.ma_50 is None else f'{self.ma_50:.2f}'}
+Moving Average Trend: {self.ma_trend.upper()}
+"""
+        
         try:
             current_price = Decimal(str(self.h1_candles.iloc[-1]['close']))
             change_24h = self._calculate_24h_change()
@@ -113,7 +131,19 @@ Current Price: ${current_price:.2f}
 24H Volume: {volume_24h:.0f}
 """
         except Exception as e:
-            return f"MarketDataService ready - LLM context generation needs debugging: {str(e)}"
+            return f"""
+MARKET DATA ANALYSIS FOR {self.symbol}
+Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+❌ DATA ACCESS ERROR
+Error: {str(e)}
+Status: Unable to access price data for context generation
+
+=== AVAILABLE TECHNICAL INDICATORS ===
+RSI(14): {self.rsi_14:.2f}
+MACD: {self.macd_signal.upper()}
+MA Trend: {self.ma_trend.upper()}
+"""
     
     def to_llm_context_enhanced(self) -> str:
         """Convert to enhanced format with candlestick analysis (~300-400 tokens)."""
