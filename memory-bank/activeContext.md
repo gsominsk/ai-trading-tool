@@ -902,3 +902,8 @@ MEMORY BANK ACTIVATION PROTOCOL (добавить в Global Instructions):
 - Monitor system performance with new enforcement rules
 - Consider adding more granular file access patterns if needed
 - Evaluate user experience with mode switching requirements
+
+[2025-08-03 23:47:00] - **Current Focus: RooCode Configuration Optimization Complete**
+Завершена работа по оптимизации .roomodes конфигурации. Успешно перешли от универсального подхода `fileRegex: .*` к специализированным ограничениям, следуя официальным паттернам RooCode. Конфигурация теперь обеспечивает естественное разделение ответственности между режимами при сохранении всей Memory Bank функциональности.
+
+**Key Achievement**: Подтверждена работоспособность fileRegex ограничений - демонстрация переключения из Code в Architect режим для доступа к Memory Bank файлам.

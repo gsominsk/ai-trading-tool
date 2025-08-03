@@ -859,3 +859,13 @@ README.md переписан с учетом существующих Global Ins
 - Consider additional mode-specific optimizations if needed
 - Expand enforcement patterns to other project types
 - Create tutorials for team onboarding
+
+[2025-08-03 23:48:00] - **✅ COMPLETED: RooCode .roomodes Configuration Optimization**
+Успешно обновлена конфигурация .roomodes с логическими ограничениями fileRegex:
+- Проанализирован официальный .roomodes из RooCode репозитория
+- Реализованы специализированные ограничения для каждого режима
+- Сохранена вся существующая Memory Bank логика
+- Подтверждена работоспособность через практическое тестирование
+- Создано естественное разделение ответственности между режимами
+
+**Status**: Конфигурация готова к использованию, следует официальным паттернам RooCode.
