@@ -501,14 +501,14 @@ class MarketDataService:
         return sr_test_candles
     
     def _identify_patterns(self, candles: list) -> list:
-        """Identify candlestick patterns in key candles."""
+        """Identify candlestick patterns in key candles with Decimal precision."""
         patterns = []
         
         for candle in candles:
-            open_price = float(candle[1])
-            high_price = float(candle[2])
-            low_price = float(candle[3])
-            close_price = float(candle[4])
+            open_price = Decimal(str(candle[1]))
+            high_price = Decimal(str(candle[2]))
+            low_price = Decimal(str(candle[3]))
+            close_price = Decimal(str(candle[4]))
             
             body = abs(close_price - open_price)
             upper_shadow = high_price - max(open_price, close_price)
@@ -518,18 +518,18 @@ class MarketDataService:
             if total_range == 0:
                 continue
                 
-            # Pattern identification
-            if body / total_range < 0.1:
-                patterns.append("Doji")
-            elif lower_shadow / total_range > 0.6 and body / total_range < 0.3:
+            # Pattern identification with Decimal thresholds (specific patterns first)
+            if lower_shadow / total_range > Decimal('0.6') and body / total_range < Decimal('0.3'):
                 patterns.append("Hammer")
-            elif upper_shadow / total_range > 0.6 and body / total_range < 0.3:
+            elif upper_shadow / total_range > Decimal('0.6') and body / total_range < Decimal('0.3'):
                 patterns.append("Shooting Star")
-            elif body / total_range > 0.7:
+            elif body / total_range > Decimal('0.7'):
                 if close_price > open_price:
                     patterns.append("Strong Bull")
                 else:
                     patterns.append("Strong Bear")
+            elif body / total_range < Decimal('0.1'):
+                patterns.append("Doji")
         
         return list(set(patterns))  # Remove duplicates
     
