@@ -576,11 +576,12 @@ class MarketDataService:
         return list(set(patterns))  # Remove duplicates
     
     def _analyze_recent_trend(self, recent_candles: list) -> str:
-        """Analyze trend from recent candles."""
+        """Analyze trend from recent candles with Decimal precision."""
         if len(recent_candles) < 3:
             return "Insufficient data"
         
-        closes = [float(c[4]) for c in recent_candles]
+        # Use Decimal for financial precision instead of float
+        closes = [Decimal(str(c[4])) for c in recent_candles]
         
         if closes[-1] > closes[-2] > closes[-3]:
             return "Strong Uptrend"
