@@ -418,38 +418,89 @@ class MarketDataService:
     
     def get_enhanced_context(self, symbol: str) -> str:
         """Get enhanced market context with candlestick analysis."""
-        market_data = self.get_market_data(symbol)
-        
-        # Generate candlestick analysis using market_data (no state pollution)
-        key_candles = self._select_key_candles(market_data.daily_candles.values.tolist())
-        patterns = self._identify_patterns(key_candles)
-        
-        basic_context = market_data.to_llm_context_basic()
-        
-        # Enhanced candlestick analysis
-        analysis = "\n=== CANDLESTICK ANALYSIS ===\n"
-        
-        # Recent candles trend
-        recent_trend = self._analyze_recent_trend(key_candles[:5])
-        analysis += f"Recent Trend: {recent_trend}\n"
-        
-        # Key patterns
-        if patterns:
-            analysis += f"Patterns: {', '.join(patterns)}\n"
-        
-        # Critical levels interaction
-        sr_tests = self._analyze_sr_tests(key_candles, market_data.support_level, market_data.resistance_level)
-        if sr_tests:
-            analysis += f"S/R Tests: {sr_tests}\n"
-        
-        # Volume-price relationship
-        volume_analysis = self._analyze_volume_relationship(key_candles)
-        analysis += f"Volume Analysis: {volume_analysis}\n"
-        
-        # Key candlestick summary
-        analysis += f"Key Candles Analyzed: {len(key_candles)} of {len(market_data.daily_candles)} total"
-        
-        return f"{basic_context}{analysis}"
+        try:
+            market_data = self.get_market_data(symbol)
+            
+            # Fallback to basic context if enhanced analysis fails
+            basic_context = market_data.to_llm_context_basic()
+            
+            try:
+                # Generate candlestick analysis using market_data (no state pollution)
+                key_candles = self._select_key_candles(market_data.daily_candles.values.tolist())
+                
+                # Enhanced candlestick analysis with error handling for each component
+                analysis = "\n=== CANDLESTICK ANALYSIS ===\n"
+                
+                # Recent candles trend analysis with error handling
+                try:
+                    recent_trend = self._analyze_recent_trend(key_candles[:5])
+                    analysis += f"Recent Trend: {recent_trend}\n"
+                except Exception as e:
+                    analysis += f"Recent Trend: Analysis failed ({str(e)[:50]}...)\n"
+                
+                # Pattern identification with error handling
+                try:
+                    patterns = self._identify_patterns(key_candles)
+                    if patterns:
+                        analysis += f"Patterns: {', '.join(patterns)}\n"
+                    else:
+                        analysis += "Patterns: No significant patterns detected\n"
+                except Exception as e:
+                    analysis += f"Patterns: Pattern analysis failed ({str(e)[:50]}...)\n"
+                
+                # Support/Resistance analysis with error handling
+                try:
+                    if market_data.support_level is not None and market_data.resistance_level is not None:
+                        sr_tests = self._analyze_sr_tests(key_candles, market_data.support_level, market_data.resistance_level)
+                        if sr_tests:
+                            analysis += f"S/R Tests: {sr_tests}\n"
+                        else:
+                            analysis += "S/R Tests: No recent support/resistance tests\n"
+                    else:
+                        analysis += "S/R Tests: Support/resistance levels unavailable\n"
+                except Exception as e:
+                    analysis += f"S/R Tests: Analysis failed ({str(e)[:50]}...)\n"
+                
+                # Volume analysis with error handling
+                try:
+                    volume_analysis = self._analyze_volume_relationship(key_candles)
+                    analysis += f"Volume Analysis: {volume_analysis}\n"
+                except Exception as e:
+                    analysis += f"Volume Analysis: Analysis failed ({str(e)[:50]}...)\n"
+                
+                # Key candlestick summary with error handling
+                try:
+                    total_candles = len(market_data.daily_candles) if hasattr(market_data.daily_candles, '__len__') else "unknown"
+                    analysis += f"Key Candles Analyzed: {len(key_candles)} of {total_candles} total"
+                except Exception as e:
+                    analysis += f"Key Candles Analyzed: {len(key_candles)} (total count unavailable)"
+                
+                return f"{basic_context}{analysis}"
+                
+            except Exception as e:
+                # If enhanced analysis completely fails, return basic context with error note
+                error_msg = f"\n=== CANDLESTICK ANALYSIS ===\n❌ Enhanced analysis unavailable: {str(e)[:100]}...\n"
+                error_msg += "Fallback: Basic market data provided above."
+                return f"{basic_context}{error_msg}"
+                
+        except Exception as e:
+            # If even basic market data fails, return minimal error context
+            return f"""
+MARKET DATA ANALYSIS FOR {symbol}
+Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+❌ CRITICAL ERROR
+Error: {str(e)[:200]}...
+Status: Unable to fetch market data
+
+Please check:
+- Network connectivity
+- API availability
+- Symbol validity ({symbol})
+- Service configuration
+
+Contact support if this error persists.
+"""
     
     def _get_klines(self, symbol: str, interval: str, limit: int) -> pd.DataFrame:
         """Fetch candlestick data from Binance API."""
@@ -683,30 +734,43 @@ class MarketDataService:
         return unique_candles[-15:]  # Keep last 15 key candles
     
     def _find_pattern_candles(self, candles: list) -> list:
-        """Identify candlestick patterns with Decimal precision."""
+        """Identify candlestick patterns with Decimal precision and error handling."""
         pattern_candles = []
         
-        for candle in candles:
-            open_price = Decimal(str(candle[1]))
-            high_price = Decimal(str(candle[2]))
-            low_price = Decimal(str(candle[3]))
-            close_price = Decimal(str(candle[4]))
-            
-            body = abs(close_price - open_price)
-            upper_shadow = high_price - max(open_price, close_price)
-            lower_shadow = min(open_price, close_price) - low_price
-            total_range = high_price - low_price
-            
-            # Doji pattern (small body)
-            if total_range > 0 and body / total_range < Decimal('0.1'):
-                pattern_candles.append(candle)
-            
-            # Hammer/Shooting star (long shadow)
-            elif total_range > 0:
-                if lower_shadow / total_range > Decimal('0.6'):  # Hammer
-                    pattern_candles.append(candle)
-                elif upper_shadow / total_range > Decimal('0.6'):  # Shooting star
-                    pattern_candles.append(candle)
+        try:
+            for candle in candles:
+                try:
+                    open_price = Decimal(str(candle[1]))
+                    high_price = Decimal(str(candle[2]))
+                    low_price = Decimal(str(candle[3]))
+                    close_price = Decimal(str(candle[4]))
+                    
+                    body = abs(close_price - open_price)
+                    upper_shadow = high_price - max(open_price, close_price)
+                    lower_shadow = min(open_price, close_price) - low_price
+                    total_range = high_price - low_price
+                    
+                    # Only proceed if we have a valid price range
+                    if total_range <= 0:
+                        continue
+                    
+                    # Doji pattern (small body)
+                    if body / total_range < Decimal('0.1'):
+                        pattern_candles.append(candle)
+                    
+                    # Hammer/Shooting star (long shadow)
+                    elif lower_shadow / total_range > Decimal('0.6'):  # Hammer
+                        pattern_candles.append(candle)
+                    elif upper_shadow / total_range > Decimal('0.6'):  # Shooting star
+                        pattern_candles.append(candle)
+                        
+                except Exception:
+                    # Skip individual candle if processing fails
+                    continue
+                    
+        except Exception:
+            # If entire pattern analysis fails, return empty list
+            pass
         
         return pattern_candles
     
@@ -729,109 +793,167 @@ class MarketDataService:
         return sr_test_candles
     
     def _identify_patterns(self, candles: list) -> list:
-        """Identify candlestick patterns in key candles with Decimal precision."""
+        """Identify candlestick patterns in key candles with Decimal precision and error handling."""
         patterns = []
         
-        for candle in candles:
-            open_price = Decimal(str(candle[1]))
-            high_price = Decimal(str(candle[2]))
-            low_price = Decimal(str(candle[3]))
-            close_price = Decimal(str(candle[4]))
-            
-            body = abs(close_price - open_price)
-            upper_shadow = high_price - max(open_price, close_price)
-            lower_shadow = min(open_price, close_price) - low_price
-            total_range = high_price - low_price
-            
-            if total_range == 0:
-                continue
-                
-            # Pattern identification with Decimal thresholds (specific patterns first)
-            if lower_shadow / total_range > Decimal('0.6') and body / total_range < Decimal('0.3'):
-                patterns.append("Hammer")
-            elif upper_shadow / total_range > Decimal('0.6') and body / total_range < Decimal('0.3'):
-                patterns.append("Shooting Star")
-            elif body / total_range > Decimal('0.7'):
-                if close_price > open_price:
-                    patterns.append("Strong Bull")
-                else:
-                    patterns.append("Strong Bear")
-            elif body / total_range < Decimal('0.1'):
-                patterns.append("Doji")
+        try:
+            for candle in candles:
+                try:
+                    open_price = Decimal(str(candle[1]))
+                    high_price = Decimal(str(candle[2]))
+                    low_price = Decimal(str(candle[3]))
+                    close_price = Decimal(str(candle[4]))
+                    
+                    body = abs(close_price - open_price)
+                    upper_shadow = high_price - max(open_price, close_price)
+                    lower_shadow = min(open_price, close_price) - low_price
+                    total_range = high_price - low_price
+                    
+                    # Skip candles with no price range
+                    if total_range <= 0:
+                        continue
+                        
+                    # Pattern identification with Decimal thresholds (specific patterns first)
+                    if lower_shadow / total_range > Decimal('0.6') and body / total_range < Decimal('0.3'):
+                        patterns.append("Hammer")
+                    elif upper_shadow / total_range > Decimal('0.6') and body / total_range < Decimal('0.3'):
+                        patterns.append("Shooting Star")
+                    elif body / total_range > Decimal('0.7'):
+                        if close_price > open_price:
+                            patterns.append("Strong Bull")
+                        else:
+                            patterns.append("Strong Bear")
+                    elif body / total_range < Decimal('0.1'):
+                        patterns.append("Doji")
+                        
+                except Exception:
+                    # Skip individual candle if processing fails
+                    continue
+                    
+        except Exception:
+            # If entire pattern identification fails, return empty list
+            pass
         
         return list(set(patterns))  # Remove duplicates
     
     def _analyze_recent_trend(self, recent_candles: list) -> str:
-        """Analyze trend from recent candles with Decimal precision."""
-        if len(recent_candles) < 3:
-            return "Insufficient data"
-        
-        # Use Decimal for financial precision instead of float
-        closes = [Decimal(str(c[4])) for c in recent_candles]
-        
-        if closes[-1] > closes[-2] > closes[-3]:
-            return "Strong Uptrend"
-        elif closes[-1] < closes[-2] < closes[-3]:
-            return "Strong Downtrend"
-        elif closes[-1] > closes[-3]:
-            return "Upward bias"
-        elif closes[-1] < closes[-3]:
-            return "Downward bias"
-        else:
-            return "Sideways"
+        """Analyze trend from recent candles with Decimal precision and error handling."""
+        try:
+            if len(recent_candles) < 3:
+                return "Insufficient data"
+            
+            # Use Decimal for financial precision instead of float
+            closes = []
+            for c in recent_candles:
+                try:
+                    closes.append(Decimal(str(c[4])))
+                except Exception:
+                    continue  # Skip invalid candles
+            
+            if len(closes) < 3:
+                return "Insufficient valid data"
+            
+            if closes[-1] > closes[-2] > closes[-3]:
+                return "Strong Uptrend"
+            elif closes[-1] < closes[-2] < closes[-3]:
+                return "Strong Downtrend"
+            elif closes[-1] > closes[-3]:
+                return "Upward bias"
+            elif closes[-1] < closes[-3]:
+                return "Downward bias"
+            else:
+                return "Sideways"
+                
+        except Exception:
+            return "Trend analysis failed"
     
     def _analyze_sr_tests(self, candles: list, support_level: Decimal, resistance_level: Decimal) -> str:
-        """Analyze support/resistance tests with Decimal precision."""
-        resistance_tests = 0
-        support_tests = 0
-        
-        for candle in candles:
-            high_price = Decimal(str(candle[2]))
-            low_price = Decimal(str(candle[3]))
+        """Analyze support/resistance tests with Decimal precision and error handling."""
+        try:
+            # Validate inputs
+            if not candles or support_level is None or resistance_level is None:
+                return "Invalid data for S/R analysis"
             
-            # Test resistance level (within 1%) using Decimal arithmetic
-            if abs(high_price - resistance_level) / resistance_level < Decimal('0.01'):
-                resistance_tests += 1
+            if support_level <= 0 or resistance_level <= 0:
+                return "Invalid S/R levels"
             
-            # Test support level (within 1%) using Decimal arithmetic
-            if abs(low_price - support_level) / support_level < Decimal('0.01'):
-                support_tests += 1
-        
-        if resistance_tests > 0 and support_tests > 0:
-            return f"R:{resistance_tests} tests, S:{support_tests} tests"
-        elif resistance_tests > 0:
-            return f"Resistance tested {resistance_tests} times"
-        elif support_tests > 0:
-            return f"Support tested {support_tests} times"
-        else:
-            return "No recent S/R tests"
+            resistance_tests = 0
+            support_tests = 0
+            
+            for candle in candles:
+                try:
+                    high_price = Decimal(str(candle[2]))
+                    low_price = Decimal(str(candle[3]))
+                    
+                    # Test resistance level (within 1%) using Decimal arithmetic
+                    if resistance_level > 0:  # Additional safety check
+                        if abs(high_price - resistance_level) / resistance_level < Decimal('0.01'):
+                            resistance_tests += 1
+                    
+                    # Test support level (within 1%) using Decimal arithmetic
+                    if support_level > 0:  # Additional safety check
+                        if abs(low_price - support_level) / support_level < Decimal('0.01'):
+                            support_tests += 1
+                            
+                except Exception:
+                    # Skip individual candle if processing fails
+                    continue
+            
+            if resistance_tests > 0 and support_tests > 0:
+                return f"R:{resistance_tests} tests, S:{support_tests} tests"
+            elif resistance_tests > 0:
+                return f"Resistance tested {resistance_tests} times"
+            elif support_tests > 0:
+                return f"Support tested {support_tests} times"
+            else:
+                return "No recent S/R tests"
+                
+        except Exception:
+            return "S/R analysis failed"
     
     def _analyze_volume_relationship(self, candles: list) -> str:
-        """Analyze volume-price relationship with Decimal precision."""
-        if len(candles) < 3:
-            return "Insufficient data"
-        
-        # Use Decimal for financial precision instead of float
-        recent_volumes = [Decimal(str(c[5])) for c in candles[-3:]]
-        recent_closes = [Decimal(str(c[4])) for c in candles[-3:]]
-        
-        # Calculate average volume using Decimal arithmetic
-        avg_volume = sum(recent_volumes) / Decimal(str(len(recent_volumes)))
-        
-        # Determine trends using Decimal comparisons
-        price_trend = "up" if recent_closes[-1] > recent_closes[0] else "down"
-        volume_trend = "increasing" if recent_volumes[-1] > avg_volume else "decreasing"
-        
-        if price_trend == "up" and volume_trend == "increasing":
-            return "Strong bullish confirmation"
-        elif price_trend == "down" and volume_trend == "increasing":
-            return "Strong bearish confirmation"
-        elif price_trend == "up" and volume_trend == "decreasing":
-            return "Weak bullish signal"
-        elif price_trend == "down" and volume_trend == "decreasing":
-            return "Weak bearish signal"
-        else:
-            return "Mixed signals"
+        """Analyze volume-price relationship with Decimal precision and error handling."""
+        try:
+            if len(candles) < 3:
+                return "Insufficient data"
+            
+            # Use Decimal for financial precision instead of float
+            recent_volumes = []
+            recent_closes = []
+            
+            for c in candles[-3:]:
+                try:
+                    recent_volumes.append(Decimal(str(c[5])))
+                    recent_closes.append(Decimal(str(c[4])))
+                except Exception:
+                    continue  # Skip invalid candles
+            
+            if len(recent_volumes) < 3 or len(recent_closes) < 3:
+                return "Insufficient valid data"
+            
+            # Calculate average volume using Decimal arithmetic
+            if len(recent_volumes) == 0:
+                return "No volume data available"
+            
+            avg_volume = sum(recent_volumes) / Decimal(str(len(recent_volumes)))
+            
+            # Determine trends using Decimal comparisons
+            price_trend = "up" if recent_closes[-1] > recent_closes[0] else "down"
+            volume_trend = "increasing" if recent_volumes[-1] > avg_volume else "decreasing"
+            
+            if price_trend == "up" and volume_trend == "increasing":
+                return "Strong bullish confirmation"
+            elif price_trend == "down" and volume_trend == "increasing":
+                return "Strong bearish confirmation"
+            elif price_trend == "up" and volume_trend == "decreasing":
+                return "Weak bullish signal"
+            elif price_trend == "down" and volume_trend == "decreasing":
+                return "Weak bearish signal"
+            else:
+                return "Mixed signals"
+                
+        except Exception:
+            return "Volume analysis failed"
 
 
 # Factory function for easy instantiation
