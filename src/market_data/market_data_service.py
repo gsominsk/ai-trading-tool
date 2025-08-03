@@ -49,9 +49,78 @@ class MarketDataSet:
     resistance_level: Optional[Decimal] = None
     
     def __post_init__(self):
-        """Validate data after initialization."""
+        """Comprehensive validation of all MarketDataSet fields."""
         self._validate_symbol()
+        self._validate_timestamp()
+        self._validate_dataframes()
         self._validate_technical_indicators()
+        self._validate_decimal_fields()
+        self._validate_optional_fields()
+        self._validate_cross_field_consistency()
+    
+    def _validate_timestamp(self):
+        """Validate timestamp is reasonable."""
+        if not isinstance(self.timestamp, datetime):
+            raise ValueError("Timestamp must be a datetime object")
+        
+        # Check if timestamp is not too far in the past or future
+        now = datetime.utcnow()
+        max_past = timedelta(days=30)  # Allow up to 30 days old data
+        max_future = timedelta(hours=1)  # Allow up to 1 hour in future (timezone tolerance)
+        
+        if self.timestamp < now - max_past:
+            raise ValueError(f"Timestamp too old: {self.timestamp}. Must be within last 30 days")
+        if self.timestamp > now + max_future:
+            raise ValueError(f"Timestamp too far in future: {self.timestamp}")
+    
+    def _validate_dataframes(self):
+        """Validate all DataFrame structures and content."""
+        dataframes = [
+            ("daily_candles", self.daily_candles, 30),  # At least 30 days
+            ("h4_candles", self.h4_candles, 10),        # At least 10 4H candles
+            ("h1_candles", self.h1_candles, 10)         # At least 10 1H candles
+        ]
+        
+        required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        
+        for df_name, df, min_rows in dataframes:
+            # Check DataFrame type
+            if not isinstance(df, pd.DataFrame):
+                raise ValueError(f"{df_name} must be a pandas DataFrame")
+            
+            # Check for empty DataFrame
+            if len(df) == 0:
+                raise ValueError(f"{df_name} cannot be empty")
+            
+            # Check minimum row count for technical analysis
+            if len(df) < min_rows:
+                raise ValueError(f"{df_name} must have at least {min_rows} rows for analysis, got {len(df)}")
+            
+            # Check required columns
+            missing_cols = [col for col in required_columns if col not in df.columns]
+            if missing_cols:
+                raise ValueError(f"{df_name} missing required columns: {missing_cols}")
+            
+            # Check for numeric columns
+            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_cols:
+                if not pd.api.types.is_numeric_dtype(df[col]):
+                    raise ValueError(f"{df_name}.{col} must be numeric")
+            
+            # Check for NaN values in critical columns
+            for col in numeric_cols:
+                if df[col].isna().any():
+                    raise ValueError(f"{df_name}.{col} contains NaN values")
+            
+            # Check OHLC logic (high >= open/close, low <= open/close)
+            if (df['high'] < df[['open', 'close']].max(axis=1)).any():
+                raise ValueError(f"{df_name} has invalid OHLC data: high < max(open, close)")
+            if (df['low'] > df[['open', 'close']].min(axis=1)).any():
+                raise ValueError(f"{df_name} has invalid OHLC data: low > min(open, close)")
+            
+            # Check for non-negative volume
+            if (df['volume'] < 0).any():
+                raise ValueError(f"{df_name} has negative volume values")
     
     def _validate_symbol(self):
         """Validate symbol format."""
@@ -68,6 +137,86 @@ class MarketDataSet:
             raise ValueError(f"Invalid MACD signal: {self.macd_signal}")
         if self.ma_trend not in ["uptrend", "downtrend", "sideways"]:
             raise ValueError(f"Invalid MA trend: {self.ma_trend}")
+    
+    def _validate_decimal_fields(self):
+        """Validate Decimal fields for reasonable ranges."""
+        # RSI validation already done in _validate_technical_indicators
+        
+        # Validate MA values are positive and reasonable
+        if self.ma_20 is not None:
+            if not isinstance(self.ma_20, Decimal):
+                raise ValueError(f"ma_20 must be Decimal, got {type(self.ma_20)}")
+            if self.ma_20 <= Decimal('0'):
+                raise ValueError(f"ma_20 must be positive, got {self.ma_20}")
+            if self.ma_20 > Decimal('1000000'):  # Reasonable upper bound
+                raise ValueError(f"ma_20 too large: {self.ma_20}")
+        
+        if self.ma_50 is not None:
+            if not isinstance(self.ma_50, Decimal):
+                raise ValueError(f"ma_50 must be Decimal, got {type(self.ma_50)}")
+            if self.ma_50 <= Decimal('0'):
+                raise ValueError(f"ma_50 must be positive, got {self.ma_50}")
+            if self.ma_50 > Decimal('1000000'):  # Reasonable upper bound
+                raise ValueError(f"ma_50 too large: {self.ma_50}")
+    
+    def _validate_optional_fields(self):
+        """Validate optional fields when present."""
+        # BTC correlation validation
+        if self.btc_correlation is not None:
+            if not isinstance(self.btc_correlation, Decimal):
+                raise ValueError(f"btc_correlation must be Decimal, got {type(self.btc_correlation)}")
+            if not (Decimal('-1') <= self.btc_correlation <= Decimal('1')):
+                raise ValueError(f"btc_correlation must be between -1 and 1, got {self.btc_correlation}")
+        
+        # Fear & Greed Index validation
+        if self.fear_greed_index is not None:
+            if not isinstance(self.fear_greed_index, int):
+                raise ValueError(f"fear_greed_index must be int, got {type(self.fear_greed_index)}")
+            if not (0 <= self.fear_greed_index <= 100):
+                raise ValueError(f"fear_greed_index must be between 0 and 100, got {self.fear_greed_index}")
+        
+        # Volume profile validation
+        if self.volume_profile not in ["high", "low", "normal"]:
+            raise ValueError(f"Invalid volume_profile: {self.volume_profile}")
+        
+        # Support/Resistance levels validation
+        if self.support_level is not None:
+            if not isinstance(self.support_level, Decimal):
+                raise ValueError(f"support_level must be Decimal, got {type(self.support_level)}")
+            if self.support_level <= Decimal('0'):
+                raise ValueError(f"support_level must be positive, got {self.support_level}")
+        
+        if self.resistance_level is not None:
+            if not isinstance(self.resistance_level, Decimal):
+                raise ValueError(f"resistance_level must be Decimal, got {type(self.resistance_level)}")
+            if self.resistance_level <= Decimal('0'):
+                raise ValueError(f"resistance_level must be positive, got {self.resistance_level}")
+    
+    def _validate_cross_field_consistency(self):
+        """Validate logical consistency between related fields."""
+        # Support level should be lower than resistance level
+        if (self.support_level is not None and self.resistance_level is not None):
+            if self.support_level >= self.resistance_level:
+                raise ValueError(f"Support level ({self.support_level}) must be lower than resistance level ({self.resistance_level})")
+        
+        # MA20 and MA50 trend consistency check
+        if (self.ma_20 is not None and self.ma_50 is not None):
+            ma_ratio = self.ma_20 / self.ma_50
+            
+            # Check trend consistency
+            if self.ma_trend == "uptrend" and ma_ratio <= Decimal('1.01'):
+                raise ValueError(f"MA trend is uptrend but MA20 ({self.ma_20}) not significantly above MA50 ({self.ma_50})")
+            elif self.ma_trend == "downtrend" and ma_ratio >= Decimal('0.99'):
+                raise ValueError(f"MA trend is downtrend but MA20 ({self.ma_20}) not significantly below MA50 ({self.ma_50})")
+        
+        # Validate price ranges in DataFrames are reasonable compared to MA values
+        if len(self.h1_candles) > 0 and self.ma_20 is not None:
+            recent_price = Decimal(str(self.h1_candles.iloc[-1]['close']))
+            price_diff_ratio = abs(recent_price - self.ma_20) / self.ma_20
+            
+            # Price shouldn't be more than 50% away from MA20 (sanity check)
+            if price_diff_ratio > Decimal('0.5'):
+                raise ValueError(f"Recent price ({recent_price}) too far from MA20 ({self.ma_20}), ratio: {price_diff_ratio}")
     
     def to_llm_context(self, include_candlesticks: bool = False) -> str:
         """Convert to structured text format for LLM consumption.
