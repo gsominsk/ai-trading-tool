@@ -32,12 +32,14 @@
 ПРАВИЛО ЗАВЕРШЕНИЯ:
 ❌ ЗАПРЕЩЕНО: attempt_completion без обновления Memory Bank
 ❌ ЗАПРЕЩЕНО: Финализация задач без git commit Memory Bank изменений
+❌ ЗАПРЕЩЕНО: attempt_completion без проверки activationProtocol.md
 
 ✅ ОБЯЗАТЕЛЬНАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ:
 1. Завершить все технические задачи
-2. Обновить релевантные Memory Bank файлы
-3. Зафиксировать Memory Bank в git commit
-4. ТОЛЬКО ПОСЛЕ ЭТОГО attempt_completion
+2. Обновить релевантные Memory Bank файлы с timestamps
+3. Применить ACTIVATION PROTOCOL проверку
+4. Зафиксировать Memory Bank в git commit
+5. ТОЛЬКО ПОСЛЕ ЭТОГО attempt_completion
 ```
 
 ### 3. MEMORY BANK UPDATE TRIGGERS
@@ -156,17 +158,56 @@ def validate_task_completion():
 ```
 НОВОЕ ПРАВИЛО #1: MEMORY BANK MANDATORY CHECK
 В НАЧАЛЕ КАЖДОЙ СЕССИИ:
-1. ОБЯЗАТЕЛЬНО прочитать все 5 файлов Memory Bank
-2. Установить статус [MEMORY BANK: ACTIVE]  
-3. ТОЛЬКО ПОСЛЕ ЭТОГО отвечать на вопросы пользователя
+1. ОБЯЗАТЕЛЬНО прочитать все 6 файлов Memory Bank (включая activationProtocol.md)
+2. Установить статус [MEMORY BANK: ACTIVE]
+3. ПРИМЕНИТЬ ACTIVATION PROTOCOL из activationProtocol.md
+4. ТОЛЬКО ПОСЛЕ ЭТОГО отвечать на вопросы пользователя
 
 НОВОЕ ПРАВИЛО #2: COMPLETION BLOCKER
 ПЕРЕД attempt_completion:
 1. ОБЯЗАТЕЛЬНО обновить релевантные Memory Bank файлы
-2. ОБЯЗАТЕЛЬНО зафиксировать изменения в git
-3. ТОЛЬКО ПОСЛЕ ЭТОГО выполнять attempt_completion
+2. ПРИМЕНИТЬ completion verification из activationProtocol.md
+3. ОБЯЗАТЕЛЬНО зафиксировать изменения в git
+4. ТОЛЬКО ПОСЛЕ ЭТОГО выполнять attempt_completion
+
+НОВОЕ ПРАВИЛО #3: ACTIVATION PROTOCOL ENFORCEMENT
+КАЖДЫЙ ОТВЕТ ДОЛЖЕН:
+1. Начинаться с [MEMORY BANK: ACTIVE] + цитата + действие
+2. Использовать <thinking> блок для активации Memory Bank
+3. Проверять соответствие activeContext/workflowChecks перед tool use
+4. БЛОКИРОВАТЬ действия при нарушении протокола
 ```
 
 ---
 
-**РЕЗУЛЬТАТ**: Система автоматических проверок предотвратит нарушения workflow и обеспечит правильное использование Memory Bank во всех будущих сессиях.
+## ACTIVATION PROTOCOL INTEGRATION
+
+### Ссылка на activationProtocol.md:
+Детальные инструкции по активации Memory Bank содержатся в [`activationProtocol.md`](memory-bank/activationProtocol.md)
+
+### Обязательные компоненты активации:
+1. **<thinking> блок** после чтения Memory Bank с конкретными цитатами
+2. **Формат ответа**: [MEMORY BANK: ACTIVE] + цитата + действие
+3. **Проверка перед tool use**: activeContext + workflowChecks + decisionLog + progress
+4. **Completion verification**: все Memory Bank файлы обновлены + git committed
+
+### Критические блокировки из activationProtocol.md:
+- ❌ Session start без чтения ВСЕХ Memory Bank файлов
+- ❌ Tool use без activation thinking блока
+- ❌ attempt_completion без Memory Bank updates + git commit
+- ❌ Действия без проверки activeContext соответствия
+
+### Integration требования для Global Instructions:
+```markdown
+MEMORY BANK ACTIVATION PROTOCOL (обязательно добавить):
+
+1. Session MUST start with reading ALL Memory Bank files + <thinking> activation
+2. Response format: [MEMORY BANK: ACTIVE] + quote + action MANDATORY
+3. Tool use MUST be preceded by activeContext/workflowChecks verification
+4. attempt_completion BLOCKED without Memory Bank updates + git commit
+5. Workflow violations trigger immediate halt and correction
+```
+
+---
+
+**РЕЗУЛЬТАТ**: Система автоматических проверок дополнена детальным протоколом активации, который превращает Memory Bank из пассивного источника в активный руководящий механизм принятия решений.

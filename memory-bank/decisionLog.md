@@ -822,3 +822,69 @@ def get_market_data(self, symbol: str, requested_by: Optional[str] = None) -> Ma
 - **Memory Bank Sync**: Continuous documentation of progress and decisions
 
 **FINAL DECISION**: Proceed with systematic logging integration implementation following established architecture.
+
+
+[2025-01-03 22:23:00] - **КРИТИЧЕСКОЕ АРХИТЕКТУРНОЕ РЕШЕНИЕ: Memory Bank Activation Protocol**
+
+## Decision
+
+Создан комплексный протокол активации Memory Bank ([`activationProtocol.md`](memory-bank/activationProtocol.md)) для решения системной проблемы "читаю но не использую".
+
+## Rationale
+
+**ПРОБЛЕМА**: AI читает Memory Bank файлы, но не интегрирует прочитанную информацию в процесс принятия решений, что делает Memory Bank бесполезным.
+
+**ДИАГНОЗ**: Отсутствие принудительного механизма применения прочитанного. Пассивные правила в [`workflowChecks.md`](memory-bank/workflowChecks.md) игнорируются под давлением задач.
+
+**РЕШЕНИЕ**: Превратить Memory Bank из пассивного источника в активный руководящий механизм через:
+- Обязательные <thinking> блоки с конкретными цитатами
+- Принудительный формат ответов: [MEMORY BANK: ACTIVE] + цитата + действие
+- Блокирующие проверки перед каждым tool use
+- Критические блокировки attempt_completion без Memory Bank updates
+
+## Implementation Details
+
+**СОЗДАННЫЕ КОМПОНЕНТЫ**:
+
+### 1. [`activationProtocol.md`](memory-bank/activationProtocol.md) (213 строк):
+- Обязательный активационный процесс (3 этапа)
+- Шаблоны правильной активации с примерами
+- Критические блокировки workflow violations
+- Emergency override protocol для исключительных случаев
+- Self-diagnostic questions для самопроверки
+- Integration requirements для Global Instructions
+
+### 2. Обновленный [`workflowChecks.md`](memory-bank/workflowChecks.md):
+- Интеграция с activationProtocol.md
+- Усиленные pre-completion проверки
+- Конкретные требования для Global Instructions
+- Обязательность активационного протокола
+
+### 3. Архитектурные компоненты:
+- **Reading Activation**: <thinking> блок после чтения Memory Bank
+- **Response Activation**: формат каждого ответа с цитатами
+- **Tool Use Activation**: проверки перед каждым tool use
+- **Completion Activation**: верификация перед attempt_completion
+
+**ПРИНЦИП ДЕЙСТВИЯ**:
+1. **Принудительная интеграция**: Каждое действие должно ссылаться на Memory Bank
+2. **Блокирующие механизмы**: Нарушения останавливают workflow
+3. **Активное цитирование**: Конкретные ссылки на Memory Bank содержимое
+4. **Самопроверка**: Диагностические вопросы перед критическими действиями
+
+**ТРЕБОВАНИЯ К GLOBAL INSTRUCTIONS**:
+```markdown
+MEMORY BANK ACTIVATION PROTOCOL (ОБЯЗАТЕЛЬНО):
+
+1. Session MUST start with reading ALL Memory Bank files + <thinking> activation
+2. Response format: [MEMORY BANK: ACTIVE] + quote + action MANDATORY  
+3. Tool use MUST be preceded by activeContext/workflowChecks verification
+4. attempt_completion BLOCKED without Memory Bank updates + git commit
+5. Workflow violations trigger immediate halt and correction
+```
+
+**ЭФФЕКТ**: Memory Bank превращается из пассивного хранилища в активный руководящий механизм, который принудительно интегрируется в каждое решение.
+
+**КРИТИЧЕСКОЕ УСЛОВИЕ**: Протокол НЕ РАБОТАЕТ как документация. Он должен быть интегрирован в Global Instructions как обязательные и блокирующие правила.
+
+**NEXT STEPS**: Пользователь должен добавить ACTIVATION PROTOCOL requirements в Global Instructions для активации системы.
