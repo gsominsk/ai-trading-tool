@@ -37,10 +37,9 @@
 ```yaml
 memory_bank_strategy:
   if_memory_bank_exists: |
-        # ... ваш существующий код до шага 6 ...
-        6. Set status to [MEMORY BANK: ACTIVE] and inform user.
+        # Keep your existing steps 1-6 unchanged, then add:
         
-        # 🆕 НОВЫЕ ОБЯЗАТЕЛЬНЫЕ ШАГИ:
+        # 🆕 NEW MANDATORY STEPS:
         7. **MANDATORY**: Read activationProtocol.md and workflowChecks.md
         8. **MANDATORY**: Apply activation protocol with <thinking> integration:
            ```
