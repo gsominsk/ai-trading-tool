@@ -1,0 +1,164 @@
+# AI Trading System Configuration
+# Configuration for multi-LLM cryptocurrency trading system
+
+# === TRADING PARAMETERS ===
+trading:
+  # Base trading pair and supported symbols
+  base_pair: "USDT"
+  supported_symbols:
+    - "BTCUSDT"
+    - "ETHUSDT" 
+    - "ADAUSDT"
+    - "DOTUSDT"
+    - "LINKUSDT"
+  
+  # Risk management
+  max_position_size: 0.1  # 10% of portfolio per position
+  stop_loss_percentage: 0.05  # 5% stop loss
+  max_daily_trades: 10
+  min_trade_amount: 10.0  # Minimum $10 USDT per trade
+  
+  # Trading hours (UTC)
+  trading_hours:
+    start: "00:00"
+    end: "23:59"  # 24/7 crypto trading
+    
+# === LLM CONFIGURATION ===
+llm:
+  # Primary model for MVP
+  primary_model: "claude_sonnet_4"
+  
+  # Model configurations
+  models:
+    claude_sonnet_4:
+      provider: "github_copilot"
+      temperature: 0.1  # Conservative for financial decisions
+      max_tokens: 500
+      timeout: 30
+      
+    gpt_4_1:
+      provider: "github_copilot" 
+      temperature: 0.1
+      max_tokens: 500
+      timeout: 30
+      
+    gemini_2_5_pro:
+      provider: "github_copilot"
+      temperature: 0.1
+      max_tokens: 500
+      timeout: 30
+  
+  # Trading prompt templates
+  prompts:
+    trading_decision: |
+      Analyze the provided market data and make a trading decision.
+      
+      Rules:
+      - Only respond with valid JSON
+      - Use conservative risk management
+      - Consider multi-timeframe analysis
+      - Factor in technical indicators
+      
+      Required JSON format:
+      {
+        "action": "buy" | "sell" | "hold",
+        "confidence": 0.0-1.0,
+        "stop_loss": price_level,
+        "reasoning": "brief explanation max 50 words"
+      }
+
+# === MARKET DATA CONFIGURATION ===
+market_data:
+  # Binance API settings
+  binance:
+    base_url: "https://api.binance.com/api/v3"
+    timeout: 10
+    rate_limit_requests_per_minute: 1200
+    
+  # Data timeframes
+  timeframes:
+    level_1: 
+      interval: "1d"
+      periods: 180  # 6 months
+      
+    level_2:
+      interval: "4h"  
+      periods: 84   # 2 weeks
+      
+    level_3:
+      interval: "1h"
+      periods: 48   # 48 hours
+  
+  # Technical indicators
+  indicators:
+    rsi_period: 14
+    macd_fast: 12
+    macd_slow: 26
+    macd_signal: 9
+    ma_short: 20
+    ma_long: 50
+    
+  # Caching
+  cache:
+    enabled: true
+    directory: "data/cache"
+    ttl_minutes: 5  # Cache data for 5 minutes
+
+# === PORTFOLIO MANAGEMENT ===
+portfolio:
+  # Starting capital
+  initial_capital: 1000.0  # $1000 USDT
+  
+  # CSV logging (adapted from Trading_Script.py)
+  logging:
+    portfolio_file: "data/portfolio_update.csv"
+    trade_log_file: "data/trade_log.csv"
+    
+  # Performance tracking
+  benchmark: "BTCUSDT"  # Compare performance against BTC
+  risk_free_rate: 0.045  # 4.5% annual for Sharpe ratio
+  
+  # Position sizing
+  position_sizing:
+    method: "fixed_percentage"  # or "volatility_adjusted"
+    percentage: 0.1  # 10% per position
+
+# === ORDER EXECUTION ===
+execution:
+  # Binance API credentials (set via environment variables)
+  # BINANCE_API_KEY and BINANCE_SECRET_KEY
+  
+  # Order types
+  default_order_type: "MARKET"
+  stop_loss_order_type: "STOP_MARKET"
+  
+  # Execution settings
+  slippage_tolerance: 0.001  # 0.1%
+  order_timeout: 30  # seconds
+  
+  # Paper trading mode for testing
+  paper_trading: true  # Set to false for live trading
+  
+# === LOGGING & MONITORING ===
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/trading_system.log"
+  max_file_size: "10MB"
+  backup_count: 5
+  
+  # Log formats
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+# === SYSTEM SETTINGS ===
+system:
+  # Main loop interval
+  loop_interval_seconds: 3600  # Check every hour
+  
+  # Emergency stops
+  max_daily_loss_percentage: 0.05  # Stop if 5% daily loss
+  max_drawdown_percentage: 0.20   # Stop if 20% drawdown
+  
+  # Restart and recovery
+  auto_restart: true
+  max_consecutive_errors: 5

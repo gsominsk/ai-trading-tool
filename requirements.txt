@@ -1,0 +1,35 @@
+# AI Trading System Dependencies
+# Minimal dependencies approach following project requirements
+
+# === CORE DEPENDENCIES ===
+# Standard industry libraries for HTTP requests and WebSocket connections
+requests>=2.31.0
+websockets>=11.0.2
+
+# Data processing and analysis
+pandas>=2.0.3
+numpy>=1.24.3
+
+# Configuration management
+PyYAML>=6.0.1
+
+# === PYTHON STANDARD LIBRARY USAGE ===
+# The following are used from Python stdlib (no additional installation needed):
+# - hmac (HMAC signing for Binance API)
+# - hashlib (Cryptographic hashing)
+# - json (JSON processing)
+# - time (Time operations)
+# - asyncio (Async programming)
+# - datetime (Date/time handling)
+# - logging (Application logging)
+# - os (Operating system interface)
+# - pathlib (File path operations)
+# - typing (Type hints)
+# - dataclasses (Data classes)
+
+# === DEVELOPMENT DEPENDENCIES (Optional) ===
+# Uncomment for development/testing
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.1
+# black>=23.7.0
+# flake8>=6.0.0
