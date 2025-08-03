@@ -1037,3 +1037,49 @@ VIOLATION PREVENTION:
 ```
 
 **РЕЗУЛЬТАТ**: Полностью автоматизированная система workflow enforcement предотвращает все возможные нарушения Memory Bank First Pattern и обеспечивает строгое соблюдение установленных процедур.
+
+
+[2025-08-03 23:24:00] - **RooCode Memory Bank Enforcement Pattern**
+
+## Architectural Patterns
+
+### **External Enforcement Pattern**
+- **Problem**: AI cannot reliably self-block or self-enforce workflows
+- **Solution**: Use external system controls (fileRegex, XML rules) instead of AI discipline
+- **Implementation**: RooCode native capabilities provide real enforcement mechanisms
+- **Benefit**: Guaranteed workflow compliance independent of AI behavior
+
+### **Mode Specialization Pattern**
+- **Architect Mode**: Creator and initializer of Memory Bank systems
+- **Ask Mode**: Read-only analysis, no Memory Bank updates, delegates modifications
+- **Code/Debug Modes**: Implementation with update capabilities, defer creation to Architect
+- **Orchestrator Mode**: Project coordination with limited Memory Bank scope
+- **Pattern**: Clear hierarchy and responsibility separation
+
+### **Layered Enforcement Pattern**
+1. **File Access Layer**: fileRegex restrictions in .roomodes prevent unauthorized file access
+2. **Workflow Layer**: XML rules in .roo/rules/ enforce session initialization and completion requirements  
+3. **Mode Layer**: customInstructions provide mode-specific Memory Bank strategies
+4. **Override Layer**: UMB command and emergency override mechanisms for critical situations
+
+## Coding Patterns
+
+### **Configuration as Code Pattern**
+- `.roomodes`: YAML-based mode definitions with embedded workflow logic
+- `.roo/rules/*.xml`: Declarative enforcement rules with blocking capabilities
+- `memory-bank/*.md`: Structured project knowledge with timestamp trails
+- **Benefit**: Versionable, reviewable, and maintainable workflow definitions
+
+### **Delegation Pattern**
+- Modes that cannot perform operations delegate to appropriate modes
+- Ask mode → "Switch to Flow-Architect mode to create Memory Bank"
+- Code mode → "Switch to Flow-Architect mode to initialize"
+- **Benefit**: Clear responsibility boundaries and user guidance
+
+## Testing Patterns
+
+### **Enforcement Validation Pattern**
+- Test fileRegex restrictions by attempting to access prohibited files
+- Verify XML rules block operations until requirements met
+- Validate mode-specific behavior differences
+- Document expected vs actual behavior for regression testing
