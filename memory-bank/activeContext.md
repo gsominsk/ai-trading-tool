@@ -682,3 +682,7 @@ MEMORY BANK ACTIVATION PROTOCOL (добавить в Global Instructions):
 - Тестирование эффективности нового протокола
 
 **ТЕКУЩИЙ СТАТУС**: Memory Bank workflow problem РЕШЕНА на архитектурном уровне, готова к практическому внедрению.
+
+
+[2025-08-03 22:27:24] - README.md создан с готовыми Global Instructions
+Создан comprehensive README.md файл с полным набором Global Instructions для активации Memory Bank протокола. Файл содержит готовые к копированию правила активации, verification checks, и emergency override процедуры.

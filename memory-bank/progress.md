@@ -649,3 +649,7 @@ AUTOMATION SCOPE:
 **GIT COMMITS COMPLETED**:
 - Volume profile comprehensive testing committed (f4a45b2)
 - All test files properly versioned and documented
+
+
+[2025-08-03 22:28:03] - Memory Bank активационная система завершена
+Создан README.md с полным набором Global Instructions. Пользователь может скопировать правила активации для обеспечения работы Memory Bank в будущих сессиях. Система готова к практическому внедрению.
