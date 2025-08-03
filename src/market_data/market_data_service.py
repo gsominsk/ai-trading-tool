@@ -44,6 +44,10 @@ class MarketDataSet:
     fear_greed_index: Optional[int] = None
     volume_profile: str = "normal"  # "high", "low", "normal"
     
+    # Enhanced analysis data (no state pollution)
+    support_level: Optional[Decimal] = None
+    resistance_level: Optional[Decimal] = None
+    
     def __post_init__(self):
         """Validate data after initialization."""
         self._validate_symbol()
@@ -175,10 +179,9 @@ class MarketDataService:
             h4_data = self._get_klines(symbol, "4h", 84)      # 2 weeks
             h1_data = self._get_klines(symbol, "1h", 48)      # 48 hours
             
-            # Store daily candles for enhanced analysis
-            self._daily_candles = daily_data.values.tolist()
-            self.support_level = daily_data['low'].tail(30).min()
-            self.resistance_level = daily_data['high'].tail(30).max()
+            # Calculate support/resistance levels (no state pollution)
+            support_level = Decimal(str(daily_data['low'].tail(30).min()))
+            resistance_level = Decimal(str(daily_data['high'].tail(30).max()))
             
             # Calculate technical indicators
             rsi = self._calculate_rsi(h1_data, 14)
@@ -203,7 +206,9 @@ class MarketDataService:
                 ma_50=ma_50,
                 ma_trend=ma_trend,
                 btc_correlation=btc_correlation,
-                volume_profile=volume_profile
+                volume_profile=volume_profile,
+                support_level=support_level,
+                resistance_level=resistance_level
             )
             
         except Exception as e:
@@ -224,8 +229,8 @@ class MarketDataService:
         """Get enhanced market context with candlestick analysis."""
         market_data = self.get_market_data(symbol)
         
-        # Generate candlestick analysis
-        key_candles = self._select_key_candles()
+        # Generate candlestick analysis using market_data (no state pollution)
+        key_candles = self._select_key_candles(market_data.daily_candles.values.tolist())
         patterns = self._identify_patterns(key_candles)
         
         basic_context = market_data.to_llm_context_basic()
@@ -242,7 +247,7 @@ class MarketDataService:
             analysis += f"Patterns: {', '.join(patterns)}\n"
         
         # Critical levels interaction
-        sr_tests = self._analyze_sr_tests(key_candles)
+        sr_tests = self._analyze_sr_tests(key_candles, market_data.support_level, market_data.resistance_level)
         if sr_tests:
             analysis += f"S/R Tests: {sr_tests}\n"
         
@@ -251,7 +256,7 @@ class MarketDataService:
         analysis += f"Volume Analysis: {volume_analysis}\n"
         
         # Key candlestick summary
-        analysis += f"Key Candles Analyzed: {len(key_candles)} of {len(self._daily_candles)} total"
+        analysis += f"Key Candles Analyzed: {len(key_candles)} of {len(market_data.daily_candles)} total"
         
         return f"{basic_context}{analysis}"
     
@@ -391,12 +396,12 @@ class MarketDataService:
         else:
             return "normal"
     
-    def _select_key_candles(self) -> list:
+    def _select_key_candles(self, daily_candles: list) -> list:
         """Select key candlesticks using 7-algorithm approach."""
-        if not hasattr(self, '_daily_candles') or len(self._daily_candles) < 10:
+        if not daily_candles or len(daily_candles) < 10:
             return []
         
-        candles = self._daily_candles.copy()
+        candles = daily_candles.copy()
         key_candles = []
         
         # 1. Recent 5 candles (most important for current context)
@@ -432,9 +437,9 @@ class MarketDataService:
         pattern_candles = self._find_pattern_candles(candles[-15:])
         key_candles.extend(pattern_candles)
         
-        # 6. Support/Resistance test candles
-        sr_test_candles = self._find_sr_test_candles(candles[-20:])
-        key_candles.extend(sr_test_candles)
+        # 6. Support/Resistance test candles (skipped - requires support/resistance levels)
+        # sr_test_candles = self._find_sr_test_candles(candles[-20:], support_level, resistance_level)
+        # key_candles.extend(sr_test_candles)
         
         # 7. Remove duplicates and sort by timestamp
         unique_candles = []
@@ -477,15 +482,13 @@ class MarketDataService:
         
         return pattern_candles
     
-    def _find_sr_test_candles(self, candles: list) -> list:
+    def _find_sr_test_candles(self, candles: list, support_level: Decimal, resistance_level: Decimal) -> list:
         """Find candles that test support/resistance levels with Decimal precision."""
         sr_test_candles = []
         
         for candle in candles:
             high_price = Decimal(str(candle[2]))
             low_price = Decimal(str(candle[3]))
-            resistance_level = Decimal(str(self.resistance_level))
-            support_level = Decimal(str(self.support_level))
             
             # Test resistance level (within 1%)
             if abs(high_price - resistance_level) / resistance_level < Decimal('0.01'):
@@ -548,7 +551,7 @@ class MarketDataService:
         else:
             return "Sideways"
     
-    def _analyze_sr_tests(self, candles: list) -> str:
+    def _analyze_sr_tests(self, candles: list, support_level: Decimal, resistance_level: Decimal) -> str:
         """Analyze support/resistance tests."""
         resistance_tests = 0
         support_tests = 0
@@ -557,9 +560,9 @@ class MarketDataService:
             high_price = float(candle[2])
             low_price = float(candle[3])
             
-            if abs(high_price - self.resistance_level) / self.resistance_level < 0.01:
+            if abs(high_price - float(resistance_level)) / float(resistance_level) < 0.01:
                 resistance_tests += 1
-            if abs(low_price - self.support_level) / self.support_level < 0.01:
+            if abs(low_price - float(support_level)) / float(support_level) < 0.01:
                 support_tests += 1
         
         if resistance_tests > 0 and support_tests > 0:
