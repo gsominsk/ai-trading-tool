@@ -15,6 +15,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, NamedTuple
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_UP
 import time
 import json
 import os
@@ -31,17 +32,38 @@ class MarketDataSet:
     h4_candles: pd.DataFrame         # 2 weeks 4H (Level 2)
     h1_candles: pd.DataFrame         # 48 hours 1H (Level 3)
     
-    # Technical indicators
-    rsi_14: float
+    # Technical indicators (using Decimal for financial precision)
+    rsi_14: Decimal
     macd_signal: str  # "bullish", "bearish", "neutral"
-    ma_20: float
-    ma_50: float
+    ma_20: Decimal
+    ma_50: Decimal
     ma_trend: str     # "uptrend", "downtrend", "sideways"
     
     # Market context
-    btc_correlation: Optional[float] = None
+    btc_correlation: Optional[Decimal] = None
     fear_greed_index: Optional[int] = None
     volume_profile: str = "normal"  # "high", "low", "normal"
+    
+    def __post_init__(self):
+        """Validate data after initialization."""
+        self._validate_symbol()
+        self._validate_technical_indicators()
+    
+    def _validate_symbol(self):
+        """Validate symbol format."""
+        if not self.symbol or not isinstance(self.symbol, str):
+            raise ValueError("Symbol must be a non-empty string")
+        if not self.symbol.endswith("USDT") or len(self.symbol) < 6:
+            raise ValueError(f"Invalid symbol format: {self.symbol}. Expected XXXUSDT")
+    
+    def _validate_technical_indicators(self):
+        """Validate technical indicator values."""
+        if not (Decimal('0') <= self.rsi_14 <= Decimal('100')):
+            raise ValueError(f"RSI must be between 0 and 100, got: {self.rsi_14}")
+        if self.macd_signal not in ["bullish", "bearish", "neutral"]:
+            raise ValueError(f"Invalid MACD signal: {self.macd_signal}")
+        if self.ma_trend not in ["uptrend", "downtrend", "sideways"]:
+            raise ValueError(f"Invalid MA trend: {self.ma_trend}")
     
     def to_llm_context(self, include_candlesticks: bool = False) -> str:
         """Convert to structured text format for LLM consumption.
@@ -57,11 +79,11 @@ class MarketDataSet:
     def to_llm_context_basic(self) -> str:
         """Convert to structured text format for LLM consumption."""
         try:
-            current_price = float(self.h1_candles.iloc[-1]['close'])
+            current_price = Decimal(str(self.h1_candles.iloc[-1]['close']))
             change_24h = self._calculate_24h_change()
-            volume_24h = float(self.h1_candles['volume'].tail(24).sum())
+            volume_24h = Decimal(str(self.h1_candles['volume'].tail(24).sum()))
             
-            # Safe format values
+            # Safe format values with Decimal precision
             ma_20_str = f"${self.ma_20:.2f}" if self.ma_20 is not None else "N/A"
             ma_50_str = f"${self.ma_50:.2f}" if self.ma_50 is not None else "N/A"
             btc_corr_str = f"{self.btc_correlation:.3f}" if self.btc_correlation is not None else "N/A"
@@ -71,7 +93,7 @@ MARKET DATA ANALYSIS FOR {self.symbol}
 Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 === TECHNICAL INDICATORS ===
-RSI(14): {self.rsi_14:.2f} - {'Oversold' if self.rsi_14 < 30 else 'Overbought' if self.rsi_14 > 70 else 'Neutral'}
+RSI(14): {self.rsi_14:.2f} - {'Oversold' if self.rsi_14 < Decimal('30') else 'Overbought' if self.rsi_14 > Decimal('70') else 'Neutral'}
 MACD: {self.macd_signal.upper()}
 MA(20): {ma_20_str}
 MA(50): {ma_50_str}
@@ -112,14 +134,14 @@ Current Price: ${current_price:.2f}
         else:
             return f"SIDEWAYS ({change_pct:.1f}%)"
     
-    def _calculate_24h_change(self) -> float:
+    def _calculate_24h_change(self) -> Decimal:
         """Calculate 24-hour price change percentage."""
         if len(self.h1_candles) < 24:
-            return 0.0
+            return Decimal('0.0')
         
-        price_24h_ago = self.h1_candles.iloc[-24]['close']
-        current_price = self.h1_candles.iloc[-1]['close']
-        return ((current_price - price_24h_ago) / price_24h_ago) * 100
+        price_24h_ago = Decimal(str(self.h1_candles.iloc[-24]['close']))
+        current_price = Decimal(str(self.h1_candles.iloc[-1]['close']))
+        return ((current_price - price_24h_ago) / price_24h_ago) * Decimal('100')
 
 
 class MarketDataService:
@@ -144,6 +166,9 @@ class MarketDataService:
         Returns:
             MarketDataSet with all timeframes and indicators
         """
+        # Validate input parameters
+        self._validate_symbol_input(symbol)
+        
         try:
             # Fetch multi-timeframe data
             daily_data = self._get_klines(symbol, "1d", 180)  # 6 months
@@ -183,6 +208,17 @@ class MarketDataService:
             
         except Exception as e:
             raise Exception(f"Failed to get market data for {symbol}: {str(e)}")
+    
+    def _validate_symbol_input(self, symbol: str):
+        """Validate symbol input before processing."""
+        if not symbol or not isinstance(symbol, str):
+            raise ValueError("Symbol must be a non-empty string")
+        if not symbol.endswith("USDT") or len(symbol) < 6:
+            raise ValueError(f"Invalid symbol format: {symbol}. Expected XXXUSDT format")
+        if len(symbol) > 12:  # Reasonable length limit
+            raise ValueError(f"Symbol too long: {symbol}")
+        if not symbol.replace("USDT", "").isalpha():
+            raise ValueError(f"Invalid characters in symbol: {symbol}")
     
     def get_enhanced_context(self, symbol: str) -> str:
         """Get enhanced market context with candlestick analysis."""
@@ -249,10 +285,10 @@ class MarketDataService:
         
         return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
     
-    def _calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> float:
-        """Calculate RSI indicator."""
+    def _calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> Decimal:
+        """Calculate RSI indicator with Decimal precision."""
         if len(df) < period + 1:
-            return 50.0  # Default neutral RSI
+            return Decimal('50.0')  # Default neutral RSI
         
         closes = df['close']
         delta = closes.diff()
@@ -263,7 +299,9 @@ class MarketDataService:
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
         
-        return float(rsi.iloc[-1])
+        # Convert to Decimal with proper precision
+        rsi_value = float(rsi.iloc[-1])
+        return Decimal(str(rsi_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
     def _calculate_macd_signal(self, df: pd.DataFrame) -> str:
         """Calculate MACD signal (bullish/bearish/neutral)."""
@@ -286,31 +324,39 @@ class MarketDataService:
         else:
             return "neutral"
     
-    def _calculate_ma(self, df: pd.DataFrame, period: int) -> float:
-        """Calculate moving average."""
+    def _calculate_ma(self, df: pd.DataFrame, period: int) -> Decimal:
+        """Calculate moving average with Decimal precision."""
         if len(df) < period:
-            return float(df['close'].mean())
+            avg_value = float(df['close'].mean())
+            return Decimal(str(avg_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         
         ma_value = df['close'].rolling(window=period).mean().iloc[-1]
-        return float(ma_value) if pd.notna(ma_value) else float(df['close'].mean())
+        if pd.notna(ma_value):
+            return Decimal(str(float(ma_value))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            avg_value = float(df['close'].mean())
+            return Decimal(str(avg_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
-    def _determine_ma_trend(self, ma_20: float, ma_50: float) -> str:
+    def _determine_ma_trend(self, ma_20: Decimal, ma_50: Decimal) -> str:
         """Determine trend based on moving averages."""
         if ma_20 is None or ma_50 is None:
             return "sideways"
         
-        if ma_20 > ma_50 * 1.02:  # 2% threshold
+        threshold_up = ma_50 * Decimal('1.02')  # 2% threshold
+        threshold_down = ma_50 * Decimal('0.98')
+        
+        if ma_20 > threshold_up:
             return "uptrend"
-        elif ma_20 < ma_50 * 0.98:
+        elif ma_20 < threshold_down:
             return "downtrend"
         else:
             return "sideways"
     
-    def _calculate_btc_correlation(self, symbol: str, df: pd.DataFrame) -> Optional[float]:
+    def _calculate_btc_correlation(self, symbol: str, df: pd.DataFrame) -> Optional[Decimal]:
         """Calculate correlation with BTC (placeholder - would need BTC data)."""
         # For MVP, return a mock correlation
         # In production, would fetch BTC data and calculate actual correlation
-        return 0.75  # Mock positive correlation
+        return Decimal('0.75')  # Mock positive correlation
     
     def _analyze_volume_profile(self, df: pd.DataFrame) -> str:
         """Analyze volume profile (high/normal/low)."""
@@ -359,10 +405,10 @@ class MarketDataService:
         # 4. Big moves (>3% daily change)
         big_move_candles = []
         for candle in candles[-20:]:  # Last 20 days
-            open_price = float(candle[1])
-            close_price = float(candle[4])
-            change_pct = abs((close_price - open_price) / open_price * 100)
-            if change_pct > 3.0:
+            open_price = Decimal(str(candle[1]))
+            close_price = Decimal(str(candle[4]))
+            change_pct = abs((close_price - open_price) / open_price * Decimal('100'))
+            if change_pct > Decimal('3.0'):
                 big_move_candles.append(candle)
         key_candles.extend(big_move_candles[-3:])  # Last 3 big moves
         
@@ -388,14 +434,14 @@ class MarketDataService:
         return unique_candles[-15:]  # Keep last 15 key candles
     
     def _find_pattern_candles(self, candles: list) -> list:
-        """Identify candlestick patterns."""
+        """Identify candlestick patterns with Decimal precision."""
         pattern_candles = []
         
         for candle in candles:
-            open_price = float(candle[1])
-            high_price = float(candle[2])
-            low_price = float(candle[3])
-            close_price = float(candle[4])
+            open_price = Decimal(str(candle[1]))
+            high_price = Decimal(str(candle[2]))
+            low_price = Decimal(str(candle[3]))
+            close_price = Decimal(str(candle[4]))
             
             body = abs(close_price - open_price)
             upper_shadow = high_price - max(open_price, close_price)
@@ -403,32 +449,34 @@ class MarketDataService:
             total_range = high_price - low_price
             
             # Doji pattern (small body)
-            if total_range > 0 and body / total_range < 0.1:
+            if total_range > 0 and body / total_range < Decimal('0.1'):
                 pattern_candles.append(candle)
             
             # Hammer/Shooting star (long shadow)
             elif total_range > 0:
-                if lower_shadow / total_range > 0.6:  # Hammer
+                if lower_shadow / total_range > Decimal('0.6'):  # Hammer
                     pattern_candles.append(candle)
-                elif upper_shadow / total_range > 0.6:  # Shooting star
+                elif upper_shadow / total_range > Decimal('0.6'):  # Shooting star
                     pattern_candles.append(candle)
         
         return pattern_candles
     
     def _find_sr_test_candles(self, candles: list) -> list:
-        """Find candles that test support/resistance levels."""
+        """Find candles that test support/resistance levels with Decimal precision."""
         sr_test_candles = []
         
         for candle in candles:
-            high_price = float(candle[2])
-            low_price = float(candle[3])
+            high_price = Decimal(str(candle[2]))
+            low_price = Decimal(str(candle[3]))
+            resistance_level = Decimal(str(self.resistance_level))
+            support_level = Decimal(str(self.support_level))
             
-            # Test resistance level
-            if abs(high_price - self.resistance_level) / self.resistance_level < 0.01:
+            # Test resistance level (within 1%)
+            if abs(high_price - resistance_level) / resistance_level < Decimal('0.01'):
                 sr_test_candles.append(candle)
             
-            # Test support level
-            elif abs(low_price - self.support_level) / self.support_level < 0.01:
+            # Test support level (within 1%)
+            elif abs(low_price - support_level) / support_level < Decimal('0.01'):
                 sr_test_candles.append(candle)
         
         return sr_test_candles

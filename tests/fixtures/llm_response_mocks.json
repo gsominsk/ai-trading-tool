@@ -1,0 +1,135 @@
+{
+  "claude_responses": {
+    "bullish_signal": {
+      "action": "BUY",
+      "confidence": 0.85,
+      "reasoning": "Strong bullish momentum with RSI indicating oversold conditions. Technical indicators show convergence with price breaking above 20-day MA. Volume confirmation supports upward movement.",
+      "risk_level": "MEDIUM",
+      "target_price": "52000.00000000",
+      "stop_loss": "47000.00000000",
+      "timestamp": "2024-01-01T12:00:00Z"
+    },
+    "bearish_signal": {
+      "action": "SELL",
+      "confidence": 0.75,
+      "reasoning": "Bearish divergence detected on MACD. Price forming lower highs while RSI shows weakness. Volume declining on recent rallies indicates lack of buying interest.",
+      "risk_level": "HIGH",
+      "target_price": "46000.00000000",
+      "stop_loss": "51500.00000000",
+      "timestamp": "2024-01-01T12:00:00Z"
+    },
+    "hold_signal": {
+      "action": "HOLD",
+      "confidence": 0.60,
+      "reasoning": "Mixed signals in current market conditions. RSI neutral around 50, MACD showing indecision. Waiting for clearer directional bias before taking position.",
+      "risk_level": "LOW",
+      "target_price": null,
+      "stop_loss": null,
+      "timestamp": "2024-01-01T12:00:00Z"
+    }
+  },
+  "gemini_responses": {
+    "bullish_signal": {
+      "action": "BUY",
+      "confidence": 0.78,
+      "reasoning": "Uptrend continuation pattern identified. Price action shows strong support at key levels with increased buying volume. Momentum indicators align bullishly.",
+      "risk_level": "MEDIUM",
+      "target_price": "51800.00000000",
+      "stop_loss": "47500.00000000",
+      "timestamp": "2024-01-01T12:00:00Z"
+    },
+    "conservative_hold": {
+      "action": "HOLD",
+      "confidence": 0.65,
+      "reasoning": "Current market structure suggests consolidation phase. Risk-reward ratio not favorable for new positions. Monitoring for breakout confirmation.",
+      "risk_level": "LOW",
+      "target_price": null,
+      "stop_loss": null,
+      "timestamp": "2024-01-01T12:00:00Z"
+    }
+  },
+  "gpt_responses": {
+    "aggressive_buy": {
+      "action": "BUY",
+      "confidence": 0.90,
+      "reasoning": "Strong breakout above resistance with exceptional volume. Multiple timeframe analysis confirms bullish trend acceleration. High probability setup.",
+      "risk_level": "HIGH",
+      "target_price": "53500.00000000",
+      "stop_loss": "48000.00000000",
+      "timestamp": "2024-01-01T12:00:00Z"
+    },
+    "risk_averse_sell": {
+      "action": "SELL",
+      "confidence": 0.70,
+      "reasoning": "Risk management suggests profit-taking at current levels. Market showing signs of exhaustion with potential reversal patterns forming.",
+      "risk_level": "MEDIUM",
+      "target_price": "47000.00000000",
+      "stop_loss": "50500.00000000",
+      "timestamp": "2024-01-01T12:00:00Z"
+    }
+  },
+  "error_responses": {
+    "invalid_format": {
+      "error": "Invalid response format",
+      "message": "LLM response missing required fields"
+    },
+    "api_timeout": {
+      "error": "Timeout",
+      "message": "LLM API request timed out after 30 seconds"
+    },
+    "rate_limit": {
+      "error": "Rate limit exceeded",
+      "message": "Too many requests to LLM API"
+    }
+  },
+  "ensemble_scenarios": {
+    "unanimous_buy": {
+      "claude": {
+        "action": "BUY",
+        "confidence": 0.85
+      },
+      "gemini": {
+        "action": "BUY", 
+        "confidence": 0.80
+      },
+      "gpt": {
+        "action": "BUY",
+        "confidence": 0.88
+      },
+      "consensus": "BUY",
+      "avg_confidence": 0.84
+    },
+    "mixed_signals": {
+      "claude": {
+        "action": "BUY",
+        "confidence": 0.75
+      },
+      "gemini": {
+        "action": "HOLD",
+        "confidence": 0.60
+      },
+      "gpt": {
+        "action": "SELL",
+        "confidence": 0.70
+      },
+      "consensus": "HOLD",
+      "avg_confidence": 0.68
+    },
+    "high_disagreement": {
+      "claude": {
+        "action": "BUY",
+        "confidence": 0.90
+      },
+      "gemini": {
+        "action": "SELL",
+        "confidence": 0.85
+      },
+      "gpt": {
+        "action": "HOLD",
+        "confidence": 0.50
+      },
+      "consensus": "HOLD",
+      "confidence_spread": 0.40
+    }
+  }
+}

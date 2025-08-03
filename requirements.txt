@@ -29,7 +29,13 @@ PyYAML>=6.0.1
 
 # === DEVELOPMENT DEPENDENCIES (Optional) ===
 # Uncomment for development/testing
-# pytest>=7.4.0
-# pytest-asyncio>=0.21.1
-# black>=23.7.0
-# flake8>=6.0.0
+pytest>=7.4.0
+pytest-asyncio>=0.21.1
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+pytest-timeout>=2.1.0
+pytest-xdist>=3.3.1
+black>=23.7.0
+flake8>=6.0.0
+mypy>=1.5.0
+pre-commit>=3.3.3

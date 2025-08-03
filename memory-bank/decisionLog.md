@@ -316,3 +316,70 @@ MVP scope: 5-10 топовых криптопар, часовой таймфре
 
 **Live Testing Results:**
 BTC $112,713: "Downward bias", patterns [Shooting Star, Hammer, Strong Bear, Doji], R:1/S:1 tests, "Weak bearish signal"
+
+
+[2025-08-03 04:26:00] - Comprehensive Testing Strategy Architecture Decision
+
+## Decision
+
+Определена comprehensive testing strategy для AI Trading System с учетом модульной LLM-архитектуры и финансовой критичности системы.
+
+## Rationale
+
+- **Financial Safety**: Торговая система работает с реальными деньгами - 100% покрытие money-related операций
+- **LLM Unpredictability**: AI модели требуют специфического подхода к тестированию (mock responses, validation)
+- **Modular Architecture**: Наша система позволяет тестировать каждый LLM Provider изолированно
+- **Multi-Configuration Support**: Нужно тестировать все 5 режимов работы (single, duplicate, specialized, ensemble, sequential)
+
+## Implementation Details
+
+**Testing Structure (70/20/10 distribution):**
+```
+tests/
+├── unit/ (70% покрытия)
+│   ├── test_data_preparer.py
+│   ├── test_portfolio_manager.py  
+│   ├── test_risk_manager.py
+│   └── test_order_executor.py
+├── integration/ (20% покрытия)
+│   ├── test_llm_providers.py
+│   ├── test_binance_api.py
+│   └── test_trading_workflow.py
+├── backtesting/ (10% покрытия)
+│   ├── test_historical_performance.py
+│   └── test_strategy_comparison.py
+└── fixtures/
+    ├── market_data_samples.json
+    └── llm_response_mocks.json
+```
+
+**Key Testing Principles:**
+- Financial precision testing (decimal arithmetic, crypto amounts)
+- LLM response validation (JSON structure, trading signals)
+- Multi-LLM comparison testing (Claude vs Gemini vs GPT performance)
+- Configuration-driven testing (все режимы работы)
+- Memory Bank integration (automated updates при изменениях)
+
+**Unique Features for AI Trading:**
+- A/B testing framework для сравнения LLM моделей
+- Fallback testing (недоступность LLM)
+- Consistency validation (одинаковые данные → похожие сигналы)
+- Risk management edge cases (stop-loss precision)
+
+
+[2025-01-03 12:53:00] - КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: MarketDataService Testing Strategy
+ПРОБЛЕМА: Обнаружено, что тесты проходили, но НЕ тестировали реальный код
+- Импорт сервиса был закомментирован в тестах
+- Тесты проверяли только моки и sample data
+- Float использовался вместо Decimal для финансовых операций
+- Отсутствовала валидация входных данных
+
+РЕШЕНИЕ: Полное переписывание тестов + исправление сервиса
+- Включен реальный импорт MarketDataService
+- Все float заменены на Decimal для финансовой точности
+- Добавлена comprehensive валидация на всех уровнях
+- Создано 4 новых реальных теста для проверки функциональности
+- Результат: 14/14 тестов проходят с реальной проверкой кода
+
+УРОК: "Зеленые тесты ≠ Рабочий код" - критически важно для финансовых систем
+ПРИОРИТЕТ: Высший - безопасность финансовых операций
