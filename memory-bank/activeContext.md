@@ -495,3 +495,67 @@ All 22 critical tasks have been successfully completed, transforming the MarketD
 - System готова к тестированию в будущих сессиях
 - Monitoring эффективности новых workflow rules
 - Continuous improvement на основе фактического использования
+
+
+[2025-08-03 17:51:00] - LOGGING ARCHITECTURE DISCUSSION AND WORKFLOW CLARIFICATION
+
+## Current Focus: Comprehensive Logging System Design
+
+### Completed Work:
+1. **Created [`logging_architecture_example.md`](logging_architecture_example.md)**:
+   - Comprehensive 608-line logging architecture example
+   - Structured JSON format with trace_id, context, and performance metrics
+   - 6 log levels (CRITICAL, ERROR, WARNING, INFO, DEBUG, TRACE)
+   - Complete data flow tracing from Binance API to LLM decisions
+   - Financial calculation logging with Decimal precision
+   - Network resilience and error handling scenarios
+   - Integration ready for Prometheus/Grafana monitoring
+
+2. **Architecture Flow Clarification**:
+   - Corrected understanding of data flow: SCHEDULER → MarketDataService → LLM Provider → OrderExecutor
+   - LLM models do NOT request data - Trading Script requests data FOR transmission to LLM
+   - `"requested_by": "ClaudeProvider"` means data requested FOR Claude, not BY Claude
+   - Proper 15-minute scheduling workflow established
+
+### Problem Addressed:
+- **Initial Confusion**: Unclear responsibility boundaries between MarketDataService and LLM Providers
+- **Solution**: Clear separation - MarketDataService prepares data, LLM Providers consume prepared data
+- **Logging Context**: `requested_by` field tracks PURPOSE of data request, not REQUEST SOURCE
+
+### Key Architectural Insights:
+- **Correct Flow**: Trading Script orchestrates entire pipeline
+- **Data Preparation**: MarketDataService handles all Binance API interactions
+- **LLM Integration**: Providers receive prepared MarketDataSet objects via API calls
+- **Order Management**: OrderExecutor handles Binance order creation and monitoring
+
+## Open Questions/Issues Requiring Discussion:
+
+### 1. **Order Execution Architecture**:
+- How exactly will OrderExecutor create orders through Binance API?
+- Real-time order monitoring strategy (WebSocket vs polling)?
+- Stop-loss implementation (Binance native orders vs our monitoring)?
+
+### 2. **Portfolio Management Integration**:
+- Real-time position updates after order execution
+- CSV persistence vs database for portfolio tracking
+- Integration with existing ChatGPT-Micro-Cap-Experiment portfolio logic
+
+### 3. **Risk Management Implementation**:
+- Automated stop-loss orders vs manual monitoring
+- Position sizing algorithms for crypto volatility
+- Maximum drawdown protection mechanisms
+
+### 4. **Logging Implementation Priority**:
+- Should comprehensive logging be implemented before or after Phase 2 (LLM Provider development)?
+- Integration points with existing MarketDataService
+- Performance impact of detailed logging on trading latency
+
+### 5. **24/7 Operation Architecture**:
+- Scheduler reliability and failure recovery
+- System health monitoring and alerting
+- Automatic restart mechanisms for component failures
+
+### Next Steps:
+- Determine priority of remaining architectural discussions
+- Choose specific area for detailed implementation planning
+- Continue with Phase 2 development or address logging implementation first

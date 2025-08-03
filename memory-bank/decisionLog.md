@@ -518,3 +518,96 @@ IMPLEMENTATION: Override logging + automatic restoration scheduling
 - **Reduced time** spent on context reconstruction
 
 **FINAL DECISION**: Full implementation of automated workflow enforcement system с immediate deployment.
+
+
+[2025-08-03 17:52:00] - LOGGING ARCHITECTURE AND WORKFLOW CLARIFICATION DECISIONS
+
+## Decision: Comprehensive Logging Architecture Design
+
+### Problem Context:
+В процессе обсуждения архитектуры логирования выявились неточности в понимании data flow между компонентами системы и необходимость четкого определения ответственности каждого компонента.
+
+### Decision Rationale:
+**ВЫБРАНО**: Создание comprehensive logging architecture с исправлением понимания workflow
+**ПРОБЛЕМЫ РЕШЕНЫ**: 
+- Неправильное понимание ответственности LLM Provider в запросе данных
+- Отсутствие четкой структуры логирования для финансовых операций
+- Недостаточная детализация data flow tracing
+
+### Key Architectural Clarifications:
+
+#### 1. **Correct Data Flow Architecture**:
+```
+ПРАВИЛЬНО: SCHEDULER → Trading Script → MarketDataService → LLM Provider → OrderExecutor
+НЕПРАВИЛЬНО: LLM Provider напрямую запрашивает данные у MarketDataService
+```
+
+#### 2. **Component Responsibilities**:
+- **Trading Script**: Orchestrates entire pipeline, requests data FOR specific LLM
+- **MarketDataService**: Handles all Binance API interactions, prepares MarketDataSet
+- **LLM Provider**: Consumes prepared data, generates trading decisions
+- **OrderExecutor**: Executes orders and monitors positions
+
+#### 3. **Logging Context Clarification**:
+```python
+# ПРАВИЛЬНОЕ понимание:
+market_data = service.get_market_data("BTCUSDT", requested_by="ClaudeProvider")
+# Означает: Trading Script запрашивает данные ДЛЯ передачи в Claude
+
+# НЕ означает: Claude сам запрашивает данные
+```
+
+### Implementation Details:
+
+#### **Logging Architecture Components**:
+- **Structured JSON Format**: trace_id, timestamp, component, operation, context
+- **6 Log Levels**: CRITICAL (financial ops) → TRACE (detailed algorithm steps)
+- **Data Flow Tracing**: Complete pipeline visibility from API to decision
+- **Performance Metrics**: API latency, calculation times, memory usage
+- **Financial Safety**: Decimal precision logging, validation checkpoints
+- **Network Resilience**: Error handling, timeouts, retry scenarios
+
+#### **Created Documentation**:
+- **[`logging_architecture_example.md`](logging_architecture_example.md)**: 608-line comprehensive reference
+- **Example Scenarios**: RSI calculations, BTC correlation, network failures
+- **Integration Points**: Prometheus/Grafana monitoring ready
+
+### Open Architectural Questions Identified:
+
+#### **1. Order Execution Strategy**:
+- **Question**: Real Binance orders vs our monitoring for stop-losses?
+- **Impact**: 24/7 protection vs system complexity
+- **Decision Needed**: Native Binance stop-loss orders or custom monitoring
+
+#### **2. Portfolio Management Integration**:
+- **Question**: Real-time updates vs periodic CSV persistence?
+- **Impact**: Performance vs data consistency
+- **Decision Needed**: Database integration or enhanced CSV system
+
+#### **3. Risk Management Implementation**:
+- **Question**: Automated position sizing for crypto volatility?
+- **Impact**: Financial safety vs trading flexibility
+- **Decision Needed**: Fixed percentages or dynamic algorithms
+
+#### **4. 24/7 Operation Architecture**:
+- **Question**: Scheduler reliability and failure recovery mechanisms?
+- **Impact**: System uptime vs complexity
+- **Decision Needed**: Simple cron jobs or sophisticated orchestration
+
+#### **5. Implementation Priority**:
+- **Question**: Logging system before or after Phase 2 LLM Provider development?
+- **Impact**: Development velocity vs operational visibility
+- **Decision Needed**: Sequential vs parallel development approach
+
+### Success Metrics:
+- **Complete Data Flow Visibility**: Every operation traceable from request to execution
+- **Financial Operation Safety**: All money-related operations logged at CRITICAL level
+- **Performance Monitoring**: Real-time system health and bottleneck identification
+- **Error Recovery**: Comprehensive failure scenario documentation and handling
+
+### Next Phase Requirements:
+- **Detailed Discussion**: Choose priority architectural area for implementation
+- **Technical Specification**: Convert architectural decisions into implementation plans
+- **Integration Strategy**: Determine logging integration points with existing code
+
+**ARCHITECTURAL CLARITY ACHIEVED**: Data flow responsibilities clearly defined, logging architecture comprehensive, open questions documented for systematic resolution.
