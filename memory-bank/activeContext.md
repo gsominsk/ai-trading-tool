@@ -686,3 +686,11 @@ MEMORY BANK ACTIVATION PROTOCOL (добавить в Global Instructions):
 
 [2025-08-03 22:27:24] - README.md создан с готовыми Global Instructions
 Создан comprehensive README.md файл с полным набором Global Instructions для активации Memory Bank протокола. Файл содержит готовые к копированию правила активации, verification checks, и emergency override процедуры.
+
+
+[2025-08-03 22:34:47] - README.md адаптирован под существующие Global Instructions пользователя
+Переписан README.md с правильными дополнениями к уже настроенной базовой Memory Bank системе. Вместо полной замены предоставлены точные дополнения для активации блокирующих механизмов из activationProtocol.md.
+
+
+[2025-08-03 22:37:00] - Исправлены все русские фразы в Global Instructions на английский
+Переведены все промпты и инструкции в YAML секциях на английский язык согласно требованию пользователя. README.md теперь содержит корректные англоязычные Global Instructions.
