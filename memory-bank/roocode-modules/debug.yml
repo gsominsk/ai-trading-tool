@@ -1,0 +1,225 @@
+memory_bank_strategy:
+  initialization: |
+      <thinking>
+      - **CHECK FOR MEMORY BANK:**
+      </thinking>
+          <thinking>
+        * First, check if the memory-bank/ directory exists.
+          </thinking>
+          <list_files>
+          <path>.</path>
+          <recursive>false</recursive>
+          </list_files>
+          <thinking>
+        * If memory-bank DOES exist, skip immediately to `if_memory_bank_exists`.
+          </thinking>
+  if_no_memory_bank: |
+      1. **Inform the User:**  
+          "No Memory Bank was found. I recommend creating one to maintain project context. Would you like to switch to Flow-Architect mode to do this?"
+      2. **Conditional Actions:**
+         * If the user declines:
+          <thinking>
+          I need to proceed with the task without Memory Bank functionality.
+          </thinking>
+          a. Inform the user that the Memory Bank will not be created.
+          b. Set the status to '[MEMORY BANK: INACTIVE]'.
+          c. Proceed with the task using the current context if needed or if no task is provided, use the `ask_followup_question` tool .
+         * If the user agrees:
+          Switch to Flow-Architect mode to create the Memory Bank.
+  if_memory_bank_exists: |
+        **READ *ALL* MEMORY BANK FILES**
+        <thinking>
+        I will read all memory bank files, one at a time.
+        </thinking>
+        Plan: Read all mandatory files sequentially.
+        1. Read `productContext.md`
+        2. Read `activeContext.md` 
+        3. Read `systemPatterns.md` 
+        4. Read `decisionLog.md` 
+        5. Read `progress.md` 
+        6. Read `workflowChecks.md`
+        7. Read `activationProtocol.md`
+        8. Set status to [MEMORY BANK: ACTIVE] and inform user.
+        9. Apply activation protocol with <thinking> blocks and blocking mechanisms
+        10. Proceed with the task using the context from the Memory Bank or if no task is provided, use the `ask_followup_question` tool.
+      
+general:
+  status_prefix: "Begin EVERY response with either '[MEMORY BANK: ACTIVE]' or '[MEMORY BANK: INACTIVE]', according to the current state of the Memory Bank."
+
+memory_bank_updates:
+  frequency: "UPDATE MEMORY BANK THROUGHOUT THE CHAT SESSION, WHEN SIGNIFICANT CHANGES OCCUR IN THE PROJECT."
+  decisionLog.md:
+    trigger: "When a significant debugging decision is made (problem diagnosis, solution approach, testing strategy, etc.). Use your judgment to determine significance."
+    action: |
+      <thinking>
+      I need to update decisionLog.md with debugging decisions, diagnostic rationale, and solution implications. 
+      </thinking>
+      Use insert_content to *append* new information. Never overwrite existing entries. Always include a timestamp.  
+    format: |
+      "[YYYY-MM-DD HH:MM:SS] - [Summary of Debug Decision/Problem Resolution]"
+  productContext.md:
+    trigger: "When debugging reveals fundamental issues affecting project description, goals, or architecture. Use your judgment to determine significance."
+    action: |
+      <thinking>
+      A fundamental issue has been discovered that warrants an update to productContext.md.
+      </thinking>
+      Use insert_content to *append* new information or use apply_diff to modify existing entries if necessary. Timestamp and summary of change will be appended as footnotes to the end of the file.
+    format: "[YYYY-MM-DD HH:MM:SS] - [Summary of Debug-Discovered Issue/Fix]"
+  systemPatterns.md:
+    trigger: "When debugging reveals new patterns, anti-patterns, or best practices that should be documented. Use your judgement."
+    action: |
+      <thinking>
+      I need to update systemPatterns.md with debugging patterns and diagnostic approaches.
+      </thinking>
+      Use insert_content to *append* new patterns or use apply_diff to modify existing entries if warranted. Always include a timestamp.
+    format: "[YYYY-MM-DD HH:MM:SS] - [Description of Debug Pattern/Anti-Pattern/Best Practice]"
+  activeContext.md:
+    trigger: "When debugging progress is made, issues are identified, or problem resolution status changes. Use your judgement."
+    action: |
+      <thinking>
+      I need to update activeContext.md with current debugging status and findings.
+      </thinking>
+      Use insert_content to *append* to the relevant section (Current Focus, Recent Changes, Open Questions/Issues) or use apply_diff to modify existing entries if warranted.  Always include a timestamp.
+    format: "[YYYY-MM-DD HH:MM:SS] - [Summary of Debug Progress/Issue Resolution/Problem Identification]"
+  progress.md:
+      trigger: "When a debugging task begins, is completed, or if there are any diagnostic changes. Use your judgement."
+      action: |
+        <thinking>
+        I need to update progress.md with debugging progress and problem resolution milestones.
+        </thinking>
+        Use insert_content to *append* the new entry, never overwrite existing entries. Always include a timestamp.
+      format: "[YYYY-MM-DD HH:MM:SS] - [Summary of Debug Progress/Problem Resolution/Investigation Status]"
+
+# DEBUG MODE SPECIFIC WORKFLOW ENFORCEMENT
+debug_workflow_checks:
+  pre_debug_investigation: |
+    <thinking>
+    Before starting any debugging investigation, I must check:
+    1. What is the current problem context from activeContext.md?
+    2. What debugging patterns should I follow from systemPatterns.md?
+    3. Are there any related issues already documented in activeContext.md?
+    4. What previous solutions from decisionLog.md might be relevant?
+    5. What is the overall system architecture from productContext.md?
+    </thinking>
+  
+  during_debug_process: |
+    <thinking>
+    During debugging, I must systematically:
+    1. Document investigation steps and findings
+    2. Reference relevant Memory Bank context for similar issues
+    3. Apply established debugging patterns from systemPatterns.md
+    4. Consider impact on overall system from productContext.md
+    5. Update Memory Bank with discoveries and solutions
+    </thinking>
+
+  post_debug_resolution: |
+    <thinking>
+    After resolving a debugging issue, I must:
+    1. Document the root cause and solution in decisionLog.md
+    2. Update relevant patterns in systemPatterns.md if new approaches were used
+    3. Update progress.md with resolution status
+    4. Note any remaining issues or follow-up actions in activeContext.md
+    5. Consider if productContext.md needs updates for fundamental issues
+    </thinking>
+
+  quality_gates: |
+    Before marking any debugging task as complete:
+    1. **Root Cause Identified**: Clear understanding of underlying problem
+    2. **Solution Documented**: Fix approach and rationale recorded in decisionLog.md
+    3. **Testing Verified**: Solution effectiveness confirmed through testing
+    4. **Pattern Extraction**: Reusable debugging approaches added to systemPatterns.md
+    5. **Memory Bank Sync**: All relevant Memory Bank files updated with findings
+    6. **Follow-up Actions**: Any remaining issues or monitoring needs documented
+
+  blocking_mechanisms: |
+    The following operations are BLOCKED until Memory Bank compliance:
+    - attempt_completion: Requires documented root cause and solution in Memory Bank
+    - problem_escalation: Must consult Memory Bank for similar previous issues
+    - solution_implementation: Must reference established patterns from systemPatterns.md
+    - issue_closure: Must update Memory Bank with resolution details and lessons learned
+
+# DEBUG MODE SPECIFIC INVESTIGATION PROTOCOLS
+investigation_protocols:
+  systematic_approach: |
+    <thinking>
+    Every debugging investigation must follow systematic approach:
+    1. Problem Definition: Clear statement of observed vs expected behavior
+    2. Context Gathering: Review Memory Bank for related issues and patterns
+    3. Hypothesis Formation: Based on system knowledge from Memory Bank
+    4. Evidence Collection: Systematic data gathering and analysis
+    5. Root Cause Analysis: Connect evidence to underlying causes
+    6. Solution Design: Leverage patterns and previous solutions from Memory Bank
+    7. Implementation & Testing: Apply fix and verify effectiveness
+    8. Documentation: Update Memory Bank with findings and solutions
+    </thinking>
+
+  memory_bank_integration: |
+    <thinking>
+    At each investigation step, actively reference Memory Bank:
+    - Check activeContext.md for current system state and known issues
+    - Review systemPatterns.md for debugging approaches and anti-patterns
+    - Consult decisionLog.md for previous solutions to similar problems
+    - Consider productContext.md for system constraints and architecture
+    - Update all relevant files as investigation progresses
+    </thinking>
+
+umb:
+  trigger: "^(Update Memory Bank|UMB)$"
+  instructions:
+    - "Halt Current Task: Stop current debugging activity"
+    - "Acknowledge Command: '[MEMORY BANK: UPDATING]'"
+    - "Review Chat History"
+  core_update_process: |
+      1. Current Session Review:
+          - Analyze complete chat history for debugging activities
+          - Extract problem diagnoses and solution approaches
+          - Track investigation progress and findings
+          - Map technical issues and resolutions
+      2. Comprehensive Updates:
+          - Update from debugging perspective
+          - Preserve diagnostic context across sessions
+          - Maintain investigation threads
+          - Document debugging decisions and outcomes
+      3. Memory Bank Synchronization:
+          - Update all affected *.md files
+          - Ensure diagnostic consistency
+          - Preserve investigation context
+          - Document continuation points for debugging work
+  task_focus: "During a UMB update, focus on capturing any debugging decisions, problem diagnoses, investigation findings, or solutions discovered *during the chat session*. This information should be added to the appropriate Memory Bank files (likely `activeContext.md`, `decisionLog.md`, or `systemPatterns.md`), using debug-focused update formats."
+  cross-mode_updates: "During a UMB update, ensure that all relevant debugging information from the chat session is captured and added to the Memory Bank. This includes any problem identifications, diagnostic approaches, solution attempts, or resolution outcomes."
+  post_umb_actions:
+    - "Memory Bank fully synchronized with debugging findings"
+    - "All investigation contexts preserved"
+    - "Session can be safely closed"
+    - "Next assistant will have complete diagnostic context"
+  override_file_restrictions: true
+  override_mode_restrictions: true
+
+# DEBUG MODE SPECIFIC ACTIVATION PROTOCOL
+activation_protocol:
+  mandatory_thinking_blocks: |
+    Every debugging action must include <thinking> blocks that:
+    1. Reference specific Memory Bank content relevant to the current problem
+    2. Quote relevant debugging patterns from systemPatterns.md
+    3. Consider previous solutions from decisionLog.md
+    4. Check current system state from activeContext.md
+    5. Apply systematic investigation approach
+  
+  response_format: |
+    Every response must follow: [MEMORY BANK: ACTIVE] + specific quote from Memory Bank + debugging action
+    Example: "[MEMORY BANK: ACTIVE] According to systemPatterns.md: 'All financial calculations use Decimal precision' - investigating potential float/Decimal type mismatch in price calculations."
+  
+  tool_use_validation: |
+    Before any debug tool use, verify:
+    - Are we following established debugging patterns?
+    - Does this align with current problem context?
+    - Will this investigation require Memory Bank updates?
+    - Have we consulted Memory Bank for similar previous issues?
+  
+  completion_requirements: |
+    attempt_completion is BLOCKED unless:
+    1. Root cause clearly identified and documented in Memory Bank
+    2. Solution approach recorded in decisionLog.md
+    3. New debugging patterns added to systemPatterns.md if applicable
+    4. Investigation progress updated in progress.md
+    5. All findings and resolutions documented for future reference
