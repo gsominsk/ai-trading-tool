@@ -594,17 +594,20 @@ class MarketDataService:
             return "Sideways"
     
     def _analyze_sr_tests(self, candles: list, support_level: Decimal, resistance_level: Decimal) -> str:
-        """Analyze support/resistance tests."""
+        """Analyze support/resistance tests with Decimal precision."""
         resistance_tests = 0
         support_tests = 0
         
         for candle in candles:
-            high_price = float(candle[2])
-            low_price = float(candle[3])
+            high_price = Decimal(str(candle[2]))
+            low_price = Decimal(str(candle[3]))
             
-            if abs(high_price - float(resistance_level)) / float(resistance_level) < 0.01:
+            # Test resistance level (within 1%) using Decimal arithmetic
+            if abs(high_price - resistance_level) / resistance_level < Decimal('0.01'):
                 resistance_tests += 1
-            if abs(low_price - float(support_level)) / float(support_level) < 0.01:
+            
+            # Test support level (within 1%) using Decimal arithmetic
+            if abs(low_price - support_level) / support_level < Decimal('0.01'):
                 support_tests += 1
         
         if resistance_tests > 0 and support_tests > 0:
