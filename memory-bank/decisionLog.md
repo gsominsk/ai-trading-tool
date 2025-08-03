@@ -611,3 +611,214 @@ market_data = service.get_market_data("BTCUSDT", requested_by="ClaudeProvider")
 - **Integration Strategy**: Determine logging integration points with existing code
 
 **ARCHITECTURAL CLARITY ACHIEVED**: Data flow responsibilities clearly defined, logging architecture comprehensive, open questions documented for systematic resolution.
+
+
+[2025-08-03 18:16:45] - LOGGING ARCHITECTURE FIELD REMOVAL DECISION
+
+## Decision: Remove "requested_by" Field from MarketDataService Logging
+
+### Problem Context:
+Пользователь выявил несоответствие между logging architecture документом и фактическим кодом MarketDataService. Поле `"requested_by": "ClaudeProvider"` присутствовало в примерах логирования, но не использовалось в реальном коде.
+
+### Decision Rationale:
+**ВЫБРАНО**: Убрать поле из logging примеров для соответствия текущей реализации
+**АЛЬТЕРНАТИВЫ ОТКЛОНЕНЫ**:
+- Добавить поле в код (преждевременно - Trading Script еще не реализован)
+- Оставить как планируемое (создает путаницу между current state и future plans)
+- Комментарии в коде (излишняя сложность для неиспользуемого поля)
+
+### Technical Implementation:
+#### **Updated logging_architecture_example.md**:
+```json
+// БЫЛО:
+"context": {
+  "symbol": "BTCUSDT",
+  "request_type": "full_analysis",
+  "requested_by": "ClaudeProvider",  // <- УБРАНО
+  "request_id": "req_12345"
+}
+
+// СТАЛО:
+"context": {
+  "symbol": "BTCUSDT", 
+  "request_type": "full_analysis",
+  "request_id": "req_12345"  // <- ДОСТАТОЧНО для трейсинга
+}
+```
+
+#### **Tag Updates**:
+- `"llm_request"` → `"market_data"` (отражает фактическую функцию)
+- `"llm_delivery"` → `"data_ready"` (нет прямой delivery в LLM)
+
+#### **Message Updates**:
+- "Market data delivered to LLM provider" → "Market data processing completed successfully"
+
+### Architectural Impact:
+- **Immediate**: Logging architecture полностью соответствует коду
+- **Future**: Поле можно добавить при реализации Trading Script orchestrator
+- **Consistency**: Документация отражает реальное состояние системы
+
+### Integration Strategy:
+**Когда добавить поле обратно:**
+1. При создании Trading Script как orchestrator
+2. При реализации LLM Provider integration
+3. При необходимости трейсинга источника запросов
+
+**Формат будущего добавления:**
+```python
+def get_market_data(self, symbol: str, requested_by: Optional[str] = None) -> MarketDataSet:
+    # Log with requested_by context when provided
+```
+
+### Success Metrics:
+- ✅ Документация точно отражает код
+- ✅ Нет confusion между current и planned features  
+- ✅ Готовность к future enhancement без breaking changes
+- ✅ Чистая архитектура без unused fields
+
+**FINAL DECISION**: Logging architecture теперь полностью соответствует фактической реализации MarketDataService.
+
+
+[2025-08-03 21:21:41] - **MAJOR ARCHITECTURAL DECISION: Complete Logging Architecture Rewrite**
+- **Decision**: Completely rewrote `docs/architecture/logging_architecture_example.md` (480 lines) to align with actual MarketDataService implementation
+- **Problem**: Previous logging documentation contained fictional operations, non-existent fields, and planned features not implemented in code
+- **Solution**: Created new architecture using only real methods: `get_market_data()`, `get_enhanced_context()`, `_get_klines()`, `_calculate_rsi()`, `_calculate_macd_signal()`, `_calculate_ma()`, `_calculate_btc_correlation()`, `_analyze_volume_profile()`, `_identify_patterns()`, `_validate_symbol_input()`
+- **Key Changes**:
+  - Removed fictional `"requested_by": "ClaudeProvider"` fields
+  - Replaced fake operations like `"fetch_binance_data"`, `"market_data_complete"`, `"export_metrics"`
+  - Added real data flow tracing based on actual method execution
+  - Included proper error handling for actual exception types
+  - Added performance monitoring aligned with real service metrics
+- **Impact**: Logging architecture now provides accurate implementation guide, ready for immediate integration
+- **Principle Established**: Documentation must precisely reflect actual implementation, not planned features
+
+
+[2025-08-03 21:26:02] - **ENHANCEMENT: Raw API Data Logging для диагностики расчетов**
+- **Problem**: ИИ при анализе не имел доступа к сырым данным от Binance API для диагностики проблем с расчетами
+- **Solution**: Добавлены детальные TRACE-level логи для:
+  - Raw Binance API responses с полными JSON данными
+  - Data validation и conversion процессы
+  - Raw input data для каждого расчетного метода (RSI, MACD, Volume, Patterns, S/R)
+  - Statistical calculations с промежуточными значениями
+- **Technical Details**:
+  - Raw API response включает sample данных, headers, integrity checks
+  - Calculation input данные для RSI включают price series, changes, gains/losses
+  - MACD input содержит EMA values, intermediate calculations
+  - Pattern analysis включает OHLCV raw data и calculated metrics
+  - Volume analysis содержит полные volume series для статистики
+  - Correlation analysis включает обе price series и statistical calculations
+- **Impact**: ИИ теперь может точно диагностировать где и почему произошла ошибка в расчетах
+- **Integration**: Логи готовы к немедленной интеграции в _get_klines() и calculation methods
+
+
+[2025-08-03 21:31:40] - **CRITICAL FIX: Restored Logging Chain Integrity**
+- **Problem**: Logging architecture had critical chain violations:
+  - Broken document structure (raw data inserted inside TRACE examples)
+  - Inconsistent temporal sequences (timestamps jumping backwards)
+  - Broken trace_id progression (non-sequential IDs)
+  - Missing flow connections between raw data and calculations
+- **Solution**: Complete restructure with proper chain integrity:
+  - **Consistent Timeline**: All timestamps follow logical progression (17:47:00 → 17:47:04)
+  - **Sequential trace_ids**: Proper progression (trd_001_...0000 → trd_001_...0412)
+  - **Connected Flow**: Raw API data properly linked to calculation methods
+  - **Flow_id Integration**: Each operation stage connected with previous/next stages
+  - **Multiple Flow Types**: 
+    - `flow_btc_20250803174700` for main get_market_data pipeline
+    - `flow_enh_20250803174705` for enhanced context analysis
+    - Separate flows for error scenarios
+- **Technical Improvements**:
+  - Raw data TRACE logs immediately follow API calls in timeline
+  - Each calculation method has both raw input (TRACE) and result (DEBUG) logs
+  - Flow stages: initiation → symbol_validation → data_collection → raw_data_processing → data_validation → technical_indicators → completion
+  - Error scenarios maintain flow integrity with termination flags
+- **Impact**: AI can now navigate complete diagnostic chain from API response to final calculations
+- **Navigation**: Tags and flow_id enable precise problem isolation and end-to-end tracing
+
+
+[2025-08-03 21:38:52] - **FINAL: Complete Logging Architecture Ready for Implementation**
+- **Achievement**: Created comprehensive 1,300+ line logging architecture with complete diagnostic coverage
+- **Final Additions**:
+  - **MarketDataSet Validation**: Input data capture + detailed error contexts (not validation logic)
+  - **7-Algorithm Breakdown**: Complete trace of _select_key_candles with all algorithm results
+  - **Error Recovery Chain**: Step-by-step fallback handling in enhanced context
+  - **Edge Case Coverage**: Empty DataFrames, insufficient periods, data anomalies
+  - **Performance Metrics**: Processing times, memory usage, bottleneck identification
+  - **Data Quality Issues**: OHLC inconsistencies, price anomalies, volume problems
+- **Diagnostic Capabilities Now Complete**:
+  - Raw API data → Validation → Calculations → Results with full traceability
+  - Error scenarios with exact failure points and recovery actions
+  - Performance bottlenecks with optimization recommendations
+  - Data quality issues with impact assessments
+- **Implementation Ready**: All logging examples use real method names, actual data structures, and precise flow IDs
+- **Next Phase**: Ready for code integration - logging architecture provides complete implementation blueprint
+
+
+[2025-08-03 21:50:00] - **SESSION RESTART: Project Status Assessment Decision**
+
+## Decision: Continue with Logging Implementation Phase
+
+### Problem Context:
+После перезагрузки roocode пользователь запросил проверку статуса завершения задачи. Выявлено что logging архитектура спроектирована (1,763 строки документации), но не интегрирована в код.
+
+### Decision Rationale:
+**СТАТУС ПРОЕКТА ОПРЕДЕЛЕН**: 23/36 задач завершены (64% прогресса)
+- **Завершенные компоненты**: MarketDataService core functionality с comprehensive validation
+- **Завершенный дизайн**: Logging architecture reference document полностью готов
+- **Критический пробел**: Отсутствует практическая интеграция logging в код
+
+**ВЫБРАНО**: Обновить Memory Bank и продолжить с logging implementation
+**АЛЬТЕРНАТИВЫ ОТКЛОНЕНЫ**:
+- Считать задачу завершенной (недостаточно - дизайн без реализации)
+- Переключиться на другие задачи (нарушит целостность logging implementation)
+
+### Implementation Strategy:
+
+#### **Immediate Actions (Completed)**:
+- ✅ Memory Bank update с текущим статусом проекта
+- ✅ Git commit и push для сохранения состояния
+- ✅ Подготовка к продолжению development phase
+
+#### **Next Phase Plan**:
+1. **Priority Tasks (20-22)**: Code quality improvements для production readiness
+2. **Logging Integration (24-36)**: Практическая реализация спроектированной архитектуры
+3. **Testing Expansion (10-14)**: Comprehensive coverage для edge cases
+
+#### **Technical Implementation Approach**:
+```python
+# Logging integration strategy:
+1. Logger initialization и configuration setup
+2. Trace_id generation system
+3. Structured JSON logging calls in each method
+4. Performance metrics collection
+5. Error context preservation
+```
+
+### Key Decisions Made:
+
+#### **1. Project Continuation Strategy**:
+- **Current State**: Logging design complete, implementation required
+- **Approach**: Systematic integration starting with validation logging
+- **Priority**: Complete logging implementation before new features
+
+#### **2. Development Methodology**:
+- **Memory Bank First**: All updates documented before continuing
+- **Git Workflow**: Regular commits for progress preservation  
+- **Incremental Integration**: One logging component at a time
+
+#### **3. Quality Standards**:
+- **Documentation-Code Alignment**: All logging must match reference examples
+- **Financial Safety**: All money-related operations logged at CRITICAL level
+- **Diagnostic Completeness**: Full traceability from API to final results
+
+### Success Metrics:
+- **Logging Integration**: All 13 remaining tasks (24-36) completed
+- **Code Quality**: Production-ready MarketDataService with comprehensive logging
+- **Documentation Accuracy**: Reference examples working in actual code
+- **Diagnostic Capabilities**: AI can trace any issue from raw data to calculations
+
+### Risk Mitigation:
+- **Incremental Approach**: Small, testable changes to avoid breaking existing functionality
+- **Reference Alignment**: Strict adherence to designed logging architecture
+- **Memory Bank Sync**: Continuous documentation of progress and decisions
+
+**FINAL DECISION**: Proceed with systematic logging integration implementation following established architecture.
