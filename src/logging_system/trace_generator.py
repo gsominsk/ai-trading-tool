@@ -5,7 +5,7 @@ Generates sequential trace IDs and flow IDs for complete log traceability
 
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 
@@ -32,7 +32,7 @@ class TraceGenerator:
         """
         with self._lock:
             self._trace_counter += 1
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
             sequence = f"{self._trace_counter:04d}"
             return f"trd_{self.session_id}_{timestamp}{sequence}"
     
@@ -45,7 +45,7 @@ class TraceGenerator:
         - "flow_btc_20250804214500"
         - "flow_enh_20250804214500"
         """
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
         identifier = symbol.lower().replace("usdt", "") if symbol else operation
         return f"flow_{identifier}_{timestamp}"
     
