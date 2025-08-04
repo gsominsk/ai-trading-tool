@@ -245,7 +245,7 @@ class MarketDataSet:
             recent_price = Decimal(str(self.h1_candles.iloc[-1]['close']))
             price_diff_ratio = abs(recent_price - self.ma_20) / self.ma_20
             
-            # Price shouldn't be more than 50% away from MA20 (sanity check)
+            # Price shouldn't be more than 50% away from MA20 (reasonable for production validation)
             if price_diff_ratio > Decimal('0.5'):
                 raise ValueError(f"Recent price ({recent_price}) too far from MA20 ({self.ma_20}), ratio: {price_diff_ratio}")
     
@@ -454,6 +454,12 @@ class MarketDataService:
             support_level = Decimal(str(daily_data['low'].tail(30).min()))
             resistance_level = Decimal(str(daily_data['high'].tail(30).max()))
             
+            # Handle edge case where support equals resistance (zero volatility)
+            if support_level >= resistance_level:
+                # Add small buffer to ensure support < resistance
+                price_buffer = resistance_level * Decimal('0.001')  # 0.1% buffer
+                support_level = resistance_level - price_buffer
+            
             # Calculate technical indicators with graceful degradation
             rsi = self._calculate_rsi_with_fallback(h1_data, 14)
             macd_signal = self._calculate_macd_signal_with_fallback(h1_data)
@@ -633,14 +639,28 @@ Please check:
 Contact support if this error persists.
 """
         except Exception as e:
-            # Wrap unexpected errors in ProcessingError
-            raise ProcessingError(
-                message=f"Unexpected error during enhanced context generation: {str(e)}",
-                operation="get_enhanced_context",
-                context=error_context,
-                processing_stage="enhanced_analysis",
-                error_details=str(e)
-            )
+            # For unexpected errors, return critical error message instead of raising
+            return f"""
+CRITICAL ERROR: MARKET DATA ANALYSIS FOR {symbol}
+Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+❌ Unable to fetch market data for {symbol}
+Error: {str(e)[:200]}
+Trace ID: {trace_id}
+Operation: get_enhanced_context
+
+Error Details:
+- Error Type: {type(e).__name__}
+- Context: Enhanced market data analysis
+- Symbol: {symbol}
+
+Please check:
+- Network connectivity (if connection issues)
+- Symbol validity (if symbol-related error)
+- Data availability (if data issues)
+
+Contact support if this error persists.
+"""
     
     def _get_klines(self, symbol: str, interval: str, limit: int) -> pd.DataFrame:
         """Fetch candlestick data from Binance API with structured error handling."""
@@ -934,17 +954,14 @@ Contact support if this error persists.
             )
     
     def _calculate_btc_correlation_with_fallback(self, symbol: str, df: pd.DataFrame) -> Optional[Decimal]:
-        """Calculate BTC correlation with graceful degradation for ProcessingError scenarios."""
+        """Calculate BTC correlation with graceful degradation for all errors."""
         try:
             return self._calculate_btc_correlation(symbol, df)
-        except (DataInsufficientError, ProcessingError) as e:
+        except (DataInsufficientError, ProcessingError, NetworkError) as e:
             # Graceful degradation: log the issue but continue without correlation
             self._log_operation_error("btc_correlation_fallback", e, symbol=symbol,
                                     error_type=type(e).__name__, fallback_used=True)
             return None  # Graceful degradation: no correlation data
-        except NetworkError:
-            # Network errors should not be degraded - they indicate connectivity issues
-            raise
     
     def _analyze_volume_profile_with_fallback(self, df: pd.DataFrame) -> str:
         """Analyze volume profile with graceful degradation for calculation failures."""

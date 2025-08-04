@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🧪 РУЧНОЕ ТЕСТИРОВАНИЕ ВСЕХ ИСПРАВЛЕНИЙ
-Проверяем реальную работу MarketDataService после всех багфиксов
+🧪 COMPREHENSIVE TESTING OF ALL FIXES
+Testing real MarketDataService functionality after all bugfixes
 """
 
 import sys
@@ -9,16 +9,16 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from decimal import Decimal
-from market_data.market_data_service import MarketDataService
+from src.market_data.market_data_service import MarketDataService
 
-def test_section(title):
+def print_section(title):
     print(f"\n{'='*60}")
     print(f"🧪 {title}")
     print('='*60)
 
 def test_rsi_division_protection():
     """Тест 1: RSI защита от деления на ноль"""
-    test_section("RSI DIVISION BY ZERO PROTECTION")
+    print_section("RSI DIVISION BY ZERO PROTECTION")
     
     service = MarketDataService()
     
@@ -46,7 +46,7 @@ def test_rsi_division_protection():
 
 def test_state_pollution():
     """Тест 2: Проверка изоляции состояния между символами"""
-    test_section("STATE POLLUTION PROTECTION")
+    print_section("STATE POLLUTION PROTECTION")
     
     service = MarketDataService()
     
@@ -76,7 +76,7 @@ def test_state_pollution():
 
 def test_decimal_precision():
     """Тест 3: Проверка Decimal точности"""
-    test_section("DECIMAL PRECISION VERIFICATION")
+    print_section("DECIMAL PRECISION VERIFICATION")
     
     service = MarketDataService()
     
@@ -108,7 +108,7 @@ def test_decimal_precision():
 
 def test_dataframe_protection():
     """Тест 4: Защита от пустых DataFrame"""
-    test_section("DATAFRAME PROTECTION")
+    print_section("DATAFRAME PROTECTION")
     
     service = MarketDataService()
     
@@ -132,7 +132,7 @@ def test_dataframe_protection():
 
 def test_symbol_validation():
     """Тест 5: Валидация символов"""
-    test_section("SYMBOL VALIDATION")
+    print_section("SYMBOL VALIDATION")
     
     service = MarketDataService()
     
@@ -160,7 +160,7 @@ def test_symbol_validation():
 
 def test_technical_indicators():
     """Тест 6: Технические индикаторы в реальных условиях"""
-    test_section("TECHNICAL INDICATORS REAL CONDITIONS")
+    print_section("TECHNICAL INDICATORS REAL CONDITIONS")
     
     service = MarketDataService()
     
@@ -201,7 +201,7 @@ def test_technical_indicators():
 
 def test_pattern_recognition():
     """Тест 7: Распознавание паттернов"""
-    test_section("PATTERN RECOGNITION")
+    print_section("PATTERN RECOGNITION")
     
     service = MarketDataService()
     
@@ -236,12 +236,12 @@ def test_pattern_recognition():
         print(f"❌ Ошибка при распознавании паттернов: {e}")
 
 def main():
-    print("🚀 НАЧИНАЕМ РУЧНОЕ ТЕСТИРОВАНИЕ ВСЕХ ИСПРАВЛЕНИЙ")
+    print("🚀 STARTING COMPREHENSIVE TESTING OF ALL FIXES")
     print("=" * 80)
     
-    # Выполняем все тесты
+    # Execute all tests
     test_rsi_division_protection()
-    test_state_pollution() 
+    test_state_pollution()
     test_decimal_precision()
     test_dataframe_protection()
     test_symbol_validation()
@@ -249,7 +249,7 @@ def main():
     test_pattern_recognition()
     
     print(f"\n{'='*80}")
-    print("🎉 РУЧНОЕ ТЕСТИРОВАНИЕ ЗАВЕРШЕНО")
+    print("🎉 COMPREHENSIVE TESTING COMPLETED")
     print("="*80)
     
     print("\n📋 ПРОВЕРЬТЕ РЕЗУЛЬТАТЫ:")

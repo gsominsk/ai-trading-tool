@@ -115,14 +115,17 @@ def test_api_failure_handling():
     with patch.object(service, '_get_klines') as mock_get_klines:
         mock_get_klines.side_effect = Exception("API connection failed")
         
-        correlation = service._calculate_btc_correlation("ETHUSDT", eth_df)
-        
-        if correlation is None:
-            print("   ✅ API failure handled gracefully (returned None)")
-            return True
-        else:
-            print(f"   ❌ ERROR: Should return None on API failure, got {correlation}")
+        try:
+            correlation = service._calculate_btc_correlation("ETHUSDT", eth_df)
+            print(f"   ❌ ERROR: Should raise ProcessingError on API failure, got {correlation}")
             return False
+        except Exception as e:
+            if "ProcessingError" in str(type(e)) or "API connection failed" in str(e):
+                print("   ✅ API failure handled correctly (raised ProcessingError)")
+                return True
+            else:
+                print(f"   ❌ ERROR: Unexpected exception type: {type(e)}, message: {e}")
+                return False
 
 
 def test_insufficient_data_handling():
@@ -141,14 +144,17 @@ def test_insufficient_data_handling():
         btc_df = create_test_dataframe(btc_prices)
         mock_get_klines.return_value = btc_df
         
-        correlation = service._calculate_btc_correlation("ETHUSDT", eth_df)
-        
-        if correlation is None:
-            print("   ✅ Insufficient data handled correctly (returned None)")
-            return True
-        else:
-            print(f"   ❌ ERROR: Should return None for insufficient data, got {correlation}")
+        try:
+            correlation = service._calculate_btc_correlation("ETHUSDT", eth_df)
+            print(f"   ❌ ERROR: Should raise DataInsufficientError for insufficient data, got {correlation}")
             return False
+        except Exception as e:
+            if "DataInsufficientError" in str(type(e)) or "Insufficient data" in str(e):
+                print("   ✅ Insufficient data handled correctly (raised DataInsufficientError)")
+                return True
+            else:
+                print(f"   ❌ ERROR: Unexpected exception type: {type(e)}, message: {e}")
+                return False
 
 
 def test_decimal_precision():

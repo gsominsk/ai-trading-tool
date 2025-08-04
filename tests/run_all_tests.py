@@ -91,17 +91,17 @@ class AITradingTestRunner:
                     'tests/test_state_pollution_simple.py',
                 ]
             },
-            'manual_verification': {
-                'description': 'Manual tests requiring human verification',
+            'comprehensive_validation': {
+                'description': 'Comprehensive validation and integration tests',
                 'tests': [
-                    'tests/test_all_fixes_manual.py',
-                    'tests/test_btc_correlation_manual.py',
-                    'tests/test_comprehensive_validation_manual.py',
-                    'tests/test_enhanced_context_error_handling_manual.py',
-                    'tests/test_network_failures_extreme_edge_cases_manual.py',
-                    'tests/test_recent_trend_fix_manual.py',
-                    'tests/test_sr_tests_fix_manual.py',
-                    'tests/test_volume_relationship_fix_manual.py',
+                    'tests/test_all_fixes_comprehensive.py',
+                    'tests/test_btc_correlation_integration.py',
+                    'tests/test_comprehensive_validation_integration.py',
+                    'tests/test_enhanced_context_error_handling_integration.py',
+                    'tests/test_network_failures_extreme_edge_cases_integration.py',
+                    'tests/test_recent_trend_fix_integration.py',
+                    'tests/test_sr_tests_fix_integration.py',
+                    'tests/test_volume_relationship_fix_integration.py',
                 ]
             },
             'fixes_and_debugging': {
@@ -232,9 +232,9 @@ class AITradingTestRunner:
         print(f"\n🧪 Running {category.upper().replace('_', ' ')} Tests")
         print(f"📋 {info['description']}")
         
-        # Skip manual tests in fast mode
-        if fast and category == 'manual_verification':
-            print("⏩ Skipping manual tests in fast mode")
+        # Skip comprehensive tests in fast mode
+        if fast and category == 'comprehensive_validation':
+            print("⏩ Skipping comprehensive validation tests in fast mode")
             return []
         
         results = []

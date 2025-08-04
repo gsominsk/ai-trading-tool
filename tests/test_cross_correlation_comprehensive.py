@@ -146,6 +146,8 @@ class TestCrossCorrelationAnalysisComprehensive:
     @patch('src.market_data.market_data_service.MarketDataService._get_klines')
     def test_insufficient_data_handling(self, mock_get_klines):
         """Test correlation calculation with insufficient data points."""
+        from src.market_data.exceptions import DataInsufficientError
+        
         # Create very small datasets
         btc_prices = [50000.0, 50100.0]  # Only 2 data points
         eth_prices = [3000.0, 3010.0]
@@ -175,16 +177,22 @@ class TestCrossCorrelationAnalysisComprehensive:
         ])
         small_df['close'] = pd.to_numeric(small_df['close'])
         
-        # Test correlation calculation with insufficient data
-        correlation = self.service._calculate_btc_correlation('ETHUSDT', small_df)
+        # Test correlation calculation with insufficient data - should raise DataInsufficientError
+        with pytest.raises(DataInsufficientError) as exc_info:
+            self.service._calculate_btc_correlation('ETHUSDT', small_df)
         
-        # Should return None for insufficient data
-        assert correlation is None, "Correlation should return None for insufficient data"
+        # Verify error details
+        error = exc_info.value
+        assert "Insufficient data for BTC correlation" in str(error)
+        assert error.required_periods == 10
+        assert error.available_periods == 2
     
     @pytest.mark.unit
     @patch('src.market_data.market_data_service.MarketDataService._get_klines')
     def test_api_failure_handling(self, mock_get_klines):
         """Test correlation calculation when BTC data fetch fails."""
+        from src.market_data.exceptions import ProcessingError
+        
         # Mock API failure for BTC data
         mock_get_klines.side_effect = Exception("API connection failed")
         
@@ -195,23 +203,31 @@ class TestCrossCorrelationAnalysisComprehensive:
         }
         test_df = pd.DataFrame(test_data)
         
-        # Test correlation calculation with API failure
-        correlation = self.service._calculate_btc_correlation('ETHUSDT', test_df)
+        # Test correlation calculation with API failure - should raise ProcessingError
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service._calculate_btc_correlation('ETHUSDT', test_df)
         
-        # Should return None when BTC data fetch fails
-        assert correlation is None, "Correlation should return None when BTC data fetch fails"
+        # Verify error details
+        error = exc_info.value
+        assert "Unexpected error during BTC correlation calculation" in str(error)
+        assert "API connection failed" in str(error)
     
     @pytest.mark.unit
     def test_empty_dataframe_handling(self):
         """Test correlation calculation with empty DataFrame."""
+        from src.market_data.exceptions import APIConnectionError
+        
         # Create empty DataFrame
         empty_df = pd.DataFrame(columns=['close', 'timestamp'])
         
-        # Test correlation calculation with empty data
-        correlation = self.service._calculate_btc_correlation('ETHUSDT', empty_df)
+        # Test correlation calculation with empty data - should raise APIConnectionError due to limit=0
+        with pytest.raises(APIConnectionError) as exc_info:
+            self.service._calculate_btc_correlation('ETHUSDT', empty_df)
         
-        # Should return None for empty data
-        assert correlation is None, "Correlation should return None for empty DataFrame"
+        # Verify error details
+        error = exc_info.value
+        assert "Network request failed" in str(error)
+        assert "400 Client Error" in str(error)
     
     @pytest.mark.unit
     @patch('src.market_data.market_data_service.MarketDataService._get_klines')

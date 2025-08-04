@@ -54,15 +54,18 @@ def test_complete_market_data_failure():
     with patch.object(service, 'get_market_data') as mock_get_data:
         mock_get_data.side_effect = Exception("API connection completely failed")
         
-        result = service.get_enhanced_context("ETHUSDT")
-        
-        if "CRITICAL ERROR" in result and "API connection completely failed" in result:
-            print("   ✅ Complete failure handled gracefully")
-            print("   📊 Returns error message with troubleshooting tips")
-            return True
-        else:
-            print("   ❌ ERROR: Complete failure not handled properly")
+        try:
+            result = service.get_enhanced_context("ETHUSDT")
+            print(f"   ❌ ERROR: Should raise ProcessingError for complete failure, got result")
             return False
+        except Exception as e:
+            if "ProcessingError" in str(type(e)) and "API connection completely failed" in str(e):
+                print("   ✅ Complete failure handled correctly (raised ProcessingError)")
+                print("   📊 Error contains proper context and trace information")
+                return True
+            else:
+                print(f"   ❌ ERROR: Unexpected exception type: {type(e)}, message: {e}")
+                return False
 
 
 def test_enhanced_analysis_failure_with_basic_fallback():

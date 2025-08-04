@@ -31,7 +31,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Request to Binance API timed out" in str(exc_info.value)
     
     def test_api_connection_error(self):
         """Test handling of API connection errors."""
@@ -41,48 +41,52 @@ class TestNetworkFailuresAndExtremeEdgeCases:
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Failed to connect to Binance API" in str(exc_info.value)
     
     def test_api_http_error_404(self):
         """Test handling of HTTP 404 errors."""
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 404
             mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Symbol BTCUSDT not found or invalid interval 1d" in str(exc_info.value)
     
     def test_api_http_error_500(self):
         """Test handling of HTTP 500 server errors."""
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 500
             mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("500 Internal Server Error")
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Binance API server error: 500" in str(exc_info.value)
     
     def test_api_rate_limiting(self):
         """Test handling of API rate limiting."""
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 429
             mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("429 Too Many Requests")
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Binance API rate limit exceeded" in str(exc_info.value)
     
     def test_malformed_api_response(self):
         """Test handling of malformed API responses."""
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.side_effect = ValueError("Invalid JSON")
             mock_get.return_value = mock_response
@@ -90,12 +94,13 @@ class TestNetworkFailuresAndExtremeEdgeCases:
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Unexpected error during klines data processing" in str(exc_info.value)
     
     def test_empty_api_response(self):
         """Test handling of empty API responses."""
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = []
             mock_get.return_value = mock_response
@@ -103,7 +108,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("BTCUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Empty or invalid response from Binance API" in str(exc_info.value)
     
     def test_partial_network_failure_btc_correlation(self):
         """Test handling when BTC correlation fetch fails but main data succeeds."""
@@ -119,12 +124,14 @@ class TestNetworkFailuresAndExtremeEdgeCases:
             mock_responses = []
             for i in range(3):
                 mock_response = MagicMock()
+                mock_response.status_code = 200
                 mock_response.raise_for_status.return_value = None
                 mock_response.json.return_value = valid_klines_data
                 mock_responses.append(mock_response)
             
             # BTC correlation call fails
             btc_response = MagicMock()
+            btc_response.status_code = 408  # Request timeout
             btc_response.raise_for_status.side_effect = requests.exceptions.Timeout("BTC timeout")
             mock_responses.append(btc_response)
             
@@ -150,6 +157,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = large_klines_data
             mock_get.return_value = mock_response
@@ -170,6 +178,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = small_klines_data
             mock_get.return_value = mock_response
@@ -192,6 +201,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = zero_volume_data
             mock_get.return_value = mock_response
@@ -213,6 +223,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = constant_price_data
             mock_get.return_value = mock_response
@@ -242,6 +253,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = volatile_data
             mock_get.return_value = mock_response
@@ -263,6 +275,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = old_data
             mock_get.return_value = mock_response
@@ -283,6 +296,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = future_data
             mock_get.return_value = mock_response
@@ -303,6 +317,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = invalid_ohlc_data
             mock_get.return_value = mock_response
@@ -322,6 +337,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = negative_price_data
             mock_get.return_value = mock_response
@@ -330,7 +346,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
                 self.service.get_market_data("NEGUSDT")
             
             # Should fail validation (support/resistance levels must be positive)
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "support_level must be positive" in str(exc_info.value)
     
     def test_nan_and_inf_values(self):
         """Test handling of NaN and infinite values."""
@@ -342,6 +358,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = nan_inf_data
             mock_get.return_value = mock_response
@@ -349,7 +366,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
             with pytest.raises(Exception) as exc_info:
                 self.service.get_market_data("NANUSDT")
             
-            assert "Failed to get market data" in str(exc_info.value)
+            assert "Invalid numeric data in column open" in str(exc_info.value)
     
     def test_memory_pressure_large_dataset(self):
         """Test handling of very large datasets."""
@@ -362,6 +379,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = large_dataset
             mock_get.return_value = mock_response
@@ -395,6 +413,7 @@ class TestNetworkFailuresAndExtremeEdgeCases:
         
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
+            mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = valid_klines_data
             mock_get.return_value = mock_response

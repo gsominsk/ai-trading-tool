@@ -61,7 +61,7 @@ class TestMarketDataService:
         from datetime import datetime, timedelta
         klines = []
         current_price = start_price
-        current_time = int((datetime.now() - timedelta(hours=count)).timestamp() * 1000)
+        current_time = int((datetime.utcnow() - timedelta(hours=count)).timestamp() * 1000)
         
         for i in range(count):
             # Realistic price changes (-1% to +1% per hour)
@@ -193,7 +193,7 @@ class TestMarketDataService:
         
         for i in range(180):  # 180 days of data
             candle = {
-                "timestamp": datetime.now() - timedelta(days=i),
+                "timestamp": datetime.utcnow() - timedelta(days=i),
                 "open": base_price + Decimal(str(i * 10)),
                 "high": base_price + Decimal(str(i * 15)),
                 "low": base_price + Decimal(str(i * 5)),
@@ -325,7 +325,7 @@ class TestMarketDataService:
         with pytest.raises(ValueError, match="Invalid symbol format"):
             MarketDataSet(
                 symbol="INVALID",
-                timestamp=datetime.now(),
+                timestamp=datetime.utcnow(),
                 daily_candles=Mock(),
                 h4_candles=Mock(),
                 h1_candles=Mock(),
@@ -336,14 +336,24 @@ class TestMarketDataService:
                 ma_trend="sideways"
             )
         
-        # Test RSI bounds validation
+        # Test RSI bounds validation - create minimal valid DataFrames to bypass DataFrame validation
+        import pandas as pd
+        minimal_df = pd.DataFrame({
+            'timestamp': [datetime.utcnow() - timedelta(hours=i) for i in range(50)],
+            'open': [50000.0] * 50,
+            'high': [50100.0] * 50,
+            'low': [49900.0] * 50,
+            'close': [50000.0] * 50,
+            'volume': [1000.0] * 50
+        })
+        
         with pytest.raises(ValueError, match="RSI must be between 0 and 100"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.now(),
-                daily_candles=Mock(),
-                h4_candles=Mock(),
-                h1_candles=Mock(),
+                timestamp=datetime.utcnow(),
+                daily_candles=minimal_df,
+                h4_candles=minimal_df,
+                h1_candles=minimal_df,
                 rsi_14=Decimal('150'),  # Invalid RSI
                 macd_signal="neutral",
                 ma_20=Decimal('50000'),
@@ -355,7 +365,7 @@ class TestMarketDataService:
     @pytest.mark.slow
     def test_data_freshness(self):
         """Test that market data timestamps are recent."""
-        current_time = datetime.now()
+        current_time = datetime.utcnow()
         data_timestamp = current_time - timedelta(minutes=5)
         
         # Data should not be older than 10 minutes for real-time trading
@@ -387,7 +397,7 @@ class TestMarketDataServiceIntegration:
         from datetime import datetime, timedelta
         klines = []
         base_price = 50000.12345678
-        current_time = int((datetime.now() - timedelta(hours=count)).timestamp() * 1000)
+        current_time = int((datetime.utcnow() - timedelta(hours=count)).timestamp() * 1000)
         
         for i in range(count):
             price = base_price * (1 + (i % 10 - 5) * 0.002)  # ±1% price variation
@@ -475,7 +485,7 @@ class TestMarketDataServiceIntegration:
         # Simulate cache hit
         cached_data = {
             "data": {"symbol": "BTCUSDT", "price": "50000.00"},
-            "timestamp": datetime.now()
+            "timestamp": datetime.utcnow()
         }
         cache[cache_key] = cached_data
         
@@ -485,10 +495,10 @@ class TestMarketDataServiceIntegration:
         # Test cache expiry
         expired_data = {
             "data": {"symbol": "BTCUSDT", "price": "49000.00"},
-            "timestamp": datetime.now() - timedelta(seconds=120)  # 2 minutes old
+            "timestamp": datetime.utcnow() - timedelta(seconds=120)  # 2 minutes old
         }
         cache[cache_key] = expired_data
         
-        time_diff = datetime.now() - cache[cache_key]["timestamp"]
+        time_diff = datetime.utcnow() - cache[cache_key]["timestamp"]
         is_expired = time_diff.total_seconds() > cache_ttl
         assert is_expired  # Should be expired

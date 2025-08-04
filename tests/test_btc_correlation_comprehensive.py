@@ -70,7 +70,7 @@ class TestBTCCorrelationComprehensive:
         """Test that BTC correlation returns None for BTCUSDT symbol."""
         # Create test DataFrame
         test_df = pd.DataFrame({
-            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='1H'),
+            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='h'),
             'open': [50000.0] * 30,
             'high': [50100.0] * 30,
             'low': [49900.0] * 30,
@@ -194,9 +194,11 @@ class TestBTCCorrelationComprehensive:
     @pytest.mark.unit
     def test_btc_correlation_insufficient_data(self):
         """Test behavior with insufficient data."""
+        from src.market_data.exceptions import DataInsufficientError
+        
         # Create DataFrame with insufficient data
         insufficient_df = pd.DataFrame({
-            'timestamp': pd.date_range(start='2024-01-01', periods=5, freq='1H'),
+            'timestamp': pd.date_range(start='2024-01-01', periods=5, freq='h'),
             'open': [2000.0] * 5,
             'high': [2010.0] * 5,
             'low': [1990.0] * 5,
@@ -204,19 +206,25 @@ class TestBTCCorrelationComprehensive:
             'volume': [1000.0] * 5
         })
         
-        # Test with insufficient data
-        result = self.service._calculate_btc_correlation("ETHUSDT", insufficient_df)
+        # Test with insufficient data - should raise DataInsufficientError
+        with pytest.raises(DataInsufficientError) as exc_info:
+            self.service._calculate_btc_correlation("ETHUSDT", insufficient_df)
         
-        # Should return None for insufficient data
-        assert result is None, "Should return None for insufficient data"
+        # Verify error details
+        error = exc_info.value
+        assert "Insufficient data for BTC correlation" in str(error)
+        assert error.required_periods == 10
+        assert error.available_periods == 5
     
     @pytest.mark.unit
     @patch('requests.get')
     def test_btc_correlation_api_failure_handling(self, mock_get):
         """Test graceful handling of BTC API failures."""
+        from src.market_data.exceptions import ProcessingError
+        
         # Create valid symbol DataFrame
         symbol_df = pd.DataFrame({
-            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='1H'),
+            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='h'),
             'open': [2000.0] * 30,
             'high': [2010.0] * 30,
             'low': [1990.0] * 30,
@@ -227,11 +235,14 @@ class TestBTCCorrelationComprehensive:
         # Mock API failure
         mock_get.side_effect = Exception("Network error")
         
-        # Test graceful failure handling
-        result = self.service._calculate_btc_correlation("ETHUSDT", symbol_df)
+        # Test graceful failure handling - should raise ProcessingError
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service._calculate_btc_correlation("ETHUSDT", symbol_df)
         
-        # Should return None on API failure
-        assert result is None, "Should return None on API failure"
+        # Verify error details
+        error = exc_info.value
+        assert "Unexpected error during klines data processing" in str(error)
+        assert "Network error" in str(error)
     
     @pytest.mark.unit
     @patch('requests.get')
@@ -239,7 +250,7 @@ class TestBTCCorrelationComprehensive:
         """Test handling of constant prices (no variance)."""
         # Generate constant price data for symbol
         symbol_df = pd.DataFrame({
-            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='1H'),
+            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='h'),
             'open': [2000.0] * 30,
             'high': [2000.0] * 30,
             'low': [2000.0] * 30,
@@ -313,7 +324,7 @@ class TestBTCCorrelationComprehensive:
         """Test that correlation is properly clamped to [-1, 1] bounds."""
         # This test verifies the bounds checking in the actual code
         symbol_df = pd.DataFrame({
-            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='1H'),
+            'timestamp': pd.date_range(start='2024-01-01', periods=30, freq='h'),
             'open': [2000.0] * 30,
             'high': [2010.0] * 30,
             'low': [1990.0] * 30,
@@ -344,7 +355,7 @@ class TestBTCCorrelationComprehensive:
         """Test that data is properly aligned between symbol and BTC."""
         # Create symbol DataFrame with specific length
         symbol_df = pd.DataFrame({
-            'timestamp': pd.date_range(start='2024-01-01', periods=25, freq='1H'),
+            'timestamp': pd.date_range(start='2024-01-01', periods=25, freq='h'),
             'open': [2000.0] * 25,
             'high': [2010.0] * 25,
             'low': [1990.0] * 25,
@@ -377,7 +388,7 @@ def test_btc_correlation_integration():
     
     # Create realistic test data
     test_df = pd.DataFrame({
-        'timestamp': pd.date_range(start='2024-01-01', periods=50, freq='1H'),
+        'timestamp': pd.date_range(start='2024-01-01', periods=50, freq='h'),
         'open': [i * 10 + 2000 for i in range(50)],
         'high': [i * 10 + 2010 for i in range(50)],
         'low': [i * 10 + 1990 for i in range(50)],
