@@ -270,3 +270,275 @@ system_info = error.context.system_info  # Debugging information
 
 ---
 *Optimized 2025-08-04: Reduced from 1,327 lines to current decisions + historical index + archive reference*
+
+
+[2025-08-04 23:00:00] - 🎯 **CRITICAL ARCHITECTURE DOCUMENTATION: Memory Bank Optimization Process & Methodology**
+
+## Decision
+
+Создана полная документация процесса оптимизации Memory Bank для сохранения методологии и обеспечения повторяемости процесса в будущем без потери истории и контекста.
+
+## Rationale
+
+**ПРОБЛЕМА**: Memory Bank может разрастаться до критических размеров (30k+ строк, $4-7 за сессию), требуя периодической оптимизации. Без документированного процесса есть риск потери критической информации или неправильного выполнения оптимизации.
+
+**СТРАТЕГИЧЕСКАЯ ВАЖНОСТЬ**: Процесс оптимизации должен быть воспроизводимым, безопасным и сохраняющим 100% контекста проекта.
+
+## Memory Bank Optimization Process
+
+### **📋 PREREQUISITE CHECKLIST**
+- [ ] Memory Bank активен и функционален
+- [ ] Все критические изменения зафиксированы в git
+- [ ] Определен размер Memory Bank (`find memory-bank -name "*.md" -not -path "*/archive/*" -exec wc -l {} +`)
+- [ ] Текущая сессия работы завершена (нет активных задач)
+
+### **🔄 PHASE 1: ASSESSMENT & PREPARATION**
+
+#### Step 1.1: Size Analysis
+```bash
+# Получить текущий размер каждого файла
+find memory-bank -name "*.md" -not -path "*/archive/*" -exec wc -l {} + | sort -n
+
+# Общий размер активного Memory Bank
+find memory-bank -name "*.md" -not -path "*/archive/*" -exec wc -l {} + | tail -1
+```
+
+#### Step 1.2: Content Analysis
+```bash
+# Проанализировать самые большие файлы
+wc -l memory-bank/*.md | sort -n | tail -5
+
+# Найти файлы-кандидаты для оптимизации (>200 строк)
+find memory-bank -name "*.md" -not -path "*/archive/*" -exec sh -c 'lines=$(wc -l < "$1"); if [ "$lines" -gt 200 ]; then echo "$lines $1"; fi' _ {} \;
+```
+
+#### Step 1.3: Git Status Check
+```bash
+git status
+git log --oneline -5  # Убедиться что последние изменения зафиксированы
+```
+
+### **🏗️ PHASE 2: ARCHIVE SYSTEM CREATION**
+
+#### Step 2.1: Create Archive Directory
+```bash
+mkdir -p memory-bank/archive
+```
+
+#### Step 2.2: Archive Original Files
+**КРИТИЧНО**: Сначала архивировать, потом оптимизировать!
+```bash
+# Архивировать каждый файл перед оптимизацией
+cp memory-bank/activeContext.md memory-bank/archive/activeContext.md
+cp memory-bank/progress.md memory-bank/archive/progress.md
+cp memory-bank/systemPatterns.md memory-bank/archive/systemPatterns.md
+cp memory-bank/decisionLog.md memory-bank/archive/decisionLog.md
+cp memory-bank/workflowChecks.md memory-bank/archive/workflowChecks.md
+# ... и так далее для всех оптимизируемых файлов
+```
+
+#### Step 2.3: Create Archive Documentation
+Создать [`memory-bank/archive/README.md`](memory-bank/archive/README.md) с:
+- Датой архивации
+- Статистикой по файлам
+- Объяснением стратегии оптимизации
+- Инструкциями по восстановлению
+
+### **✂️ PHASE 3: SYSTEMATIC OPTIMIZATION**
+
+#### Step 3.1: File-by-File Optimization Strategy
+
+**🎯 UNIVERSAL PATTERN для каждого файла**:
+```markdown
+# [File Name]
+
+## Archive Reference
+Complete [description] history ([X] lines) archived in [`memory-bank/archive/[filename].md`](memory-bank/archive/[filename].md).
+
+## Recent [Content Type] (Last 10 Entries)
+
+[последние 10 записей с полным контекстом]
+
+---
+
+### Historical [Content Type] Index (Chronological)
+
+- [Date] - [Brief description]
+- [Date] - [Brief description]
+...
+
+## Summary Statistics
+- **Total [Content]**: ~[N] entries
+- **Archive Size**: [X] lines of complete history
+- **Current Active**: Last 10 entries (optimized for daily operations)
+- **Complete History**: Available in [`memory-bank/archive/[filename].md`](memory-bank/archive/[filename].md)
+
+---
+*Optimized [Date]: Reduced from [X] lines to current [content type] + historical index + archive reference*
+```
+
+#### Step 3.2: Specific File Optimization Approaches
+
+**For activeContext.md**:
+- Keep: Last 10 entries with full context
+- Archive reference at top
+- Brief historical overview by phases
+
+**For decisionLog.md**:
+- Keep: Last 10 full architectural decisions
+- Chronological index of all historical decisions by phase
+- Archive reference for complete details
+
+**For progress.md**:
+- Keep: Current project status and overview
+- Major milestones summary
+- Archive reference for complete history
+
+**For systemPatterns.md**:
+- Keep: Core active patterns currently in use
+- Brief list of archived patterns
+- Archive reference for detailed pattern history
+
+**For workflowChecks.md**:
+- Keep: Essential active workflow rules
+- Archive reference for complete rule history
+
+### **🔧 PHASE 4: VALIDATION & TESTING**
+
+#### Step 4.1: Size Validation
+```bash
+# Проверить новый размер
+find memory-bank -name "*.md" -not -path "*/archive/*" -exec wc -l {} + | tail -1
+
+# Вычислить процент сокращения
+# Original: [X] lines → New: [Y] lines = [Z]% reduction
+```
+
+#### Step 4.2: Content Integrity Check
+```bash
+# Убедиться что архивы созданы
+ls -la memory-bank/archive/
+
+# Проверить размер архивов
+wc -l memory-bank/archive/*.md
+```
+
+#### Step 4.3: Functional Testing
+- Убедиться что все ссылки на архивы работают
+- Проверить что ключевая информация доступна
+- Протестировать что новые записи можно добавлять
+
+### **💾 PHASE 5: COMMIT & DOCUMENTATION**
+
+#### Step 5.1: Git Staging
+```bash
+# Добавить все изменения
+git add memory-bank/
+
+# Проверить что именно коммитим
+git status
+git diff --cached --stat
+```
+
+#### Step 5.2: Comprehensive Commit
+```bash
+git commit -m "feat: Memory Bank optimization - [X]% token reduction
+
+OPTIMIZATION RESULTS:
+- [Original size] → [New size] lines ([X]% reduction)
+- ~$[Old cost] → ~$[New cost] per session ([Y]% cost savings)
+- 100% context preservation via archive system
+
+OPTIMIZED FILES:
+- [file]: [old]→[new] lines ([description])
+- [file]: [old]→[new] lines ([description])
+...
+
+Complete [N]-file archive preserves full history in memory-bank/archive/"
+```
+
+#### Step 5.3: Update Memory Bank with Optimization Results
+Добавить запись в [`activeContext.md`](memory-bank/activeContext.md) с результатами оптимизации.
+
+### **⚠️ CRITICAL SAFETY RULES**
+
+#### ❌ NEVER DO:
+- Удалять файлы без архивирования
+- Оптимизировать без git commit перед началом
+- Терять timestamp'ы или связи между записями
+- Архивировать без создания proper references
+- Оптимизировать во время активной работы над задачами
+
+#### ✅ ALWAYS DO:
+- Archive FIRST, optimize SECOND
+- Сохранять 100% исторического контекста
+- Создавать clear navigation между active и archive
+- Документировать процесс и результаты
+- Тестировать доступность информации после оптимизации
+
+### **🔄 RECOVERY PROCEDURES**
+
+#### Если что-то пошло не так:
+```bash
+# Restore из archive
+cp memory-bank/archive/[filename].md memory-bank/[filename].md
+
+# Или revert git commit
+git revert [commit-hash]
+```
+
+#### Если архив поврежден:
+```bash
+# Восстановить из git history
+git show [commit-hash]:memory-bank/[filename].md > memory-bank/[filename].md
+```
+
+### **📊 OPTIMIZATION TRIGGERS**
+
+**Perform optimization when**:
+- Memory Bank > 8,000 lines total
+- Individual files > 1,000 lines
+- Session costs > $3.00 consistently
+- Context switching becomes slow
+- Memory Bank reading takes >30 seconds
+
+**Optimization frequency**: Every 3-6 months or при достижении thresholds
+
+## Expected Impact
+
+### **Immediate Benefits**:
+- **Massive Token Reduction**: 85-97% reduction in Memory Bank size
+- **Cost Savings**: 90-95% reduction in session costs
+- **Faster Context Loading**: Quick access to recent information
+- **Preserved History**: 100% historical context via archive system
+
+### **Long-term Value**:
+- **Sustainable Growth**: Memory Bank can grow indefinitely with periodic optimization
+- **Repeatable Process**: Documented methodology for future optimizations
+- **Knowledge Preservation**: Zero information loss during optimization cycles
+- **Cost Management**: Predictable token costs for large projects
+
+### **Strategic Significance**:
+- **Scalability**: Memory Bank system scales to multi-year projects
+- **Maintainability**: Clear process for managing information growth
+- **Reliability**: Archive system provides backup and recovery capabilities
+- **Efficiency**: Optimal balance between context and performance
+
+## Documentation References
+
+**Complete optimization example**: This AI Trading System project optimization (August 2025)
+- **Before**: 30,709 lines, ~$4.50-6.75 per session
+- **After**: 1,005 lines, ~$0.20-0.30 per session
+- **Results**: 96.7% reduction, 100% context preserved
+
+**Archive location**: [`memory-bank/archive/`](memory-bank/archive/) directory
+**Process validation**: Successful optimization with zero information loss
+
+**CRITICAL SUCCESS FACTORS**:
+1. **Archive First, Optimize Second** - Never lose original content
+2. **Document Everything** - Each step must be traceable
+3. **Test Thoroughly** - Verify information accessibility after optimization
+4. **Preserve Context** - Maintain logical connections between information
+5. **Git Safety** - Every step committed for easy recovery
+
+---
