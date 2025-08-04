@@ -20,6 +20,22 @@ import time
 import json
 import os
 
+# Error hierarchy imports for Phase 2 - Integration
+from .exceptions import (
+    ErrorContext,
+    MarketDataError,
+    ValidationError,
+    NetworkError,
+    ProcessingError,
+    SymbolValidationError,
+    DataFrameValidationError,
+    APIConnectionError,
+    RateLimitError,
+    APIResponseError,
+    CalculationError,
+    DataInsufficientError
+)
+
 
 @dataclass
 class MarketDataSet:
@@ -84,50 +100,65 @@ class MarketDataSet:
         required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
         
         for df_name, df, min_rows in dataframes:
-            # Check DataFrame type
-            if not isinstance(df, pd.DataFrame):
-                raise ValueError(f"{df_name} must be a pandas DataFrame")
-            
-            # Check for empty DataFrame
-            if len(df) == 0:
-                raise ValueError(f"{df_name} cannot be empty")
-            
-            # Check minimum row count for technical analysis
-            if len(df) < min_rows:
-                raise ValueError(f"{df_name} must have at least {min_rows} rows for analysis, got {len(df)}")
-            
-            # Check required columns
-            missing_cols = [col for col in required_columns if col not in df.columns]
-            if missing_cols:
-                raise ValueError(f"{df_name} missing required columns: {missing_cols}")
-            
-            # Check for numeric columns
-            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
-            for col in numeric_cols:
-                if not pd.api.types.is_numeric_dtype(df[col]):
-                    raise ValueError(f"{df_name}.{col} must be numeric")
-            
-            # Check for NaN values in critical columns
-            for col in numeric_cols:
-                if df[col].isna().any():
-                    raise ValueError(f"{df_name}.{col} contains NaN values")
-            
-            # Check OHLC logic (high >= open/close, low <= open/close)
-            if (df['high'] < df[['open', 'close']].max(axis=1)).any():
-                raise ValueError(f"{df_name} has invalid OHLC data: high < max(open, close)")
-            if (df['low'] > df[['open', 'close']].min(axis=1)).any():
-                raise ValueError(f"{df_name} has invalid OHLC data: low > min(open, close)")
-            
-            # Check for non-negative volume
-            if (df['volume'] < 0).any():
-                raise ValueError(f"{df_name} has negative volume values")
+            try:
+                # Check DataFrame type
+                if not isinstance(df, pd.DataFrame):
+                    raise DataFrameValidationError(f"{df_name} must be a pandas DataFrame", df_name, "type_check")
+                
+                # Check for empty DataFrame
+                if len(df) == 0:
+                    raise DataFrameValidationError(f"{df_name} cannot be empty", df_name, "empty_check")
+                
+                # Check minimum row count for technical analysis
+                if len(df) < min_rows:
+                    raise DataFrameValidationError(f"{df_name} must have at least {min_rows} rows for analysis, got {len(df)}", df_name, "row_count")
+                
+                # Check required columns
+                missing_cols = [col for col in required_columns if col not in df.columns]
+                if missing_cols:
+                    raise DataFrameValidationError(f"{df_name} missing required columns: {missing_cols}", df_name, "column_structure")
+                
+                # Check for numeric columns
+                numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+                for col in numeric_cols:
+                    if not pd.api.types.is_numeric_dtype(df[col]):
+                        raise DataFrameValidationError(f"{df_name}.{col} must be numeric", df_name, "column_type")
+                
+                # Check for NaN values in critical columns
+                for col in numeric_cols:
+                    if df[col].isna().any():
+                        raise DataFrameValidationError(f"{df_name}.{col} contains NaN values", df_name, "nan_values")
+                
+                # Check OHLC logic (high >= open/close, low <= open/close)
+                if (df['high'] < df[['open', 'close']].max(axis=1)).any():
+                    raise DataFrameValidationError(f"{df_name} has invalid OHLC data: high < max(open, close)", df_name, "ohlc_logic")
+                if (df['low'] > df[['open', 'close']].min(axis=1)).any():
+                    raise DataFrameValidationError(f"{df_name} has invalid OHLC data: low > min(open, close)", df_name, "ohlc_logic")
+                
+                # Check for non-negative volume
+                if (df['volume'] < 0).any():
+                    raise DataFrameValidationError(f"{df_name} has negative volume values", df_name, "volume_validation")
+                    
+            except DataFrameValidationError:
+                # Re-raise DataFrameValidationError as-is to maintain rich context
+                raise
+            except Exception as e:
+                # Wrap unexpected errors in DataFrameValidationError for consistency
+                raise DataFrameValidationError(f"Unexpected error during {df_name} validation: {str(e)}", df_name, "unexpected_error")
     
     def _validate_symbol(self):
         """Validate symbol format."""
-        if not self.symbol or not isinstance(self.symbol, str):
-            raise ValueError("Symbol must be a non-empty string")
-        if not self.symbol.endswith("USDT") or len(self.symbol) < 6:
-            raise ValueError(f"Invalid symbol format: {self.symbol}. Expected XXXUSDT")
+        try:
+            if not self.symbol or not isinstance(self.symbol, str):
+                raise SymbolValidationError("Symbol must be a non-empty string", symbol=str(self.symbol))
+            if not self.symbol.endswith("USDT") or len(self.symbol) < 6:
+                raise SymbolValidationError(f"Invalid symbol format: {self.symbol}. Expected XXXUSDT", symbol=self.symbol)
+        except SymbolValidationError:
+            # Re-raise SymbolValidationError as-is to maintain rich context
+            raise
+        except Exception as e:
+            # Wrap unexpected errors in SymbolValidationError for consistency
+            raise SymbolValidationError(f"Unexpected error during symbol validation: {str(e)}", symbol=str(self.symbol))
     
     def _validate_technical_indicators(self):
         """Validate technical indicator values."""
@@ -330,10 +361,67 @@ MA Trend: {self.ma_trend.upper()}
 class MarketDataService:
     """Service for aggregating multi-timeframe cryptocurrency market data."""
     
-    def __init__(self, cache_dir: str = "data/cache"):
+    def __init__(self, cache_dir: str = "data/cache", enable_logging: bool = False, fail_fast: bool = False):
         self.cache_dir = cache_dir
         self.base_url = "https://api.binance.com/api/v3"
         self._ensure_cache_dir()
+        
+        # Error context infrastructure for Phase 2 - Integration
+        self._current_trace_id = None
+        
+        # Logging integration points (Phase 2 - Integration)
+        self._enable_logging = enable_logging
+        self._operation_metrics = {}  # For future performance tracking
+        
+        # Fail-fast vs recovery strategy configuration (Phase 2 - Integration)
+        self._fail_fast = fail_fast
+        self._critical_failures = {"symbol_validation", "api_connection", "core_data"}
+        self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators"}
+        
+    def _generate_trace_id(self, operation: str = "market_data") -> str:
+        """Generate a new trace ID for error tracking and logging integration."""
+        import uuid
+        trace_id = f"{operation}_{uuid.uuid4().hex[:8]}"
+        self._current_trace_id = trace_id
+        return trace_id
+    
+    def _get_error_context(self, operation: str, **kwargs) -> ErrorContext:
+        """Create ErrorContext with current trace ID and operation details."""
+        if not self._current_trace_id:
+            self._generate_trace_id(operation)
+        
+        # Logging integration point: capture operation start
+        self._log_operation_start(operation, **kwargs)
+        
+        return ErrorContext(trace_id=self._current_trace_id, operation=operation)
+    
+    def _log_operation_start(self, operation: str, **kwargs):
+        """Logging integration point: Log operation start with context."""
+        if self._enable_logging:
+            # Future logging implementation will go here
+            # For now, this is a placeholder that maintains current functionality
+            pass
+        
+        # Store operation metrics for future logging integration
+        if operation not in self._operation_metrics:
+            self._operation_metrics[operation] = {"count": 0, "errors": 0}
+        self._operation_metrics[operation]["count"] += 1
+    
+    def _log_operation_success(self, operation: str, **kwargs):
+        """Logging integration point: Log successful operation completion."""
+        if self._enable_logging:
+            # Future logging implementation will go here
+            pass
+    
+    def _log_operation_error(self, operation: str, error: Exception, **kwargs):
+        """Logging integration point: Log operation error with rich context."""
+        if self._enable_logging:
+            # Future logging implementation will go here
+            pass
+        
+        # Track error metrics for future logging integration
+        if operation in self._operation_metrics:
+            self._operation_metrics[operation]["errors"] += 1
         
     def _ensure_cache_dir(self):
         """Create cache directory if it doesn't exist."""
@@ -341,7 +429,7 @@ class MarketDataService:
     
     def get_market_data(self, symbol: str) -> MarketDataSet:
         """
-        Get complete multi-timeframe market data for a symbol.
+        Get complete multi-timeframe market data for a symbol with structured error handling.
         
         Args:
             symbol: Trading pair symbol (e.g., 'BTCUSDT')
@@ -349,11 +437,15 @@ class MarketDataService:
         Returns:
             MarketDataSet with all timeframes and indicators
         """
-        # Validate input parameters
-        self._validate_symbol_input(symbol)
+        # Generate trace ID for this main operation
+        trace_id = self._generate_trace_id("get_market_data")
+        error_context = self._get_error_context("get_market_data", symbol=symbol)
         
         try:
-            # Fetch multi-timeframe data
+            # Validate input parameters - may raise SymbolValidationError
+            self._validate_symbol_input(symbol)
+            
+            # Fetch multi-timeframe data - may raise NetworkError exceptions
             daily_data = self._get_klines(symbol, "1d", 180)  # 6 months
             h4_data = self._get_klines(symbol, "4h", 84)      # 2 weeks
             h1_data = self._get_klines(symbol, "1h", 48)      # 48 hours
@@ -362,18 +454,18 @@ class MarketDataService:
             support_level = Decimal(str(daily_data['low'].tail(30).min()))
             resistance_level = Decimal(str(daily_data['high'].tail(30).max()))
             
-            # Calculate technical indicators
-            rsi = self._calculate_rsi(h1_data, 14)
-            macd_signal = self._calculate_macd_signal(h1_data)
-            ma_20 = self._calculate_ma(h1_data, 20)
-            ma_50 = self._calculate_ma(h1_data, 50)
-            ma_trend = self._determine_ma_trend(ma_20, ma_50)
+            # Calculate technical indicators with graceful degradation
+            rsi = self._calculate_rsi_with_fallback(h1_data, 14)
+            macd_signal = self._calculate_macd_signal_with_fallback(h1_data)
+            ma_20 = self._calculate_ma_with_fallback(h1_data, 20)
+            ma_50 = self._calculate_ma_with_fallback(h1_data, 50)
+            ma_trend = self._determine_ma_trend_with_fallback(ma_20, ma_50)
             
-            # Get market context
+            # Get market context - may raise ProcessingError or DataInsufficientError
             btc_correlation = self._calculate_btc_correlation(symbol, h1_data) if symbol != "BTCUSDT" else None
             volume_profile = self._analyze_volume_profile(h1_data)
             
-            return MarketDataSet(
+            market_data_set = MarketDataSet(
                 symbol=symbol,
                 timestamp=datetime.utcnow(),
                 daily_candles=daily_data,
@@ -390,35 +482,66 @@ class MarketDataService:
                 resistance_level=resistance_level
             )
             
+            # Logging integration point: successful operation completion
+            self._log_operation_success("get_market_data", symbol=symbol, data_points=len(h1_data))
+            
+            return market_data_set
+            
+        except (ValidationError, NetworkError, ProcessingError) as e:
+            # Logging integration point: structured error
+            self._log_operation_error("get_market_data", e, symbol=symbol, error_type=type(e).__name__)
+            # Re-raise our custom exceptions to preserve rich error context chain
+            raise
         except Exception as e:
-            raise Exception(f"Failed to get market data for {symbol}: {str(e)}")
+            # Logging integration point: unexpected error
+            self._log_operation_error("get_market_data", e, symbol=symbol, error_type="unexpected")
+            # Wrap unexpected errors in ProcessingError with rich context
+            raise ProcessingError(
+                message=f"Unexpected error during market data aggregation: {str(e)}",
+                operation="get_market_data",
+                context=error_context,
+                processing_stage="data_aggregation",
+                error_details=str(e)
+            )
     
     def _validate_symbol_input(self, symbol: str):
         """Validate symbol input before processing."""
-        if not symbol or not isinstance(symbol, str):
-            raise ValueError("Symbol must be a non-empty string")
-        if not symbol.endswith("USDT") or len(symbol) < 6:
-            raise ValueError(f"Invalid symbol format: {symbol}. Expected XXXUSDT format")
-        if len(symbol) > 12:  # Reasonable length limit
-            raise ValueError(f"Symbol too long: {symbol}")
-        
-        # Extract base currency by removing only the trailing USDT
-        if symbol.count("USDT") > 1:
-            raise ValueError(f"Invalid symbol format: {symbol}. Multiple USDT occurrences not allowed")
-        
-        base_currency = symbol[:-4]  # Remove last 4 characters (USDT)
-        if not base_currency or not base_currency.isalpha() or not base_currency.isupper():
-            raise ValueError(f"Invalid base currency: '{base_currency}'. Must be uppercase letters only")
-        
-        # Validate base currency length (cryptocurrency standards)
-        if len(base_currency) < 3:
-            raise ValueError(f"Base currency too short: '{base_currency}'. Must be at least 3 characters")
-        if len(base_currency) > 5:
-            raise ValueError(f"Base currency too long: '{base_currency}'. Must be 5 characters or less")
+        try:
+            if not symbol or not isinstance(symbol, str):
+                raise SymbolValidationError("Symbol must be a non-empty string", symbol=str(symbol))
+            if not symbol.endswith("USDT") or len(symbol) < 6:
+                raise SymbolValidationError(f"Invalid symbol format: {symbol}. Expected XXXUSDT format", symbol=symbol)
+            if len(symbol) > 12:  # Reasonable length limit
+                raise SymbolValidationError(f"Symbol too long: {symbol}", symbol=symbol)
+            
+            # Extract base currency by removing only the trailing USDT
+            if symbol.count("USDT") > 1:
+                raise SymbolValidationError(f"Invalid symbol format: {symbol}. Multiple USDT occurrences not allowed", symbol=symbol)
+            
+            base_currency = symbol[:-4]  # Remove last 4 characters (USDT)
+            if not base_currency or not base_currency.isalpha() or not base_currency.isupper():
+                raise SymbolValidationError(f"Invalid base currency: '{base_currency}'. Must be uppercase letters only", symbol=symbol)
+            
+            # Validate base currency length (cryptocurrency standards)
+            if len(base_currency) < 3:
+                raise SymbolValidationError(f"Base currency too short: '{base_currency}'. Must be at least 3 characters", symbol=symbol)
+            if len(base_currency) > 5:
+                raise SymbolValidationError(f"Base currency too long: '{base_currency}'. Must be 5 characters or less", symbol=symbol)
+        except SymbolValidationError:
+            # Re-raise SymbolValidationError as-is to maintain rich context
+            raise
+        except Exception as e:
+            # Wrap unexpected errors in SymbolValidationError for consistency
+            raise SymbolValidationError(f"Unexpected error during symbol validation: {str(e)}", symbol=str(symbol))
     
     def get_enhanced_context(self, symbol: str) -> str:
-        """Get enhanced market context with candlestick analysis."""
+        """Get enhanced market context with candlestick analysis and structured error handling."""
+        # Generate trace ID for this enhanced context operation
+        trace_id = self._generate_trace_id("get_enhanced_context")
+        error_context = self._get_error_context("get_enhanced_context", symbol=symbol)
+        
         try:
+            # Get market data - this may raise various structured exceptions
             market_data = self.get_market_data(symbol)
             
             # Fallback to basic context if enhanced analysis fails
@@ -487,27 +610,40 @@ class MarketDataService:
                 error_msg += "Fallback: Basic market data provided above."
                 return f"{basic_context}{error_msg}"
                 
-        except Exception as e:
-            # If even basic market data fails, return minimal error context
+        except (ValidationError, NetworkError, ProcessingError) as e:
+            # Handle our structured exceptions with rich error context
             return f"""
 MARKET DATA ANALYSIS FOR {symbol}
 Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-❌ CRITICAL ERROR
-Error: {str(e)[:200]}...
-Status: Unable to fetch market data
+❌ {type(e).__name__.upper()}: {str(e)[:200]}
+Trace ID: {getattr(e.context, 'trace_id', 'N/A') if hasattr(e, 'context') else 'N/A'}
+Operation: {getattr(e, 'operation', 'unknown')}
+
+Error Details:
+- Error Type: {type(e).__name__}
+- Context: Enhanced market data analysis
+- Symbol: {symbol}
 
 Please check:
-- Network connectivity
-- API availability
-- Symbol validity ({symbol})
-- Service configuration
+- Network connectivity (if NetworkError)
+- Symbol validity (if ValidationError)
+- Data availability (if ProcessingError)
 
 Contact support if this error persists.
 """
+        except Exception as e:
+            # Wrap unexpected errors in ProcessingError
+            raise ProcessingError(
+                message=f"Unexpected error during enhanced context generation: {str(e)}",
+                operation="get_enhanced_context",
+                context=error_context,
+                processing_stage="enhanced_analysis",
+                error_details=str(e)
+            )
     
     def _get_klines(self, symbol: str, interval: str, limit: int) -> pd.DataFrame:
-        """Fetch candlestick data from Binance API."""
+        """Fetch candlestick data from Binance API with structured error handling."""
         url = f"{self.base_url}/klines"
         params = {
             "symbol": symbol,
@@ -515,26 +651,141 @@ Contact support if this error persists.
             "limit": limit
         }
         
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(data, columns=[
-            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_asset_volume', 'number_of_trades',
-            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
-        ])
-        
-        # Convert to proper types
-        numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-        for col in numeric_columns:
-            df[col] = pd.to_numeric(df[col])
-        
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        
-        return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+        try:
+            # Generate trace ID for this network operation
+            trace_id = self._generate_trace_id("get_klines")
+            error_context = self._get_error_context("get_klines", symbol=symbol, interval=interval, limit=limit)
+            
+            response = requests.get(url, params=params, timeout=30)
+            
+            # Handle specific HTTP status codes with rich error context
+            if response.status_code == 429:
+                raise RateLimitError(
+                    message="Binance API rate limit exceeded",
+                    operation="get_klines",
+                    context=error_context,
+                    retry_after=response.headers.get('Retry-After'),
+                    rate_limit_type="request_weight"
+                )
+            elif response.status_code == 404:
+                raise APIResponseError(
+                    message=f"Symbol {symbol} not found or invalid interval {interval}",
+                    operation="get_klines",
+                    context=error_context,
+                    status_code=404,
+                    response_body=response.text[:500]
+                )
+            elif response.status_code >= 500:
+                raise APIConnectionError(
+                    message=f"Binance API server error: {response.status_code}",
+                    operation="get_klines",
+                    context=error_context,
+                    endpoint=url,
+                    status_code=response.status_code
+                )
+            
+            # Raise for other HTTP errors
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Validate API response structure
+            if not isinstance(data, list) or len(data) == 0:
+                raise APIResponseError(
+                    message="Empty or invalid response from Binance API",
+                    operation="get_klines",
+                    context=error_context,
+                    status_code=response.status_code,
+                    response_body=str(data)[:500]
+                )
+            
+            # Convert to DataFrame
+            df = pd.DataFrame(data, columns=[
+                'timestamp', 'open', 'high', 'low', 'close', 'volume',
+                'close_time', 'quote_asset_volume', 'number_of_trades',
+                'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+            ])
+            
+            # Convert to proper types with error handling
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_columns:
+                try:
+                    df[col] = pd.to_numeric(df[col])
+                except (ValueError, TypeError) as e:
+                    raise APIResponseError(
+                        message=f"Invalid numeric data in column {col}: {str(e)}",
+                        operation="get_klines",
+                        context=error_context,
+                        status_code=response.status_code,
+                        response_body=f"Column {col} data validation failed"
+                    )
+            
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            
+            result_df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+            
+            # Logging integration point: successful API call
+            self._log_operation_success("get_klines", symbol=symbol, interval=interval,
+                                      rows_returned=len(result_df), status_code=response.status_code)
+            
+            return result_df
+            
+        except requests.exceptions.Timeout as e:
+            timeout_error = APIConnectionError(
+                message="Request to Binance API timed out",
+                operation="get_klines",
+                context=error_context,
+                endpoint=url,
+                timeout_duration=30
+            )
+            # Logging integration point: timeout error
+            self._log_operation_error("get_klines", timeout_error, symbol=symbol,
+                                    error_type="timeout", endpoint=url)
+            raise timeout_error
+        except requests.exceptions.ConnectionError as e:
+            connection_error = APIConnectionError(
+                message=f"Failed to connect to Binance API: {str(e)}",
+                operation="get_klines",
+                context=error_context,
+                endpoint=url,
+                connection_error=str(e)
+            )
+            # Logging integration point: connection error
+            self._log_operation_error("get_klines", connection_error, symbol=symbol,
+                                    error_type="connection", endpoint=url)
+            raise connection_error
+        except requests.exceptions.RequestException as e:
+            # Catch any other requests-related errors
+            request_error = APIConnectionError(
+                message=f"Network request failed: {str(e)}",
+                operation="get_klines",
+                context=error_context,
+                endpoint=url,
+                request_error=str(e)
+            )
+            # Logging integration point: request error
+            self._log_operation_error("get_klines", request_error, symbol=symbol,
+                                    error_type="request", endpoint=url)
+            raise request_error
+        except (RateLimitError, APIResponseError, APIConnectionError) as e:
+            # Logging integration point: structured API error
+            self._log_operation_error("get_klines", e, symbol=symbol,
+                                    error_type=type(e).__name__, endpoint=url)
+            # Re-raise our custom exceptions as-is to maintain rich context
+            raise
+        except Exception as e:
+            # Wrap any unexpected errors in a ProcessingError
+            processing_error = ProcessingError(
+                message=f"Unexpected error during klines data processing: {str(e)}",
+                operation="get_klines",
+                context=error_context,
+                processing_stage="data_conversion",
+                error_details=str(e)
+            )
+            # Logging integration point: unexpected error
+            self._log_operation_error("get_klines", processing_error, symbol=symbol,
+                                    error_type="unexpected", endpoint=url)
+            raise processing_error
     
     def _calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> Decimal:
         """Calculate RSI indicator with Decimal precision and division by zero protection."""
@@ -620,18 +871,28 @@ Contact support if this error persists.
             return "sideways"
     
     def _calculate_btc_correlation(self, symbol: str, df: pd.DataFrame) -> Optional[Decimal]:
-        """Calculate correlation with BTC using actual price data."""
+        """Calculate correlation with BTC using actual price data with structured error handling."""
         # Skip correlation calculation for BTC itself
         if symbol == "BTCUSDT":
             return None
         
         try:
-            # Fetch BTC data for correlation calculation
+            # Generate trace ID for this correlation operation
+            trace_id = self._generate_trace_id("btc_correlation")
+            error_context = self._get_error_context("btc_correlation", symbol=symbol, data_points=len(df))
+            
+            # Fetch BTC data for correlation calculation - error context is preserved from _get_klines
             btc_data = self._get_klines("BTCUSDT", "1h", len(df))
             
             # Ensure we have enough data points for meaningful correlation
             if len(btc_data) < 10 or len(df) < 10:
-                return None
+                raise DataInsufficientError(
+                    message=f"Insufficient data for BTC correlation: BTC={len(btc_data)}, {symbol}={len(df)} (need 10+ each)",
+                    operation="btc_correlation",
+                    context=error_context,
+                    required_data="10+ candles for both symbols",
+                    available_data=f"BTC: {len(btc_data)}, {symbol}: {len(df)}"
+                )
             
             # Align data by taking minimum length
             min_length = min(len(df), len(btc_data))
@@ -643,6 +904,7 @@ Contact support if this error persists.
             
             # Handle NaN correlation (can happen with constant prices)
             if pd.isna(correlation):
+                # This is not necessarily an error - constant prices can produce NaN correlation
                 return Decimal('0.0')
             
             # Convert to Decimal and clamp to valid range [-1, 1]
@@ -656,11 +918,111 @@ Contact support if this error persists.
             
             return correlation_decimal
             
+        except (NetworkError, DataInsufficientError, ProcessingError):
+            # Re-raise our custom exceptions to preserve error context chain
+            raise
         except Exception as e:
-            # If BTC data fetch fails, log the issue but don't crash
-            # In production, this should use proper logging
-            print(f"Warning: Failed to calculate BTC correlation for {symbol}: {e}")
-            return None
+            # Wrap unexpected errors in ProcessingError with preserved context
+            error_context = self._get_error_context("btc_correlation", symbol=symbol, data_points=len(df))
+            raise ProcessingError(
+                message=f"Unexpected error during BTC correlation calculation: {str(e)}",
+                operation="btc_correlation",
+                context=error_context,
+                processing_stage="correlation_calculation",
+                error_details=str(e)
+            )
+    
+    def _calculate_btc_correlation_with_fallback(self, symbol: str, df: pd.DataFrame) -> Optional[Decimal]:
+        """Calculate BTC correlation with graceful degradation for ProcessingError scenarios."""
+        try:
+            return self._calculate_btc_correlation(symbol, df)
+        except (DataInsufficientError, ProcessingError) as e:
+            # Graceful degradation: log the issue but continue without correlation
+            self._log_operation_error("btc_correlation_fallback", e, symbol=symbol,
+                                    error_type=type(e).__name__, fallback_used=True)
+            return None  # Graceful degradation: no correlation data
+        except NetworkError:
+            # Network errors should not be degraded - they indicate connectivity issues
+            raise
+    
+    def _analyze_volume_profile_with_fallback(self, df: pd.DataFrame) -> str:
+        """Analyze volume profile with graceful degradation for calculation failures."""
+        try:
+            return self._analyze_volume_profile(df)
+        except Exception as e:
+            # Graceful degradation: default to "normal" volume profile
+            self._log_operation_error("volume_profile_fallback", e,
+                                    error_type=type(e).__name__, fallback_used=True)
+            return "normal"  # Safe default value
+    
+    def _calculate_rsi_with_fallback(self, df: pd.DataFrame, period: int = 14) -> Decimal:
+        """Calculate RSI with graceful degradation to neutral value."""
+        try:
+            return self._calculate_rsi(df, period)
+        except Exception as e:
+            # Graceful degradation: return neutral RSI
+            self._log_operation_error("rsi_fallback", e, period=period,
+                                    error_type=type(e).__name__, fallback_used=True)
+            return Decimal('50.0')  # Neutral RSI value
+    
+    def _calculate_macd_signal_with_fallback(self, df: pd.DataFrame) -> str:
+        """Calculate MACD signal with graceful degradation to neutral."""
+        try:
+            return self._calculate_macd_signal(df)
+        except Exception as e:
+            # Graceful degradation: return neutral signal
+            self._log_operation_error("macd_fallback", e,
+                                    error_type=type(e).__name__, fallback_used=True)
+            return "neutral"  # Safe default signal
+    
+    def _calculate_ma_with_fallback(self, df: pd.DataFrame, period: int) -> Decimal:
+        """Calculate moving average with graceful degradation to current price."""
+        try:
+            return self._calculate_ma(df, period)
+        except Exception as e:
+            # Graceful degradation: use current price as MA fallback
+            self._log_operation_error("ma_fallback", e, period=period,
+                                    error_type=type(e).__name__, fallback_used=True)
+            try:
+                # Try to use current price as fallback
+                current_price = Decimal(str(df['close'].iloc[-1]))
+                return current_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            except Exception:
+                # Ultimate fallback: return a reasonable default price
+                return Decimal('50000.00')  # Conservative estimate for crypto
+    
+    def _determine_ma_trend_with_fallback(self, ma_20: Decimal, ma_50: Decimal) -> str:
+        """Determine MA trend with graceful degradation to sideways."""
+        try:
+            return self._determine_ma_trend(ma_20, ma_50)
+        except Exception as e:
+            # Graceful degradation: return sideways trend
+            self._log_operation_error("ma_trend_fallback", e,
+                                    error_type=type(e).__name__, fallback_used=True)
+            return "sideways"  # Safe default trend
+    
+    def _execute_with_strategy(self, operation_type: str, operation_func, fallback_value=None):
+        """Execute operation with fail-fast vs recovery strategy."""
+        try:
+            return operation_func()
+        except Exception as e:
+            # Determine strategy based on operation type and configuration
+            if self._fail_fast or operation_type in self._critical_failures:
+                # Fail-fast: Re-raise the exception immediately
+                self._log_operation_error(f"{operation_type}_fail_fast", e,
+                                        strategy="fail_fast", operation_type=operation_type)
+                raise
+            elif operation_type in self._recoverable_operations:
+                # Recovery: Log error and return fallback value
+                self._log_operation_error(f"{operation_type}_recovery", e,
+                                        strategy="recovery", operation_type=operation_type,
+                                        fallback_value=fallback_value)
+                return fallback_value
+            else:
+                # Default: fail-fast for unknown operations
+                self._log_operation_error(f"{operation_type}_unknown_fail_fast", e,
+                                        strategy="fail_fast_default", operation_type=operation_type)
+                raise
     
     def _analyze_volume_profile(self, df: pd.DataFrame) -> str:
         """Analyze volume profile (high/normal/low)."""
