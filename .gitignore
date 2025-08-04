@@ -159,6 +159,9 @@ Thumbs.db
 ChatGPT-Micro-Cap-Experiment/
 binance-api/
 
+# RooCode reference repository
+roocode-reference/
+
 # Temporary files
 *.tmp
 *.temp

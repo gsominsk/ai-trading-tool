@@ -426,7 +426,11 @@ class MarketDataService:
             
             try:
                 # Generate candlestick analysis using market_data (no state pollution)
-                key_candles = self._select_key_candles(market_data.daily_candles.values.tolist())
+                key_candles = self._select_key_candles(
+                    market_data.daily_candles.values.tolist(),
+                    market_data.support_level,
+                    market_data.resistance_level
+                )
                 
                 # Enhanced candlestick analysis with error handling for each component
                 analysis = "\n=== CANDLESTICK ANALYSIS ===\n"
@@ -675,7 +679,7 @@ Contact support if this error persists.
         else:
             return "normal"
     
-    def _select_key_candles(self, daily_candles: list) -> list:
+    def _select_key_candles(self, daily_candles: list, support_level: Optional[Decimal] = None, resistance_level: Optional[Decimal] = None) -> list:
         """Select key candlesticks using 7-algorithm approach."""
         if not daily_candles or len(daily_candles) < 10:
             return []
@@ -716,9 +720,10 @@ Contact support if this error persists.
         pattern_candles = self._find_pattern_candles(candles[-15:])
         key_candles.extend(pattern_candles)
         
-        # 6. Support/Resistance test candles (skipped - requires support/resistance levels)
-        # sr_test_candles = self._find_sr_test_candles(candles[-20:], support_level, resistance_level)
-        # key_candles.extend(sr_test_candles)
+        # 6. Support/Resistance test candles (now active with proper parameters)
+        if support_level is not None and resistance_level is not None:
+            sr_test_candles = self._find_sr_test_candles(candles[-20:], support_level, resistance_level)
+            key_candles.extend(sr_test_candles)
         
         # 7. Remove duplicates and sort by timestamp
         unique_candles = []
