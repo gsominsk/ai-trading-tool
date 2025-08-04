@@ -31,7 +31,7 @@ def run_test_suite(test_file, verbose=False):
     print(f"Running: {test_file}")
     print(f"{'='*60}")
     
-    cmd = ["python", "-m", "pytest", str(test_file)]
+    cmd = ["python3", "-m", "pytest", str(test_file)]
     if verbose:
         cmd.append("-v")
     else:
@@ -87,7 +87,7 @@ def run_coverage_analysis():
         "tests/test_exception_hierarchy_compatibility.py"
     ]
     
-    cmd = ["python", "-m", "pytest"] + test_files + [
+    cmd = ["python3", "-m", "pytest"] + test_files + [
         "--cov=src/market_data",
         "--cov-report=term-missing",
         "--cov-report=html:htmlcov",

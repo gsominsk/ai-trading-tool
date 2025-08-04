@@ -186,8 +186,8 @@ class NetworkError(MarketDataError):
     """
     
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         status_code: Optional[int] = None,
         response_data: Optional[str] = None,
         endpoint: Optional[str] = None,
@@ -195,7 +195,7 @@ class NetworkError(MarketDataError):
     ):
         """
         Initialize NetworkError with network-specific context.
-        
+
         Args:
             message: Error message
             status_code: HTTP status code (if applicable)
@@ -203,9 +203,12 @@ class NetworkError(MarketDataError):
             endpoint: API endpoint that failed
             **kwargs: Additional context
         """
+        # Set default operation if not provided
+        if 'operation' not in kwargs:
+            kwargs['operation'] = "network_request"
+        
         super().__init__(
             message,
-            operation="network_request",
             status_code=status_code,
             response_data=response_data,
             endpoint=endpoint,
@@ -228,15 +231,15 @@ class ProcessingError(MarketDataError):
     """
     
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         calculation_type: Optional[str] = None,
         input_data: Optional[Dict[str, Any]] = None,
         **kwargs
     ):
         """
         Initialize ProcessingError with calculation-specific context.
-        
+
         Args:
             message: Error message
             calculation_type: Type of calculation that failed
@@ -254,10 +257,13 @@ class ProcessingError(MarketDataError):
                     sanitized_input[key] = f"<{type(value).__name__} length={len(value)}>"
                 else:
                     sanitized_input[key] = str(value)
-        
+
+        # Set default operation if not provided
+        if 'operation' not in kwargs:
+            kwargs['operation'] = "data_processing"
+
         super().__init__(
             message,
-            operation="data_processing",
             calculation_type=calculation_type,
             input_data=sanitized_input,
             **kwargs
@@ -277,11 +283,17 @@ class SymbolValidationError(ValidationError):
     """
     
     def __init__(self, message: str, symbol: str, **kwargs):
+        # Remove conflicting parameters from kwargs to avoid conflicts
+        kwargs.pop('field_name', None)
+        kwargs.pop('field_value', None)
+        kwargs.pop('operation', None)  # Remove operation conflict
+        expected_format = kwargs.pop('expected_format', "Valid trading pair format (e.g., BTCUSDT)")
+        
         super().__init__(
             message,
             field_name="symbol",
             field_value=symbol,
-            expected_format="Valid trading pair format (e.g., BTCUSDT)",
+            expected_format=expected_format,
             symbol=symbol,
             **kwargs
         )
@@ -296,12 +308,14 @@ class DataFrameValidationError(ValidationError):
     """
     
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         dataframe_type: str,
         validation_type: str,
         **kwargs
     ):
+        self.dataframe_type = dataframe_type
+        self.validation_type = validation_type
         super().__init__(
             message,
             field_name="dataframe",

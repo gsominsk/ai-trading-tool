@@ -265,11 +265,11 @@ class TestProcessingErrorIntegration:
     """Test ProcessingError graceful degradation scenarios."""
     
     def test_btc_correlation_processing_error(self):
-        """Test BTC correlation calculation with insufficient data."""
+        """Test direct BTC correlation calculation with insufficient data."""
         service = MarketDataService()
         
-        # Create minimal DataFrame that will pass basic validation but fail correlation
-        minimal_data = {
+        # Create insufficient data (less than 10 periods required for correlation)
+        insufficient_data = {
             'timestamp': pd.date_range('2023-01-01', periods=5, freq='1H'),
             'open': [100.0] * 5,
             'high': [101.0] * 5,
@@ -277,20 +277,15 @@ class TestProcessingErrorIntegration:
             'close': [100.0] * 5,
             'volume': [1000.0] * 5
         }
-        minimal_df = pd.DataFrame(minimal_data)
+        insufficient_df = pd.DataFrame(insufficient_data)
         
         with patch.object(service, '_get_klines') as mock_get_klines:
-            # First call for ETH data - return minimal data
-            # Second call for BTC data - return insufficient data
-            mock_get_klines.side_effect = [
-                minimal_df,  # daily_data for ETH
-                minimal_df,  # h4_data for ETH  
-                minimal_df,  # h1_data for ETH
-                minimal_df.iloc[:5]  # BTC data with insufficient points
-            ]
+            # Mock BTC data to be insufficient (5 periods when 10+ needed)
+            mock_get_klines.return_value = insufficient_df
             
+            # Test direct _calculate_btc_correlation method (without fallback)
             with pytest.raises(DataInsufficientError) as exc_info:
-                service.get_market_data("ETHUSDT")
+                service._calculate_btc_correlation("ETHUSDT", insufficient_df)
             
             error = exc_info.value
             assert isinstance(error, DataInsufficientError)
@@ -303,8 +298,9 @@ class TestProcessingErrorIntegration:
             
             context_dict = error.get_context()
             assert context_dict['operation'] == 'btc_correlation'
-            assert 'required_data' in context_dict
-            assert 'available_data' in context_dict
+            assert 'required_periods' in context_dict
+            assert 'available_periods' in context_dict
+            assert 'data_type' in context_dict
     
     @patch('requests.get')
     def test_unexpected_processing_error_wrapping(self, mock_get):
@@ -313,8 +309,8 @@ class TestProcessingErrorIntegration:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"],  # Valid data
-            [1640998800000, "invalid", "51000", "49000", "50500", "100"]  # Invalid open price
+            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""],  # Valid data
+            [1640998800000, "invalid", "51000", "49000", "50500", "100", 1640998800000, "1", 50, "50500", "0.1", ""]  # Invalid open price
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
@@ -555,7 +551,7 @@ class TestLoggingIntegrationPoints:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response

@@ -112,7 +112,7 @@ class TestFailFastVsRecoveryStrategies:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640998800000, "1000", 100, "50", "500", "0"] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
@@ -151,17 +151,18 @@ class TestGracefulDegradationMechanisms:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100",
+             1640995259999, "5050000", 200, "50", "2525000", "0"] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
         service = MarketDataService(fail_fast=False)
         
-        with patch.object(service, '_get_btc_data') as mock_btc_data:
-            # Simulate BTC data failure
-            mock_btc_data.side_effect = APIConnectionError(
-                "Failed to fetch BTC data",
+        with patch.object(service, '_calculate_btc_correlation') as mock_btc_correlation:
+            # Simulate BTC correlation calculation failure
+            mock_btc_correlation.side_effect = APIConnectionError(
+                "Failed to fetch BTC data for correlation",
                 endpoint="https://api.binance.com/api/v3/klines",
                 operation="get_klines",
                 status_code=503
@@ -181,18 +182,20 @@ class TestGracefulDegradationMechanisms:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100",
+             1640995259999, "5050000", 200, "50", "2525000", "0"] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
         service = MarketDataService(fail_fast=False)
         
-        with patch.object(service, '_calculate_volume_profile') as mock_volume:
-            # Simulate volume profile calculation failure
+        with patch.object(service, '_analyze_volume_profile') as mock_volume:
+            # Simulate volume profile analysis failure
             mock_volume.side_effect = CalculationError(
-                "Volume profile calculation failed",
-                calculation_type="volume_weighted_average_price",
+                "Volume profile analysis failed",
+                indicator_type="volume_profile",
+                calculation_step="volume_weighted_average_price",
                 operation="volume_analysis"
             )
             
@@ -210,7 +213,8 @@ class TestGracefulDegradationMechanisms:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100",
+             1640995259999, "5050000", 200, "50", "2525000", "0"] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
@@ -221,7 +225,8 @@ class TestGracefulDegradationMechanisms:
             # Simulate technical indicators calculation failure
             mock_indicators.side_effect = CalculationError(
                 "RSI calculation failed with insufficient data",
-                calculation_type="rsi_14",
+                indicator_type="rsi_14",
+                calculation_step="rsi_calculation",
                 operation="technical_analysis"
             )
             
@@ -249,7 +254,7 @@ class TestGracefulDegradationMechanisms:
             mock_get_klines.return_value = valid_df
             
             with patch.object(service, '_calculate_btc_correlation') as mock_btc, \
-                 patch.object(service, '_calculate_volume_profile') as mock_volume, \
+                 patch.object(service, '_analyze_volume_profile') as mock_volume, \
                  patch.object(service, '_calculate_technical_indicators') as mock_tech:
                 
                 # Simulate multiple failures
@@ -257,10 +262,14 @@ class TestGracefulDegradationMechanisms:
                     "BTC correlation failed", required_periods=100, available_periods=50
                 )
                 mock_volume.side_effect = CalculationError(
-                    "Volume profile failed", calculation_type="vwap"
+                    "Volume profile failed",
+                    indicator_type="vwap",
+                    calculation_step="volume_analysis"
                 )
                 mock_tech.side_effect = CalculationError(
-                    "Technical indicators failed", calculation_type="rsi"
+                    "Technical indicators failed",
+                    indicator_type="rsi",
+                    calculation_step="technical_analysis"
                 )
                 
                 # Should still return basic market data
@@ -463,14 +472,14 @@ class TestFallbackMechanismIntegration:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640998800000, "1000", 100, "50", "500", "0"] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
         service = MarketDataService(fail_fast=False, enable_logging=True)
         
-        with patch.object(service, '_get_enhanced_context') as mock_enhanced:
+        with patch.object(service, 'get_enhanced_context') as mock_enhanced:
             # Simulate enhanced context failure
             mock_enhanced.side_effect = ProcessingError(
                 "Enhanced analysis failed",
@@ -512,7 +521,7 @@ class TestFallbackMechanismIntegration:
                 # Technical indicators fail
                 mock_tech.side_effect = CalculationError(
                     "RSI calculation failed",
-                    calculation_type="rsi_14"
+                    indicator_type="rsi_14"
                 )
                 
                 # Should return data with BTC correlation but without technical indicators

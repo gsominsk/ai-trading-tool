@@ -220,19 +220,27 @@ class TestLegacyExceptionHandlingPatterns:
         
         for invalid_params in test_cases:
             try:
-                MarketDataSet(
-                    symbol="BTCUSDT",
-                    timestamp=datetime.utcnow(),
-                    daily_candles=valid_df,
-                    h4_candles=valid_df,
-                    h1_candles=valid_df,
-                    rsi_14=Decimal('50.0'),
-                    macd_signal="bullish",
-                    ma_20=Decimal('50000.0'),
-                    ma_50=Decimal('49000.0'),
-                    ma_trend="uptrend",
-                    **invalid_params
-                )
+                # Create base params without rsi_14
+                base_params = {
+                    "symbol": "BTCUSDT",
+                    "timestamp": datetime.utcnow(),
+                    "daily_candles": valid_df,
+                    "h4_candles": valid_df,
+                    "h1_candles": valid_df,
+                    "macd_signal": "bullish",
+                    "ma_20": Decimal('50000.0'),
+                    "ma_50": Decimal('49000.0'),
+                    "ma_trend": "uptrend"
+                }
+                
+                # Add rsi_14 only if not in invalid_params
+                if "rsi_14" not in invalid_params:
+                    base_params["rsi_14"] = Decimal('50.0')
+                
+                # Merge with invalid params
+                base_params.update(invalid_params)
+                
+                MarketDataSet(**base_params)
             except ValueError as e:
                 validation_errors.append(str(e))
         
@@ -276,7 +284,7 @@ class TestMarketDataServiceBackwardCompatibility:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100"] for _ in range(50)
+            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""] for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
@@ -292,10 +300,10 @@ class TestMarketDataServiceBackwardCompatibility:
         """Test that MarketDataSet properties are accessible as before."""
         valid_df = pd.DataFrame({
             'timestamp': pd.date_range('2023-01-01', periods=50, freq='1H'),
-            'open': [100.0] * 50,
-            'high': [101.0] * 50,
-            'low': [99.0] * 50,
-            'close': [100.0] * 50,
+            'open': [50000.0] * 50,
+            'high': [51000.0] * 50,
+            'low': [49000.0] * 50,
+            'close': [50000.0] * 50,
             'volume': [1000.0] * 50
         })
         
@@ -346,10 +354,10 @@ class TestNoBreakingChangesPublicAPI:
         """Test that all expected public properties still exist."""
         valid_df = pd.DataFrame({
             'timestamp': pd.date_range('2023-01-01', periods=50, freq='1H'),
-            'open': [100.0] * 50,
-            'high': [101.0] * 50,
-            'low': [99.0] * 50,
-            'close': [100.0] * 50,
+            'open': [50000.0] * 50,
+            'high': [51000.0] * 50,
+            'low': [49000.0] * 50,
+            'close': [50000.0] * 50,
             'volume': [1000.0] * 50
         })
         
@@ -388,7 +396,11 @@ class TestNoBreakingChangesPublicAPI:
         # Test instantiation
         error = MarketDataError("test message", operation="test")
         assert isinstance(error, MarketDataError)
-        assert str(error) == "test message [trace_id: err_00000000] [operation: test]"
+        # Trace ID is randomly generated, so just check the pattern
+        error_str = str(error)
+        assert "test message" in error_str
+        assert "[trace_id: err_" in error_str
+        assert "]" in error_str
     
     def test_backwards_compatible_error_messages(self):
         """Test that error messages remain understandable and informative."""

@@ -375,8 +375,8 @@ class MarketDataService:
         
         # Fail-fast vs recovery strategy configuration (Phase 2 - Integration)
         self._fail_fast = fail_fast
-        self._critical_failures = {"symbol_validation", "api_connection", "core_data"}
-        self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators"}
+        self._critical_failures = {"symbol_validation", "api_connection", "data_validation", "basic_data_processing"}
+        self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators", "enhanced_analysis", "market_sentiment"}
         
     def _generate_trace_id(self, operation: str = "market_data") -> str:
         """Generate a new trace ID for error tracking and logging integration."""
@@ -461,9 +461,9 @@ class MarketDataService:
             ma_50 = self._calculate_ma_with_fallback(h1_data, 50)
             ma_trend = self._determine_ma_trend_with_fallback(ma_20, ma_50)
             
-            # Get market context - may raise ProcessingError or DataInsufficientError
-            btc_correlation = self._calculate_btc_correlation(symbol, h1_data) if symbol != "BTCUSDT" else None
-            volume_profile = self._analyze_volume_profile(h1_data)
+            # Get market context with graceful degradation
+            btc_correlation = self._calculate_btc_correlation_with_fallback(symbol, h1_data) if symbol != "BTCUSDT" else None
+            volume_profile = self._analyze_volume_profile_with_fallback(h1_data)
             
             market_data_set = MarketDataSet(
                 symbol=symbol,
@@ -888,10 +888,11 @@ Contact support if this error persists.
             if len(btc_data) < 10 or len(df) < 10:
                 raise DataInsufficientError(
                     message=f"Insufficient data for BTC correlation: BTC={len(btc_data)}, {symbol}={len(df)} (need 10+ each)",
+                    required_periods=10,
+                    available_periods=min(len(btc_data), len(df)),
+                    data_type="btc_correlation",
                     operation="btc_correlation",
-                    context=error_context,
-                    required_data="10+ candles for both symbols",
-                    available_data=f"BTC: {len(btc_data)}, {symbol}: {len(df)}"
+                    context=error_context
                 )
             
             # Align data by taking minimum length
@@ -1001,6 +1002,247 @@ Contact support if this error persists.
                                     error_type=type(e).__name__, fallback_used=True)
             return "sideways"  # Safe default trend
     
+    def _get_market_data_with_fallback(self, symbol: str) -> dict:
+        """
+        Get market data with graceful degradation fallback strategy.
+        
+        Returns a dictionary with basic data and enhanced features that succeeded,
+        setting failed components to None for graceful degradation.
+        
+        Args:
+            symbol: Trading pair symbol (e.g., 'BTCUSDT')
+            
+        Returns:
+            Dict with basic_data and enhanced features (correlation, volume_profile, etc.)
+        """
+        try:
+            # Generate trace ID for this fallback operation
+            trace_id = self._generate_trace_id("get_market_data_with_fallback")
+            error_context = self._get_error_context("get_market_data_with_fallback", symbol=symbol)
+            
+            # Try to get basic market data with manual graceful degradation
+            try:
+                # Get core data first (timeframes - critical)
+                daily_data = self._get_klines(symbol, "1d", 180)  # 6 months
+                h4_data = self._get_klines(symbol, "4h", 84)      # 2 weeks
+                h1_data = self._get_klines(symbol, "1h", 48)      # 48 hours
+                
+                # Calculate support/resistance levels (no state pollution)
+                support_level = Decimal(str(daily_data['low'].tail(30).min()))
+                resistance_level = Decimal(str(daily_data['high'].tail(30).max()))
+                
+                # Calculate technical indicators with graceful degradation
+                rsi = self._calculate_rsi_with_fallback(h1_data, 14)
+                macd_signal = self._calculate_macd_signal_with_fallback(h1_data)
+                ma_20 = self._calculate_ma_with_fallback(h1_data, 20)
+                ma_50 = self._calculate_ma_with_fallback(h1_data, 50)
+                ma_trend = self._determine_ma_trend_with_fallback(ma_20, ma_50)
+                
+                # Create basic market data with graceful defaults for enhanced features
+                market_data = MarketDataSet(
+                    symbol=symbol,
+                    timestamp=datetime.utcnow(),
+                    daily_candles=daily_data,
+                    h4_candles=h4_data,
+                    h1_candles=h1_data,
+                    rsi_14=rsi,
+                    macd_signal=macd_signal,
+                    ma_20=ma_20,
+                    ma_50=ma_50,
+                    ma_trend=ma_trend,
+                    btc_correlation=None,  # Will be calculated below with graceful degradation
+                    volume_profile="normal",  # Will be calculated below with graceful degradation
+                    support_level=support_level,
+                    resistance_level=resistance_level
+                )
+                
+                result = {
+                    "basic_data": market_data,
+                    "symbol": symbol,
+                    "timestamp": market_data.timestamp
+                }
+            except Exception as e:
+                # If basic data fails, this is a critical failure
+                self._log_operation_error("get_market_data_with_fallback", e,
+                                        symbol=symbol, error_type="critical_basic_data_failure")
+                raise
+            
+            # Try enhanced features with graceful degradation
+            enhanced_features = {}
+            
+            # BTC Correlation (graceful degradation)
+            try:
+                if symbol != "BTCUSDT":
+                    correlation = self._calculate_btc_correlation(symbol, market_data.h1_candles)
+                    enhanced_features["correlation"] = correlation
+                else:
+                    enhanced_features["correlation"] = None
+            except Exception as e:
+                enhanced_features["correlation"] = None
+                self._log_graceful_degradation(
+                    "get_market_data_with_fallback",
+                    failed_component="btc_correlation",
+                    fallback_used="no_correlation_data",
+                    trace_id=trace_id
+                )
+            
+            # Volume Profile (graceful degradation)
+            try:
+                volume_profile = self._analyze_volume_profile(market_data.h1_candles)
+                enhanced_features["volume_profile"] = volume_profile
+            except Exception as e:
+                enhanced_features["volume_profile"] = None
+                self._log_graceful_degradation(
+                    "get_market_data_with_fallback",
+                    failed_component="volume_profile",
+                    fallback_used="no_volume_analysis",
+                    trace_id=trace_id
+                )
+            
+            # Technical Indicators (graceful degradation)
+            try:
+                technical_indicators = self._calculate_technical_indicators(market_data.h1_candles)
+                enhanced_features["technical_indicators"] = technical_indicators
+            except Exception as e:
+                enhanced_features["technical_indicators"] = None
+                self._log_graceful_degradation(
+                    "get_market_data_with_fallback",
+                    failed_component="technical_indicators",
+                    fallback_used="basic_indicators_only",
+                    trace_id=trace_id
+                )
+            
+            # Merge enhanced features into result
+            result.update(enhanced_features)
+            
+            # Log successful operation completion
+            self._log_operation_success("get_market_data_with_fallback", symbol=symbol,
+                                      enhanced_features_count=len([f for f in enhanced_features.values() if f is not None]))
+            
+            return result
+            
+        except Exception as e:
+            # Log the error
+            self._log_operation_error("get_market_data_with_fallback", e, symbol=symbol, error_type=type(e).__name__)
+            # Re-raise for caller to handle
+            raise
+    
+    def _log_graceful_degradation(self, operation: str, failed_component: str = None,
+                                fallback_used: str = None, trace_id: str = None, **kwargs):
+        """
+        Log graceful degradation events for non-critical operation failures.
+        
+        Args:
+            operation: Name of the operation experiencing degradation
+            failed_component: Component that failed (e.g., 'btc_correlation', 'volume_profile')
+            fallback_used: Description of fallback strategy used
+            trace_id: Optional trace ID for correlation
+            **kwargs: Additional context for logging
+        """
+        if self._enable_logging:
+            # Future logging implementation will go here
+            # For now, this is a placeholder that maintains current functionality
+            pass
+        
+        # Store degradation metrics for future logging integration
+        if operation not in self._operation_metrics:
+            self._operation_metrics[operation] = {"count": 0, "errors": 0, "degradations": 0}
+        
+        # Track degradation event
+        if "degradations" not in self._operation_metrics[operation]:
+            self._operation_metrics[operation]["degradations"] = 0
+        self._operation_metrics[operation]["degradations"] += 1
+        
+        # Store degradation context for debugging
+        if not hasattr(self, '_degradation_history'):
+            self._degradation_history = []
+        
+        self._degradation_history.append({
+            "operation": operation,
+            "failed_component": failed_component,
+            "fallback_used": fallback_used,
+            "trace_id": trace_id or self._current_trace_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            **kwargs
+        })
+        
+        # Keep only last 100 degradation events to prevent memory growth
+        if len(self._degradation_history) > 100:
+            self._degradation_history = self._degradation_history[-100:]
+    
+    def _calculate_technical_indicators(self, df: pd.DataFrame) -> dict:
+        """
+        Calculate comprehensive technical indicators for enhanced analysis.
+        
+        Args:
+            df: DataFrame with OHLC data
+            
+        Returns:
+            Dict with technical indicators (RSI, MACD, Bollinger Bands, etc.)
+        """
+        if len(df) < 20:
+            raise CalculationError(
+                "Insufficient data for technical indicators calculation",
+                calculation_type="technical_indicators",
+                operation="technical_analysis",
+                required_periods=20,
+                available_periods=len(df)
+            )
+        
+        try:
+            indicators = {}
+            
+            # RSI calculation
+            indicators['rsi_14'] = self._calculate_rsi(df, 14)
+            indicators['rsi_7'] = self._calculate_rsi(df, 7) if len(df) >= 8 else None
+            
+            # MACD calculation
+            indicators['macd_signal'] = self._calculate_macd_signal(df)
+            
+            # Moving averages
+            indicators['ma_10'] = self._calculate_ma(df, 10) if len(df) >= 10 else None
+            indicators['ma_20'] = self._calculate_ma(df, 20)
+            indicators['ma_50'] = self._calculate_ma(df, 50) if len(df) >= 50 else None
+            
+            # Bollinger Bands (if enough data)
+            if len(df) >= 20:
+                bb_data = self._calculate_bollinger_bands(df, 20)
+                indicators.update(bb_data)
+            
+            # Volume indicators
+            if 'volume' in df.columns:
+                indicators['volume_sma_10'] = df['volume'].rolling(10).mean().iloc[-1] if len(df) >= 10 else None
+                indicators['volume_ratio'] = (df['volume'].iloc[-1] / df['volume'].rolling(10).mean().iloc[-1]) if len(df) >= 10 else None
+            
+            return indicators
+            
+        except Exception as e:
+            raise CalculationError(
+                f"Technical indicators calculation failed: {str(e)}",
+                calculation_type="comprehensive_technical_indicators",
+                operation="technical_analysis",
+                error_details=str(e)
+            )
+    
+    def _calculate_bollinger_bands(self, df: pd.DataFrame, period: int = 20) -> dict:
+        """Calculate Bollinger Bands with Decimal precision."""
+        if len(df) < period:
+            return {"bb_upper": None, "bb_middle": None, "bb_lower": None}
+        
+        closes = df['close']
+        sma = closes.rolling(period).mean()
+        std = closes.rolling(period).std()
+        
+        bb_upper = sma + (std * 2)
+        bb_middle = sma
+        bb_lower = sma - (std * 2)
+        
+        return {
+            "bb_upper": Decimal(str(bb_upper.iloc[-1])).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+            "bb_middle": Decimal(str(bb_middle.iloc[-1])).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+            "bb_lower": Decimal(str(bb_lower.iloc[-1])).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        }
+    
     def _execute_with_strategy(self, operation_type: str, operation_func, fallback_value=None):
         """Execute operation with fail-fast vs recovery strategy."""
         try:
@@ -1026,11 +1268,22 @@ Contact support if this error persists.
     
     def _analyze_volume_profile(self, df: pd.DataFrame) -> str:
         """Analyze volume profile (high/normal/low)."""
-        if len(df) < 24:
+        if len(df) < 24:  # Need at least 24 hours for basic comparison
             return "normal"
         
+        # Recent volume: last 24 hours
         recent_volume = df['volume'].tail(24).mean()
-        historical_volume = df['volume'].mean()
+        
+        # Historical volume: exclude recent 24 hours to avoid overlap
+        historical_data = df['volume'].iloc[:-24]  # All data except last 24 hours
+        if len(historical_data) == 0:
+            return "normal"
+        
+        historical_volume = historical_data.mean()
+        
+        # Prevent division by zero
+        if historical_volume == 0:
+            return "normal"
         
         ratio = recent_volume / historical_volume
         
