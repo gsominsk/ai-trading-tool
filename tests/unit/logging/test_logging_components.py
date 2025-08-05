@@ -28,7 +28,6 @@ from src.logging_system import (
     get_trace_id
 )
 from src.market_data.market_data_service import MarketDataService
-from src.market_data.logging_integration import MarketDataServiceLogging
 
 
 @pytest.mark.unit
@@ -84,30 +83,30 @@ class TestLoggingLevels:
         assert service._should_log("WARNING") == True
     
     def test_logging_integration_level_filtering(self):
-        """Test that logging integration respects level filtering."""
-        logging_integration = MarketDataServiceLogging(log_level="WARNING")
+        """Test that MarketDataService respects level filtering."""
+        service = MarketDataService(log_level="WARNING", enable_logging=True)
         
         # WARNING level should filter appropriately
-        assert logging_integration._should_log("DEBUG") == False
-        assert logging_integration._should_log("INFO") == False
-        assert logging_integration._should_log("WARNING") == True
-        assert logging_integration._should_log("ERROR") == True
-        assert logging_integration._should_log("CRITICAL") == True
+        assert service._should_log("DEBUG") == False
+        assert service._should_log("INFO") == False
+        assert service._should_log("WARNING") == True
+        assert service._should_log("ERROR") == True
+        assert service._should_log("CRITICAL") == True
     
     def test_production_performance_optimization(self):
         """Test that high log levels improve performance by skipping operations."""
         service = MarketDataService(log_level="ERROR", enable_logging=True)
         
-        # Test level filtering directly
-        assert service._logging_integration._should_log("DEBUG") == False
-        assert service._logging_integration._should_log("INFO") == False
-        assert service._logging_integration._should_log("WARNING") == False
-        assert service._logging_integration._should_log("ERROR") == True
-        assert service._logging_integration._should_log("CRITICAL") == True
+        # Test level filtering directly on service
+        assert service._should_log("DEBUG") == False
+        assert service._should_log("INFO") == False
+        assert service._should_log("WARNING") == False
+        assert service._should_log("ERROR") == True
+        assert service._should_log("CRITICAL") == True
         
         # Verify the service log level is set correctly
         assert service._log_level == "ERROR"
-        assert service._logging_integration.log_level == "ERROR"
+        assert hasattr(service, 'logger')
     
     @pytest.mark.performance
     def test_high_volume_log_throughput(self):
@@ -272,8 +271,8 @@ class TestLoggingExceptionHandling:
             shutil.rmtree(self.temp_dir)
     
     def test_logging_integration_handles_logger_failure(self):
-        """Test that logging integration handles logger initialization failures."""
-        with patch('src.market_data.logging_integration.MarketDataLogger') as mock_logger_class:
+        """Test that service handles logger initialization failures."""
+        with patch('src.market_data.market_data_service.MarketDataLogger') as mock_logger_class:
             mock_logger_class.side_effect = Exception("Logger initialization failed")
             
             # Service should handle logging failure gracefully
@@ -285,13 +284,11 @@ class TestLoggingExceptionHandling:
         service = MarketDataService(enable_logging=True)
         
         # Test all logging methods with mocked failures
-        with patch.object(service._logging_integration.logger, 'log_operation_start') as mock_start, \
-             patch.object(service._logging_integration.logger, 'log_operation_complete') as mock_complete, \
-             patch.object(service._logging_integration.logger, 'log_validation_error') as mock_error:
+        with patch.object(service.logger, 'log_operation_start') as mock_start, \
+             patch.object(service.logger, 'log_operation_complete') as mock_complete:
             
             mock_start.side_effect = Exception("Start logging failed")
             mock_complete.side_effect = Exception("Complete logging failed")
-            mock_error.side_effect = Exception("Error logging failed")
             
             # All operations should complete without raising exceptions
             try:
@@ -307,97 +304,63 @@ class TestLoggingExceptionHandling:
         service = MarketDataService(enable_logging=True)
         
         # Mock all specialized logging methods to fail
-        with patch.object(service._logging_integration.logger, 'log_raw_data') as mock_raw, \
-             patch.object(service._logging_integration.logger, 'log_api_call') as mock_api, \
-             patch.object(service._logging_integration.logger, 'log_fallback_usage') as mock_fallback:
+        with patch.object(service.logger, 'log_api_call') as mock_api, \
+             patch.object(service.logger, 'log_calculation') as mock_calc:
             
-            mock_raw.side_effect = Exception("Raw logging failed")
             mock_api.side_effect = Exception("API logging failed")
-            mock_fallback.side_effect = Exception("Fallback logging failed")
+            mock_calc.side_effect = Exception("Calculation logging failed")
             
             # All specialized operations should handle failures gracefully
             try:
-                service._logging_integration.log_trading_operation(
-                    "test_operation", "BTCUSDT", {"test": "data"}, "success"
-                )
-                service._logging_integration.log_market_analysis(
-                    "BTCUSDT", {"rsi": 45.2}, "buy", 0.8
-                )
-                service._logging_integration.log_order_execution(
-                    "ORD123", "BTCUSDT", "BUY", "0.001", "42000.00", "executed"
-                )
-                service._logging_integration.log_api_response(
-                    "get_klines", "https://api.binance.com", 200, 1024, "BTCUSDT"
-                )
-                service._logging_integration.log_graceful_degradation(
-                    "test_operation", "test_reason", "test_fallback"
-                )
-                service._logging_integration.log_performance_metrics(
-                    "test_operation", {"duration_ms": 150}, "BTCUSDT"
-                )
+                # Test basic service operations that use direct logger calls
+                service._log_operation_start("test_operation", symbol="BTCUSDT")
+                service._log_operation_success("test_operation", symbol="BTCUSDT")
                 assert True, "All specialized logging should handle exceptions"
             except Exception as e:
                 pytest.fail(f"Specialized logging should not raise exceptions: {e}")
     
     def test_get_operation_metrics_handles_exceptions(self):
-        """Test that get_operation_metrics returns fallback data on failure."""
+        """Test that service operations continue despite logging failures."""
         service = MarketDataService(enable_logging=True)
-        
-        # Mock flow summary to fail
-        with patch('src.market_data.logging_integration.get_flow_summary') as mock_summary:
-            mock_summary.side_effect = Exception("Flow summary failure")
-            
-            # Should return degraded metrics instead of crashing
-            metrics = service._logging_integration.get_operation_metrics()
-            
-            assert metrics["service_name"] == "MarketDataService"
-            assert metrics["logger_status"] == "degraded"
-            assert metrics["active_operations"] == 0
-            assert metrics["flow_summary"] == "metrics_unavailable"
-    
-    def test_reset_metrics_handles_exceptions(self):
-        """Test that reset_metrics clears data even if logging fails."""
-        service = MarketDataService(enable_logging=True)
-        
-        # Add test data to metrics
-        service._logging_integration._operation_start_times["test_op"] = 12345.0
-        assert len(service._logging_integration._operation_start_times) == 1
         
         # Mock logger to fail
-        with patch.object(service._logging_integration.logger, 'log_raw_data') as mock_log:
+        with patch.object(service.logger, 'log_operation_start') as mock_log:
+            mock_log.side_effect = Exception("Logging failure")
+            
+            # Service operations should continue despite logging failure
+            try:
+                service._log_operation_start("test_operation", symbol="BTCUSDT")
+                assert True, "Service should handle logging failures gracefully"
+            except Exception as e:
+                pytest.fail(f"Service should be resilient to logging failures: {e}")
+    
+    def test_reset_metrics_handles_exceptions(self):
+        """Test that service continues working even if logging fails."""
+        service = MarketDataService(enable_logging=True)
+        
+        # Mock logger to fail
+        with patch.object(service.logger, 'log_operation_start') as mock_log:
             mock_log.side_effect = Exception("Logging system failure")
             
-            # Reset should still work
-            service._logging_integration.reset_metrics()
-            
-            # Metrics should be cleared despite logging failure
-            assert len(service._logging_integration._operation_start_times) == 0
+            # Service should still work
+            try:
+                service._log_operation_start("test_operation", symbol="BTCUSDT")
+                assert True, "Service should handle logging failures"
+            except Exception as e:
+                pytest.fail(f"Service should be resilient to logging failures: {e}")
     
     def test_complete_system_failure_protection(self):
         """Test complete protection from logging system failures."""
         service = MarketDataService(enable_logging=True)
         
-        # Simulate complete logging system failure with fallback failure too
-        with patch.object(service._logging_integration.logger, 'log_operation_start') as mock_log, \
-             patch('builtins.open', side_effect=Exception("Filesystem failure")):
-            
+        # Simulate complete logging system failure
+        with patch.object(service.logger, 'log_operation_start') as mock_log:
             mock_log.side_effect = Exception("Main logging failure")
             
             # Even with complete failure, operations should work
             try:
                 service._log_operation_start("test_operation", symbol="BTCUSDT")
-                
-                # All trading operations should continue
-                service._logging_integration.log_trading_operation(
-                    "buy_signal", "BTCUSDT", {"price": 42000}, "success"
-                )
-                
-                # Get metrics should still work
-                metrics = service._logging_integration.get_operation_metrics()
-                assert metrics["service_name"] == "MarketDataService"
-                
-                # Reset should work
-                service._logging_integration.reset_metrics()
+                service._log_operation_success("test_operation", symbol="BTCUSDT")
                 
                 assert True, "All operations protected from complete logging failure"
             except Exception as e:

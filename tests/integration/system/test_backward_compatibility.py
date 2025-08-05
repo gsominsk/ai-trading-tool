@@ -263,7 +263,7 @@ class TestMarketDataServiceBackwardCompatibility:
         # Should have default values
         assert hasattr(service, '_enable_logging')
         assert hasattr(service, '_fail_fast')
-        assert hasattr(service, '_operation_metrics')
+        assert hasattr(service, 'logger')  # New DI architecture uses direct logger
     
     def test_constructor_with_legacy_parameters(self):
         """Test constructor compatibility with potential legacy parameters."""

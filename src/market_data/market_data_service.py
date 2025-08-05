@@ -36,8 +36,11 @@ from .exceptions import (
     DataInsufficientError
 )
 
-# Logging integration imports for trading operations
-from .logging_integration import integrate_with_market_data_service, MarketDataServiceLogging
+# Direct logging imports - simplified approach
+from src.logging_system import (
+    configure_ai_logging,
+    MarketDataLogger
+)
 
 
 @dataclass
@@ -373,20 +376,34 @@ class MarketDataService:
         # Error context infrastructure for Phase 2 - Integration
         self._current_trace_id = None
         
-        # Logging integration points (Phase 2 - Integration)
+        # Simple direct logging setup (simplified architecture)
         self._enable_logging = enable_logging
-        self._log_level = log_level.upper()  # CRITICAL, ERROR, WARNING, INFO, DEBUG
-        self._operation_metrics = {}  # For future performance tracking
-        self._logging_integration = None  # Will be set by integrate_with_market_data_service
+        self._log_level = log_level.upper()
         
-        # Fail-fast vs recovery strategy configuration (Phase 2 - Integration)
+        # Direct logger initialization - no monkey patching
+        if self._enable_logging:
+            try:
+                import os
+                os.makedirs("logs", exist_ok=True)
+                configure_ai_logging(
+                    log_level=self._log_level,
+                    log_file="logs/trading_operations.log",
+                    console_output=True,
+                    max_bytes=50*1024*1024,
+                    backup_count=10
+                )
+                self.logger = MarketDataLogger("market_data_service")
+            except Exception as e:
+                # If logging initialization fails, raise the exception
+                # This allows tests to validate error handling behavior
+                raise e
+        else:
+            self.logger = None
+        
+        # Fail-fast vs recovery strategy configuration
         self._fail_fast = fail_fast
         self._critical_failures = {"symbol_validation", "api_connection", "data_validation", "basic_data_processing"}
         self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators", "enhanced_analysis", "market_sentiment"}
-        
-        # Integrate logging system if enabled
-        if self._enable_logging:
-            self._logging_integration = integrate_with_market_data_service(self, log_level=self._log_level)
         
     def _should_log(self, level: str) -> bool:
         """Check if message should be logged based on current log level."""
@@ -407,8 +424,7 @@ class MarketDataService:
         if not self._current_trace_id:
             self._generate_trace_id(operation)
         
-        # Logging integration point: capture operation start
-        # Extract symbol for logging if present
+        # Direct logging: capture operation start
         symbol = kwargs.get('symbol', '')
         context = {k: v for k, v in kwargs.items() if k != 'symbol'}
         self._log_operation_start(operation, symbol=symbol, **context)
@@ -416,51 +432,51 @@ class MarketDataService:
         return ErrorContext(trace_id=self._current_trace_id, operation=operation)
     
     def _log_operation_start(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
-        """Logging integration point: Log operation start with context."""
-        if self._enable_logging and self._logging_integration:
-            # Use actual logging integration (it handles level checking internally)
-            self._logging_integration.log_operation_start(
-                operation=operation,
-                symbol=symbol,
-                context=kwargs,
-                trace_id=self._current_trace_id,
-                level=level
-            )
-        
-        # Store operation metrics for future logging integration
-        if operation not in self._operation_metrics:
-            self._operation_metrics[operation] = {"count": 0, "errors": 0}
-        self._operation_metrics[operation]["count"] += 1
+        """Direct logging: Log operation start with context."""
+        if self.logger:
+            try:
+                self.logger.log_operation_start(
+                    operation=operation,
+                    symbol=symbol,
+                    context=kwargs,
+                    trace_id=self._current_trace_id
+                )
+            except Exception:
+                # Graceful degradation: logging failures should not crash operations
+                pass
     
     def _log_operation_success(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
-        """Logging integration point: Log successful operation completion."""
-        if self._enable_logging and self._logging_integration:
-            # Use actual logging integration (it handles level checking internally)
-            self._logging_integration.log_operation_success(
-                operation=operation,
-                symbol=symbol,
-                context=kwargs,
-                trace_id=self._current_trace_id,
-                level=level
-            )
+        """Direct logging: Log successful operation completion."""
+        if self.logger:
+            try:
+                self.logger.log_operation_complete(
+                    operation=operation,
+                    processing_time_ms=kwargs.get('processing_time_ms', 0),
+                    context={
+                        'symbol': symbol,
+                        'status': 'success',
+                        **kwargs
+                    },
+                    trace_id=self._current_trace_id
+                )
+            except Exception:
+                # Graceful degradation: logging failures should not crash operations
+                pass
     
     def _log_operation_error(self, operation: str, error: Exception, symbol: str = "", level: str = "ERROR", **kwargs):
-        """Logging integration point: Log operation error with rich context."""
-        if self._enable_logging and self._logging_integration:
-            # Use actual logging integration (it handles level checking internally)
-            self._logging_integration.log_operation_error(
-                operation=operation,
-                error=error,
-                symbol=symbol,
-                context=kwargs,
-                trace_id=self._current_trace_id,
-                error_type=kwargs.get('error_type', 'unknown'),
-                level=level
-            )
-        
-        # Track error metrics for future logging integration
-        if operation in self._operation_metrics:
-            self._operation_metrics[operation]["errors"] += 1
+        """Direct logging: Log operation error with rich context."""
+        if self.logger:
+            try:
+                self.logger.log_validation_error(
+                    field=operation,
+                    value=str(error),
+                    expected="successful_operation",
+                    error_msg=f"{kwargs.get('error_type', type(error).__name__)}: {str(error)}",
+                    trace_id=self._current_trace_id
+                )
+            except Exception:
+                # Graceful degradation: logging failures should not crash operations
+                pass
         
     def _ensure_cache_dir(self):
         """Create cache directory if it doesn't exist."""
@@ -527,11 +543,11 @@ class MarketDataService:
                 resistance_level=resistance_level
             )
             
-            # Logging integration point: successful operation completion
+            # Direct logging: successful operation completion
             self._log_operation_success("get_market_data", symbol=symbol, level="INFO", data_points=len(h1_data))
             
             # Log complete market analysis for trading operations
-            if self._logging_integration:
+            if self.logger:
                 self._log_market_analysis_complete(symbol, market_data_set, trace_id)
             
             return market_data_set
@@ -854,7 +870,32 @@ Contact support if this error persists.
     
     def _calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> Decimal:
         """Calculate RSI indicator with Decimal precision and division by zero protection."""
+        # Log RSI calculation start
+        if self.logger:
+            self.logger.log_operation_start(
+                operation="rsi_calculation",
+                symbol="",
+                context={
+                    "period": period,
+                    "data_points": len(df),
+                    "calculation_type": "technical_indicator"
+                },
+                trace_id=self._current_trace_id
+            )
+        
         if len(df) < period + 1:
+            if self.logger:
+                self.logger.log_raw_data(
+                    data_type="rsi_calculation",
+                    data_sample={
+                        "result": "insufficient_data",
+                        "required_periods": period + 1,
+                        "available_periods": len(df),
+                        "fallback_value": 50.0
+                    },
+                    data_stats={"status": "fallback"},
+                    trace_id=self._current_trace_id
+                )
             return Decimal('50.0')  # Default neutral RSI
         
         closes = df['close']
@@ -884,11 +925,53 @@ Contact support if this error persists.
             rsi_value = 100 - (100 / (1 + rs))
         
         # Convert to Decimal with proper precision
-        return Decimal(str(rsi_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        result = Decimal(str(rsi_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        # Log RSI calculation completion
+        if self.logger:
+            self.logger.log_operation_complete(
+                operation="rsi_calculation",
+                processing_time_ms=0,  # Fast calculation
+                context={
+                    "rsi_value": float(result),
+                    "final_gain": float(final_gain),
+                    "final_loss": float(final_loss),
+                    "period": period,
+                    "data_quality": "normal" if len(df) >= period + 10 else "minimal"
+                },
+                trace_id=self._current_trace_id
+            )
+        
+        return result
     
     def _calculate_macd_signal(self, df: pd.DataFrame) -> str:
         """Calculate MACD signal (bullish/bearish/neutral)."""
+        # Log MACD calculation start
+        if self.logger:
+            self.logger.log_operation_start(
+                operation="macd_calculation",
+                symbol="",
+                context={
+                    "data_points": len(df),
+                    "calculation_type": "technical_indicator",
+                    "required_periods": 26
+                },
+                trace_id=self._current_trace_id
+            )
+        
         if len(df) < 26:
+            if self.logger:
+                self.logger.log_raw_data(
+                    data_type="macd_calculation",
+                    data_sample={
+                        "result": "insufficient_data",
+                        "required_periods": 26,
+                        "available_periods": len(df),
+                        "fallback_signal": "neutral"
+                    },
+                    data_stats={"status": "fallback"},
+                    trace_id=self._current_trace_id
+                )
             return "neutral"
         
         closes = df['close']
@@ -901,24 +984,87 @@ Contact support if this error persists.
         current_signal = signal_line.iloc[-1]
         
         if current_macd > current_signal:
-            return "bullish"
+            result = "bullish"
         elif current_macd < current_signal:
-            return "bearish"
+            result = "bearish"
         else:
-            return "neutral"
+            result = "neutral"
+        
+        # Log MACD calculation completion
+        if self.logger:
+            self.logger.log_operation_complete(
+                operation="macd_calculation",
+                processing_time_ms=0,  # Fast calculation
+                context={
+                    "macd_signal": result,
+                    "current_macd": float(current_macd),
+                    "current_signal": float(current_signal),
+                    "ema_12": float(ema_12.iloc[-1]),
+                    "ema_26": float(ema_26.iloc[-1]),
+                    "data_quality": "normal" if len(df) >= 35 else "minimal"
+                },
+                trace_id=self._current_trace_id
+            )
+        
+        return result
     
     def _calculate_ma(self, df: pd.DataFrame, period: int) -> Decimal:
         """Calculate moving average with Decimal precision."""
+        # Log MA calculation start
+        if self.logger:
+            self.logger.log_operation_start(
+                operation="ma_calculation",
+                symbol="",
+                context={
+                    "period": period,
+                    "data_points": len(df),
+                    "calculation_type": "technical_indicator"
+                },
+                trace_id=self._current_trace_id
+            )
+        
         if len(df) < period:
             avg_value = float(df['close'].mean())
-            return Decimal(str(avg_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            result = Decimal(str(avg_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            
+            if self.logger:
+                self.logger.log_raw_data(
+                    data_type="ma_calculation",
+                    data_sample={
+                        "result": "insufficient_data_fallback",
+                        "required_periods": period,
+                        "available_periods": len(df),
+                        "fallback_method": "simple_average",
+                        "ma_value": float(result)
+                    },
+                    data_stats={"status": "fallback"},
+                    trace_id=self._current_trace_id
+                )
+            return result
         
         ma_value = df['close'].rolling(window=period).mean().iloc[-1]
         if pd.notna(ma_value):
-            return Decimal(str(float(ma_value))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            result = Decimal(str(float(ma_value))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
             avg_value = float(df['close'].mean())
-            return Decimal(str(avg_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            result = Decimal(str(avg_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        # Log MA calculation completion
+        if self.logger:
+            self.logger.log_operation_complete(
+                operation="ma_calculation",
+                processing_time_ms=0,  # Fast calculation
+                context={
+                    "period": period,
+                    "ma_value": float(result),
+                    "data_points_used": period,
+                    "data_quality": "normal" if len(df) >= period + 5 else "minimal",
+                    "calculation_method": "rolling_average" if pd.notna(ma_value) else "simple_average"
+                },
+                trace_id=self._current_trace_id
+            )
+        
+        return result
     
     def _determine_ma_trend(self, ma_20: Decimal, ma_50: Decimal) -> str:
         """Determine trend based on moving averages."""
@@ -941,6 +1087,19 @@ Contact support if this error persists.
         if symbol == "BTCUSDT":
             return None
         
+        # Log BTC correlation calculation start
+        if self.logger:
+            self.logger.log_operation_start(
+                operation="btc_correlation_calculation",
+                symbol=symbol,
+                context={
+                    "target_symbol": symbol,
+                    "data_points": len(df),
+                    "calculation_type": "market_correlation"
+                },
+                trace_id=self._current_trace_id
+            )
+        
         try:
             # Generate trace ID for this correlation operation
             trace_id = self._generate_trace_id("btc_correlation")
@@ -951,6 +1110,19 @@ Contact support if this error persists.
             
             # Ensure we have enough data points for meaningful correlation
             if len(btc_data) < 10 or len(df) < 10:
+                if self.logger:
+                    self.logger.log_raw_data(
+                        data_type="btc_correlation_calculation",
+                        data_sample={
+                            "result": "insufficient_data",
+                            "btc_data_points": len(btc_data),
+                            "symbol_data_points": len(df),
+                            "required_minimum": 10,
+                            "correlation_value": None
+                        },
+                        data_stats={"status": "insufficient_data"},
+                        trace_id=self._current_trace_id
+                    )
                 raise DataInsufficientError(
                     message=f"Insufficient data for BTC correlation: BTC={len(btc_data)}, {symbol}={len(df)} (need 10+ each)",
                     required_periods=10,
@@ -970,6 +1142,18 @@ Contact support if this error persists.
             
             # Handle NaN correlation (can happen with constant prices)
             if pd.isna(correlation):
+                if self.logger:
+                    self.logger.log_raw_data(
+                        data_type="btc_correlation_calculation",
+                        data_sample={
+                            "result": "nan_correlation",
+                            "reason": "constant_prices_or_no_variance",
+                            "fallback_correlation": 0.0,
+                            "data_points_used": min_length
+                        },
+                        data_stats={"status": "fallback"},
+                        trace_id=self._current_trace_id
+                    )
                 # This is not necessarily an error - constant prices can produce NaN correlation
                 return Decimal('0.0')
             
@@ -981,6 +1165,22 @@ Contact support if this error persists.
                 correlation_decimal = Decimal('1.0')
             elif correlation_decimal < Decimal('-1.0'):
                 correlation_decimal = Decimal('-1.0')
+            
+            # Log BTC correlation calculation completion
+            if self.logger:
+                self.logger.log_operation_complete(
+                    operation="btc_correlation_calculation",
+                    processing_time_ms=0,  # Fast calculation
+                    context={
+                        "symbol": symbol,
+                        "correlation_value": float(correlation_decimal),
+                        "data_points_used": min_length,
+                        "btc_data_points": len(btc_data),
+                        "symbol_data_points": len(df),
+                        "correlation_strength": "strong" if abs(correlation_decimal) > Decimal('0.7') else "moderate" if abs(correlation_decimal) > Decimal('0.3') else "weak"
+                    },
+                    trace_id=self._current_trace_id
+                )
             
             return correlation_decimal
             
@@ -1234,7 +1434,7 @@ Contact support if this error persists.
     
     def _log_market_analysis_complete(self, symbol: str, market_data: MarketDataSet, trace_id: str = None):
         """Log complete market analysis for AI trading strategy optimization."""
-        if not self._logging_integration:
+        if not self.logger:
             return
             
         try:
@@ -1265,12 +1465,21 @@ Contact support if this error persists.
             confidence = self._calculate_analysis_confidence(market_data)
             decision = self._get_basic_trading_decision(market_data)
             
-            # Log market analysis with trading context
-            self._logging_integration.log_market_analysis(
-                symbol=symbol,
-                analysis_data=analysis_data,
-                decision=decision,
-                confidence=confidence,
+            # Direct logging: market analysis with trading context
+            self.logger.log_raw_data(
+                data_type="market_analysis",
+                data_sample={
+                    "symbol": symbol,
+                    "analysis_data": analysis_data,
+                    "decision": decision,
+                    "confidence": confidence,
+                    "analysis_timestamp": datetime.utcnow().isoformat()
+                },
+                data_stats={
+                    "symbol": symbol,
+                    "decision": decision,
+                    "confidence_level": "high" if confidence > 0.7 else "medium" if confidence > 0.4 else "low"
+                },
                 trace_id=trace_id
             )
             
@@ -1338,12 +1547,21 @@ Contact support if this error persists.
     
     def log_trading_operation(self, operation_type: str, symbol: str, trade_data: dict, result: str = "success"):
         """Public method to log trading operations from external components."""
-        if self._logging_integration:
-            self._logging_integration.log_trading_operation(
-                operation_type=operation_type,
-                symbol=symbol,
-                trade_data=trade_data,
-                result=result,
+        if self.logger:
+            self.logger.log_raw_data(
+                data_type="trading_operation",
+                data_sample={
+                    "operation_type": operation_type,
+                    "symbol": symbol,
+                    "trade_data": trade_data,
+                    "result": result,
+                    "trading_timestamp": datetime.utcnow().isoformat()
+                },
+                data_stats={
+                    "operation_type": operation_type,
+                    "symbol": symbol,
+                    "result": result
+                },
                 trace_id=self._current_trace_id
             )
     
@@ -1351,15 +1569,25 @@ Contact support if this error persists.
                            amount: str, price: str, status: str = "executed",
                            execution_time_ms: int = None):
         """Public method to log order executions from trading components."""
-        if self._logging_integration:
-            self._logging_integration.log_order_execution(
-                order_id=order_id,
-                symbol=symbol,
-                order_type=order_type,
-                amount=amount,
-                price=price,
-                status=status,
-                execution_time_ms=execution_time_ms,
+        if self.logger:
+            self.logger.log_raw_data(
+                data_type="order_execution",
+                data_sample={
+                    "order_id": order_id,
+                    "symbol": symbol,
+                    "order_type": order_type,
+                    "amount": amount,
+                    "price": price,
+                    "status": status,
+                    "execution_time_ms": execution_time_ms,
+                    "execution_timestamp": datetime.utcnow().isoformat()
+                },
+                data_stats={
+                    "symbol": symbol,
+                    "order_type": order_type,
+                    "status": status,
+                    "amount": amount
+                },
                 trace_id=self._current_trace_id
             )
     
@@ -1461,7 +1689,32 @@ Contact support if this error persists.
     
     def _analyze_volume_profile(self, df: pd.DataFrame) -> str:
         """Analyze volume profile (high/normal/low)."""
+        # Log volume analysis start
+        if self.logger:
+            self.logger.log_operation_start(
+                operation="volume_analysis",
+                symbol="",
+                context={
+                    "data_points": len(df),
+                    "calculation_type": "volume_profile",
+                    "required_minimum": 24
+                },
+                trace_id=self._current_trace_id
+            )
+        
         if len(df) < 24:  # Need at least 24 hours for basic comparison
+            if self.logger:
+                self.logger.log_raw_data(
+                    data_type="volume_analysis",
+                    data_sample={
+                        "result": "insufficient_data",
+                        "required_periods": 24,
+                        "available_periods": len(df),
+                        "fallback_profile": "normal"
+                    },
+                    data_stats={"status": "fallback"},
+                    trace_id=self._current_trace_id
+                )
             return "normal"
         
         # Recent volume: last 24 hours
@@ -1470,22 +1723,64 @@ Contact support if this error persists.
         # Historical volume: exclude recent 24 hours to avoid overlap
         historical_data = df['volume'].iloc[:-24]  # All data except last 24 hours
         if len(historical_data) == 0:
+            if self.logger:
+                self.logger.log_raw_data(
+                    data_type="volume_analysis",
+                    data_sample={
+                        "result": "no_historical_data",
+                        "recent_volume": float(recent_volume),
+                        "fallback_profile": "normal"
+                    },
+                    data_stats={"status": "fallback"},
+                    trace_id=self._current_trace_id
+                )
             return "normal"
         
         historical_volume = historical_data.mean()
         
         # Prevent division by zero
         if historical_volume == 0:
+            if self.logger:
+                self.logger.log_raw_data(
+                    data_type="volume_analysis",
+                    data_sample={
+                        "result": "zero_historical_volume",
+                        "recent_volume": float(recent_volume),
+                        "historical_volume": 0.0,
+                        "fallback_profile": "normal"
+                    },
+                    data_stats={"status": "fallback"},
+                    trace_id=self._current_trace_id
+                )
             return "normal"
         
         ratio = recent_volume / historical_volume
         
         if ratio > 1.5:
-            return "high"
+            result = "high"
         elif ratio < 0.5:
-            return "low"
+            result = "low"
         else:
-            return "normal"
+            result = "normal"
+        
+        # Log volume analysis completion
+        if self.logger:
+            self.logger.log_operation_complete(
+                operation="volume_analysis",
+                processing_time_ms=0,  # Fast calculation
+                context={
+                    "volume_profile": result,
+                    "recent_volume": float(recent_volume),
+                    "historical_volume": float(historical_volume),
+                    "volume_ratio": float(ratio),
+                    "recent_periods": 24,
+                    "historical_periods": len(historical_data),
+                    "data_quality": "normal" if len(df) >= 48 else "minimal"
+                },
+                trace_id=self._current_trace_id
+            )
+        
+        return result
     
     def _select_key_candles(self, daily_candles: list, support_level: Optional[Decimal] = None, resistance_level: Optional[Decimal] = None) -> list:
         """Select key candlesticks using 7-algorithm approach."""

@@ -348,9 +348,9 @@ class TestTradingLoggingIntegration:
         """Test MarketDataService integration with logging system."""
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        # Test that service has logging integration
-        assert service._logging_integration is not None
-        assert service._logging_integration.logger is not None
+        # Test that service has logger
+        assert hasattr(service, 'logger')
+        assert service.logger is not None
         
         # Test logging operations work
         service._log_operation_start("test_operation", symbol="BTCUSDT")
@@ -378,15 +378,13 @@ class TestTradingLoggingIntegration:
             
             # Data collection stage
             advance_to_stage("data_collection")
-            service._logging_integration.log_api_response(
-                "get_klines", "https://api.binance.com", 200, 1024, "BTCUSDT"
-            )
+            # Test API call logging through the new DI system
+            service.logger.log_api_call("BTCUSDT", "1d", 180, response_time_ms=150)
             
             # Technical indicators stage
             advance_to_stage("technical_indicators")
-            service._logging_integration.log_market_analysis(
-                "BTCUSDT", {"rsi": 65, "macd": 0.2}, "buy", 0.85
-            )
+            # Test calculation logging through the new DI system
+            service.logger.log_calculation("RSI", "BTCUSDT", result="65")
             
             # Complete operation
             advance_to_stage("completion")
@@ -406,25 +404,13 @@ class TestTradingLoggingIntegration:
         
         # Test all trading operation logging methods
         try:
-            service._logging_integration.log_trading_operation(
-                "buy_signal", "BTCUSDT", {"price": 42000, "quantity": 0.001}, "success"
-            )
+            # Test basic logging operations that are available in new architecture
+            service._log_operation_start("buy_signal", symbol="BTCUSDT")
+            service._log_operation_success("buy_signal", symbol="BTCUSDT")
             
-            service._logging_integration.log_market_analysis(
-                "BTCUSDT", {"rsi": 65, "macd": 0.2}, "buy", 0.85
-            )
-            
-            service._logging_integration.log_order_execution(
-                "ORD123", "BTCUSDT", "BUY", "0.001", "42000.00", "filled"
-            )
-            
-            service._logging_integration.log_performance_metrics(
-                "market_analysis", {"duration_ms": 45, "operations": 3}, "BTCUSDT"
-            )
-            
-            service._logging_integration.log_graceful_degradation(
-                "price_feed", "timeout", "using_cached_data"
-            )
+            # Test direct logger operations
+            service.logger.log_api_call("BTCUSDT", "1d", 180, response_time_ms=45)
+            service.logger.log_calculation("RSI", "BTCUSDT", result="65")
             
             # All operations should complete without errors
             assert True, "All trading operations logging should work"
@@ -437,7 +423,7 @@ class TestTradingLoggingIntegration:
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
         # Simulate logging system failure
-        with patch.object(service._logging_integration.logger, 'log_operation_start') as mock_log:
+        with patch.object(service.logger, 'log_operation_start') as mock_log:
             mock_log.side_effect = Exception("Logging system failure")
             
             # Trading operations should continue despite logging failure
@@ -445,13 +431,11 @@ class TestTradingLoggingIntegration:
                 service._log_operation_start("critical_trade", symbol="BTCUSDT")
                 
                 # Continue with trading operations
-                service._logging_integration.log_trading_operation(
-                    "emergency_trade", "BTCUSDT", {"price": 42000}, "executed"
-                )
+                service._log_operation_start("emergency_trade", symbol="BTCUSDT")
+                service._log_operation_success("emergency_trade", symbol="BTCUSDT")
                 
-                # Get system metrics (should return degraded state)
-                metrics = service._logging_integration.get_operation_metrics()
-                assert metrics["service_name"] == "MarketDataService"
+                # Service should continue working
+                assert hasattr(service, 'logger')
                 
                 # Trading should continue successfully
                 assert True, "Trading operations should continue despite logging failures"
@@ -492,9 +476,7 @@ class TestCompleteLoggingWorkflows:
             
             # 3. Service integration logging
             service._log_operation_start("service_integration", symbol="BTCUSDT")
-            service._logging_integration.log_trading_operation(
-                "integration_trade", "BTCUSDT", {"price": 42000}, "success"
-            )
+            service.logger.log_api_call("BTCUSDT", "1d", 180, response_time_ms=123)
             
             # 4. Flow progression
             advance_to_stage("validation")

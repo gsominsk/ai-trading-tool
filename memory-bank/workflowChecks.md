@@ -1,5 +1,12 @@
 # Memory Bank Workflow Rules
 
+## CRITICAL RULE - NEVER VIOLATE!
+
+### 🚫 File Creation Policy
+**NEVER CREATE NEW FILES WITHOUT EXPLICIT USER PERMISSION**
+- Do not create configuration files, scripts, or any other files
+- Always ask user permission before creating any new file
+
 ## Simple Rules (replacing 374-line complex system)
 
 ### Rule 1: Start with Memory Bank
