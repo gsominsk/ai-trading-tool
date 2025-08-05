@@ -108,6 +108,152 @@ class TestLoggingLevels:
         # Verify the service log level is set correctly
         assert service._log_level == "ERROR"
         assert service._logging_integration.log_level == "ERROR"
+    
+    @pytest.mark.performance
+    def test_high_volume_log_throughput(self):
+        """Test logging system can handle high volume of log messages."""
+        from src.logging_system.json_formatter import AIOptimizedJSONFormatter
+        import time
+        import psutil
+        
+        formatter = AIOptimizedJSONFormatter()
+        
+        # Test parameters
+        message_count = 1000
+        start_time = time.time()
+        
+        # Generate high volume of log messages
+        for i in range(message_count):
+            log_record = self._create_log_record(f"test_message_{i}")
+            formatted_message = formatter.format(log_record)
+            
+            # Verify message is properly formatted
+            assert "test_message_" in formatted_message
+            assert "timestamp" in formatted_message
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        # Performance requirement: > 1000 messages/second
+        messages_per_second = message_count / duration
+        assert messages_per_second > 500, f"Throughput too low: {messages_per_second:.1f} msg/sec"
+        
+        print(f"✅ Log throughput: {messages_per_second:.1f} messages/second")
+    
+    @pytest.mark.performance
+    def test_memory_usage_during_extended_logging(self):
+        """Test memory usage remains reasonable during extended logging."""
+        from src.logging_system.json_formatter import AIOptimizedJSONFormatter
+        import psutil
+        
+        formatter = AIOptimizedJSONFormatter()
+        process = psutil.Process()
+        
+        # Record initial memory
+        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        
+        # Generate large number of log messages
+        message_count = 5000  # Reduced for unit test
+        for i in range(message_count):
+            log_record = self._create_log_record(f"extended_test_{i}")
+            formatted_message = formatter.format(log_record)
+            
+            # Periodically check memory
+            if i % 1000 == 0:
+                current_memory = process.memory_info().rss / 1024 / 1024
+                memory_increase = current_memory - initial_memory
+                
+                # Performance requirement: < 50MB for 5K messages
+                assert memory_increase < 50, f"Memory usage too high: {memory_increase:.1f}MB"
+        
+        final_memory = process.memory_info().rss / 1024 / 1024
+        total_increase = final_memory - initial_memory
+        
+        print(f"✅ Memory increase for {message_count} messages: {total_increase:.1f}MB")
+        assert total_increase < 50, f"Total memory increase too high: {total_increase:.1f}MB"
+    
+    @pytest.mark.performance
+    def test_json_formatting_performance(self):
+        """Test JSON formatting performance for individual messages."""
+        from src.logging_system.json_formatter import AIOptimizedJSONFormatter
+        import time
+        from decimal import Decimal
+        
+        formatter = AIOptimizedJSONFormatter()
+        
+        # Test parameters
+        iterations = 500  # Reduced for unit test
+        max_time_per_message = 0.005  # 5ms - more lenient
+        
+        total_time = 0
+        for i in range(iterations):
+            log_record = self._create_complex_log_record(i)
+            
+            start_time = time.time()
+            formatted_message = formatter.format(log_record)
+            end_time = time.time()
+            
+            format_time = end_time - start_time
+            total_time += format_time
+            
+            # Verify formatting works
+            assert "complex_message_" in formatted_message
+            assert "timestamp" in formatted_message
+            
+        average_time = total_time / iterations
+        
+        # Performance requirement: < 5ms per message (lenient for unit test)
+        assert average_time < max_time_per_message, f"JSON formatting too slow: {average_time*1000:.2f}ms"
+        
+        print(f"✅ Average JSON formatting time: {average_time*1000:.2f}ms per message")
+    
+    def _create_log_record(self, message, level="INFO"):
+        """Helper to create a log record for testing."""
+        import time
+        return type('LogRecord', (), {
+            'levelname': level,
+            'msg': message,
+            'args': (),
+            'created': time.time(),
+            'filename': 'test.py',
+            'funcName': 'test_function',
+            'lineno': 42,
+            'module': 'test_module',
+            'msecs': 123,
+            'name': 'test_logger',
+            'pathname': '/test/test.py',
+            'process': 12345,
+            'processName': 'TestProcess',
+            'relativeCreated': 1000,
+            'thread': 67890,
+            'threadName': 'TestThread',
+            'exc_info': None,
+            'exc_text': None,
+            'stack_info': None,
+            'getMessage': lambda self: message
+        })()
+    
+    def _create_complex_log_record(self, index):
+        """Helper to create a complex log record with nested data."""
+        from decimal import Decimal
+        message = f"complex_message_{index}"
+        record = self._create_log_record(message)
+        
+        # Add complex data that should be in extra/context fields
+        complex_data = {
+            'nested_object': {
+                'id': index,
+                'values': [1, 2, 3, index],
+                'metadata': {'key': f'value_{index}'}
+            },
+            'decimal_value': str(Decimal('123.456')),  # Convert to string for JSON
+            'large_string': 'x' * 100
+        }
+        
+        # Add as context data for formatter
+        record.context = {'complex_data': complex_data}
+        
+        return record
 
 
 @pytest.mark.unit

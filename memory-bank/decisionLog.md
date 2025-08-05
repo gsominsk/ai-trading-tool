@@ -993,3 +993,37 @@ CRITICAL: Failed to configure file logging - shutting down service: [Errno 13] P
 - Git workflow validated for tracking large-scale architectural changes
 
 **Validation**: 100% test pass rate confirms successful preservation of all critical functionality while achieving significant organizational improvements.
+
+
+## [2025-01-05 18:52:00] - CRITICAL ARCHITECTURAL DECISION: Performance Tests Integration Strategy
+
+### Decision: Abandon Separate Performance Directory Structure
+**РЕШЕНИЕ**: Отказ от `tests/performance/` в пользу интеграции в модули
+**ОБОСНОВАНИЕ**: 
+- Performance тесты должны evolve вместе с основным кодом
+- Отдельные папки tend to be forgotten and become stale
+- Разработчики должны видеть performance requirements при работе с модулем
+- Unified test infrastructure reduces maintenance overhead
+
+### Implementation:
+- **Moved**: All performance tests to respective module test files
+- **Added**: `@pytest.mark.performance` markers for discovery
+- **Benefit**: `pytest -m performance` runs all performance tests
+- **Architecture**: Performance tests live alongside unit tests they validate
+
+### Rationale:
+1. **Maintainability**: Performance requirements stay visible
+2. **Integration**: Same mocks, fixtures, and test infrastructure
+3. **Discovery**: Performance tests can't be "lost" in separate directories
+4. **Evolution**: Performance tests update when APIs change
+
+### Impact:
+- **Immediate**: Better test organization and maintainability
+- **Long-term**: Performance consciousness embedded in development workflow
+- **Risk Mitigation**: Performance regressions caught earlier in development cycle
+
+### Question: Backtesting Tests Development Timing
+**ВОПРОС ПОЛЬЗОВАТЕЛЯ**: Не рано ли делать ФАЗУ 8 (Backtesting Tests)?
+**КОНТЕКСТ**: `tests/backtesting/` содержит только `__init__.py`
+**ТРЕБУЕТ АНАЛИЗА**: Есть ли реальная backtesting логика в `src/` before test development?
+**ПОДОЗРЕНИЕ**: Backtesting тесты могут быть преждевременными без actual trading strategies

@@ -343,5 +343,145 @@ class TestMarketDataServiceCore:
         assert no_test_result == "No recent S/R tests"
 
 
+@pytest.mark.unit
+@pytest.mark.performance
+class TestMarketDataPerformance:
+    """Performance tests for MarketDataService."""
+    
+    def setup_method(self):
+        """Setup for each test method."""
+        import psutil
+        self.process = psutil.Process()
+        self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # MB
+    
+    @patch('requests.get')
+    def test_api_response_processing_performance(self, mock_get):
+        """Test API response processing speed."""
+        import time
+        
+        # Mock large dataset response
+        large_dataset = [[
+            int(time.time() * 1000) - (200 - i) * 3600000,
+            f"{50000 + i * 10}",
+            f"{50000 + i * 10 + 500}",
+            f"{50000 + i * 10 - 300}",
+            f"{50000 + i * 10 + 100}",
+            f"{1000 + i * 5}",
+            int(time.time() * 1000) - (200 - i) * 3600000,
+            "1000000",
+            100,
+            "500000",
+            "250000",
+            "0"
+        ] for i in range(200)]
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = large_dataset
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        service = MarketDataService()
+        
+        start_time = time.time()
+        result = service.get_market_data("BTCUSDT")
+        end_time = time.time()
+        
+        processing_time = end_time - start_time
+        
+        # Performance requirement: < 2 seconds for 200 data points
+        assert processing_time < 2.0, f"Processing too slow: {processing_time:.2f}s"
+        assert isinstance(result, MarketDataSet)
+        
+        print(f"✅ API processing: {processing_time:.2f}s for 200 data points")
+    
+    @patch('requests.get')
+    def test_rsi_calculation_performance(self, mock_get):
+        """Test RSI calculation performance with large datasets."""
+        import time
+        
+        # Create dataset for RSI calculation
+        large_dataset = [[
+            int(time.time() * 1000) - (500 - i) * 3600000,
+            f"{50000 + i * 2 + (i % 10) - 5}",  # Varying prices
+            f"{50000 + i * 2 + (i % 10)}",
+            f"{50000 + i * 2 + (i % 10) - 10}",
+            f"{50000 + i * 2 + (i % 10) - 2}",
+            f"{1000 + i * 3}",
+            int(time.time() * 1000) - (500 - i) * 3600000,
+            "1000000",
+            100,
+            "500000",
+            "250000",
+            "0"
+        ] for i in range(500)]
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = large_dataset
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        service = MarketDataService()
+        
+        start_time = time.time()
+        result = service.get_market_data("BTCUSDT")
+        rsi_calculation_time = time.time() - start_time
+        
+        # Performance requirement: RSI calculation < 3 seconds for 500 points
+        assert rsi_calculation_time < 3.0, f"RSI calculation too slow: {rsi_calculation_time:.2f}s"
+        assert isinstance(result.rsi_14, Decimal)
+        
+        print(f"✅ RSI calculation: {rsi_calculation_time:.2f}s for 500 data points")
+    
+    @patch('requests.get')
+    def test_memory_efficiency_during_operations(self, mock_get):
+        """Test memory efficiency during multiple operations."""
+        import time
+        
+        # Setup mock for consistent responses
+        dataset = [[
+            int(time.time() * 1000) - (100 - i) * 3600000,
+            f"{50000 + i}",
+            f"{50000 + i + 100}",
+            f"{50000 + i - 100}",
+            f"{50000 + i + 50}",
+            f"{1000}",
+            int(time.time() * 1000) - (100 - i) * 3600000,
+            "1000000",
+            100,
+            "500000",
+            "250000",
+            "0"
+        ] for i in range(100)]
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = dataset
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        service = MarketDataService()
+        
+        # Perform multiple operations and monitor memory
+        for i in range(10):
+            result = service.get_market_data("BTCUSDT")
+            basic_context = result.to_llm_context_basic()
+            
+            # Check memory every few operations
+            if i % 3 == 2:
+                current_memory = self.process.memory_info().rss / 1024 / 1024
+                memory_increase = current_memory - self.initial_memory
+                
+                # Memory should not grow excessively
+                assert memory_increase < 100, f"Memory usage too high: {memory_increase:.1f}MB"
+        
+        final_memory = self.process.memory_info().rss / 1024 / 1024
+        total_increase = final_memory - self.initial_memory
+        
+        print(f"✅ Memory usage for 10 operations: +{total_increase:.1f}MB")
+        assert total_increase < 100, f"Total memory increase too high: {total_increase:.1f}MB"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
