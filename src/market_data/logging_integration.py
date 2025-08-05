@@ -52,7 +52,7 @@ class MarketDataServiceLogging:
         configure_ai_logging(
             log_level=log_level,  # Use configurable log level
             log_file="logs/trading_operations.log",  # Main trading operations log
-            console_output=False,  # Disable console output for production file logging
+            console_output=True,  # Enable console output so JSON formatter applies to file handler
             max_bytes=50*1024*1024,  # 50MB per log file (trading operations can be verbose)
             backup_count=10  # Keep 10 backup files (500MB total history)
         )

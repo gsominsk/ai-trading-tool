@@ -80,6 +80,12 @@ class LoggerConfig:
                     encoding='utf-8'
                 )
                 file_handler.setLevel(numeric_level)
+                
+                # Apply JSON formatter to file handler for structured logs
+                from .json_formatter import AIOptimizedJSONFormatter
+                json_formatter = AIOptimizedJSONFormatter("MarketDataService")
+                file_handler.setFormatter(json_formatter)
+                
                 root_logger.addHandler(file_handler)
             except Exception as e:
                 # Логи сломались - останавливаем сервис

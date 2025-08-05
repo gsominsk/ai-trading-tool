@@ -37,95 +37,26 @@ class AITradingTestRunner:
         self.project_root = Path(__file__).parent.parent
         self.test_categories = {
             'unit': {
-                'description': 'Core unit tests for MarketDataService',
+                'description': 'Core unit tests across all components',
                 'tests': [
                     'tests/unit/test_market_data_service.py',
+                    'tests/unit/error_architecture/test_error_exceptions.py',
+                    'tests/unit/logging/test_core_logging.py',
+                    'tests/unit/logging/test_logging_components.py',
+                    'tests/unit/market_data/test_market_data_core.py',
+                    'tests/unit/market_data/test_market_data_api.py',
+                    'tests/unit/market_data/test_market_data_edge_cases.py',
                 ]
             },
-            'error_architecture': {
-                'description': 'Error handling and exception architecture',
+            'integration': {
+                'description': 'Integration tests across system components',
                 'tests': [
-                    'tests/test_exception_hierarchy_compatibility.py',
-                    'tests/test_error_architecture_integration.py',
-                    'tests/test_backward_compatibility.py',
-                    'tests/test_error_recovery_fallbacks.py',
-                    'tests/test_error_context_logging.py',
-                ]
-            },
-            'core_functionality': {
-                'description': 'Core MarketDataService features and validation',
-                'tests': [
-                    'tests/test_comprehensive_validation.py',
-                    'tests/test_symbol_validation_comprehensive.py',
-                    'tests/test_symbol_validation_logic.py',
-                    'tests/test_dataframe_protection.py',
-                    'tests/test_decimal_patterns.py',
-                ]
-            },
-            'technical_analysis': {
-                'description': 'Technical indicators and analysis features',
-                'tests': [
-                    'tests/test_technical_indicators_edge_cases.py',
-                    'tests/test_volume_profile_comprehensive.py',
-                    'tests/test_rsi_edge_cases.py',
-                    'tests/test_rsi_division_zero.py',
-                    'tests/test_btc_correlation_comprehensive.py',
-                    'tests/test_cross_correlation_comprehensive.py',
-                ]
-            },
-            'network_resilience': {
-                'description': 'Network failures and API resilience',
-                'tests': [
-                    'tests/test_network_failures_extreme_edge_cases.py',
-                    'tests/test_api_rate_limiting_comprehensive.py',
-                    'tests/test_caching_system_comprehensive.py',
-                    'tests/test_data_freshness_comprehensive.py',
-                ]
-            },
-            'edge_cases': {
-                'description': 'Edge cases and extreme scenarios',
-                'tests': [
-                    'tests/test_enhanced_context_edge_cases_comprehensive.py',
-                    'tests/test_enhanced_context_error_handling.py',
-                    'tests/test_empty_dataframes.py',
-                    'tests/test_state_pollution_simple.py',
-                ]
-            },
-            'comprehensive_validation': {
-                'description': 'Comprehensive validation and integration tests',
-                'tests': [
-                    'tests/test_all_fixes_comprehensive.py',
-                    'tests/test_btc_correlation_integration.py',
-                    'tests/test_comprehensive_validation_integration.py',
-                    'tests/test_enhanced_context_error_handling_integration.py',
-                    'tests/test_network_failures_extreme_edge_cases_integration.py',
-                    'tests/test_recent_trend_fix_integration.py',
-                    'tests/test_sr_tests_fix_integration.py',
-                    'tests/test_volume_relationship_fix_integration.py',
-                ]
-            },
-            'fixes_and_debugging': {
-                'description': 'Bug fixes and debugging tests',
-                'tests': [
-                    'tests/test_mock_data_fix.py',
-                    'tests/test_recent_trend_decimal_fix.py',
-                    'tests/test_sr_tests_decimal_fix.py',
-                    'tests/test_volume_relationship_decimal_fix.py',
-                    'tests/test_rsi_debug.py',
-                ]
-            },
-            'logging_system': {
-                'description': 'AI-Optimized Logging System comprehensive tests',
-                'tests': [
-                    'tests/test_logging_system.py',
-                    'tests/test_logging_system_fixed.py',
-                    'tests/test_logging_system_critical_fixes.py',
-                    'tests/test_logging_json_schema_validation.py',
-                    'tests/test_stderr_integration.py',
-                    'tests/test_production_configuration.py',
-                    'tests/test_memory_leak_detection.py',
-                    'tests/test_encoding_unicode.py',
-                    'tests/test_error_recovery.py',
+                    'tests/integration/error_architecture/test_error_integration.py',
+                    'tests/integration/logging/test_logging_integration.py',
+                    'tests/integration/logging/test_logging_production.py',
+                    'tests/integration/market_data/test_market_data_integration.py',
+                    'tests/integration/system/test_backward_compatibility.py',
+                    'tests/integration/system/test_comprehensive_integration.py',
                 ]
             }
         }
