@@ -539,4 +539,61 @@ except CalculationError:
 
 **ИСКЛЮЧЕНИЙ НЕТ** - это правило критично для качества всей системы.
 
+
+[2025-01-05 19:01:00] - Modular Performance Testing Architecture Pattern
+
+## Modular Performance Testing Pattern для maintainable benchmarks
+
+### Проблема:
+Отдельные performance директории становятся "сиротами" - забываются, устаревают, не обновляются при изменении API.
+
+### Решение: Embedded Performance Testing
+**Принцип**: Performance тесты живут рядом с функциональными тестами в тех же модулях
+**Маркировка**: `@pytest.mark.performance` для discovery и selective execution
+**Архитектура**: tests/unit/logging/ содержит и unit тесты и performance тесты
+
+### Архитектурные преимущества:
+1. **Co-evolution** - performance требования evolve вместе с кодом
+2. **Shared Infrastructure** - одни fixtures, mocks, setup для всех тестов
+3. **Visibility** - разработчики видят performance требования при работе с модулем
+4. **Discoverability** - `pytest -m performance` находит все benchmark тесты
+
+### Почему не separate directory:
+- Separate directories tend to be forgotten during refactoring
+- Performance tests using outdated APIs become stale
+- Developers lose awareness of performance implications
+- Infrastructure duplication between functional and performance tests
+
+### Архитектурный принцип:
+**"Performance tests should live where they belong, not where it's convenient"** - proximity to tested code ensures co-evolution and maintenance.
+
+---
+
+[2025-01-05 19:01:00] - Archive & Extract Test Migration Pattern
+
+## Archive & Extract Pattern для safe test reorganization
+
+### Проблема:
+Реорганизация тестов рискует потерей working test logic и regression в coverage.
+
+### Решение: Archive-First Strategy
+**Этап 1**: Полное архивирование оригинальных тестов с сохранением структуры
+**Этап 2**: Извлечение реальной логики из архивных тестов (не rewrite с нуля)
+**Этап 3**: Консолидация в organized structure с validation
+**Этап 4**: Backward compatibility verification
+
+### Архитектурные принципы:
+1. **Preserve History** - `tests/archive/` как backup и reference
+2. **Extract, Don't Recreate** - используем проверенную логику тестов
+3. **Validate Migration** - 100% тестов должны проходить после реорганизации
+4. **Maintain Compatibility** - zero breaking changes в test patterns
+
+### Почему не rewrite from scratch:
+- Working test logic содержит edge cases и domain knowledge
+- Rewriting risks losing important test scenarios
+- Archive служит fallback при обнаружении проблем
+- Incremental migration safer чем big bang rewrite
+
+### Архитектурный принцип:
+**"Preserve what works, organize what's scattered"** - reorganization should improve structure, not recreate functionality.
 ---

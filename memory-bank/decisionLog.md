@@ -1026,4 +1026,130 @@ CRITICAL: Failed to configure file logging - shutting down service: [Errno 13] P
 **ВОПРОС ПОЛЬЗОВАТЕЛЯ**: Не рано ли делать ФАЗУ 8 (Backtesting Tests)?
 **КОНТЕКСТ**: `tests/backtesting/` содержит только `__init__.py`
 **ТРЕБУЕТ АНАЛИЗА**: Есть ли реальная backtesting логика в `src/` before test development?
+
+[2025-08-05 20:32:00] - **КРИТИЧЕСКОЕ АРХИТЕКТУРНОЕ РЕШЕНИЕ: Стратегия упрощения системы логирования MarketDataService**
+
+## Decision
+Определена комплексная стратегия упрощения архитектуры системы логирования MarketDataService с заменой monkey patching на простой Dependency Injection при сохранении 100% функциональности файлового логирования.
+
+## Problem Addressed
+- **Избыточная сложность**: 569-строчный [`logging_integration.py`](src/market_data/logging_integration.py) создает unnecessary complexity
+- **Monkey patching anti-pattern**: Service Locator pattern вместо clean Dependency Injection
+- **Неполное покрытие**: 80% математических операций не логируются (RSI, MACD, MA, BTC correlation)
+- **Архитектурный долг**: Сложная интеграция затрудняет тестирование и поддержку
+
+## Solution Strategy
+**Простое DI решение без усложнения**:
+
+### **Architecture Approach**:
+```python
+class MarketDataService:
+    def __init__(self, cache_dir: str = "data/cache", 
+                 logger: Optional['MarketDataLogger'] = None):
+        self.cache_dir = cache_dir
+        
+        # Простой DI: либо инжектируем, либо создаем дефолтный
+        if logger is not None:
+            self.logger = logger
+        else:
+            # Создаем дефолтный логгер с файловым выводом
+            configure_ai_logging(log_file="logs/trading_operations.log")
+            self.logger = MarketDataLogger("market_data_service")
+    
+    def get_market_data(self, symbol: str):
+        self.logger.log_operation_start("get_market_data", symbol=symbol)
+        # ... бизнес логика ...
+        self.logger.log_operation_complete("get_market_data", symbol=symbol)
+```
+
+### **Key Principles**:
+1. **Files logging preserved**: JSON data continues writing to `logs/trading_operations.log`
+2. **Simple DI**: Constructor injection with default behavior
+3. **Remove monkey patching**: Direct `self.logger.log_*()` calls
+4. **Backward compatibility**: Default behavior unchanged
+5. **Testability**: Mock injection for unit tests
+
+## Implementation Plan
+
+### **Phase 1: Code Extraction**
+- Extract [`configure_ai_logging()`](src/market_data/logging_integration.py:52) setup to MarketDataService
+- Extract [`_handle_logging_error()`](src/market_data/logging_integration.py:74) protection logic
+
+### **Phase 2: Constructor Modification**  
+- Add `logger: Optional[MarketDataLogger] = None` parameter
+- Remove [`integrate_with_market_data_service()`](src/market_data/logging_integration.py:512) call
+- Add conditional logger creation with file output
+
+### **Phase 3: Method Replacement**
+- Remove `_log_operation_start`, `_log_operation_success`, etc. methods
+- Replace all `self._log_*()` with `self.logger.log_*()`
+- Add missing mathematical operation logging
+
+### **Phase 4: File Cleanup**
+- Delete 569-line `logging_integration.py` file
+- Update imports and dependencies
+
+## Expected Impact
+
+### **Immediate Benefits**:
+- **Code Reduction**: 569 lines → ~50 lines (90% reduction)
+- **Architecture Cleanup**: Remove Service Locator anti-pattern
+- **Testability**: Easy mock injection for unit tests
+- **Maintainability**: Simple, understandable code
+
+### **Preserved Functionality**:
+- **JSON File Logging**: Continues working exactly as before
+- **Log Rotation**: 50MB files with 10 backups preserved
+- **Error Handling**: Thread-safe operations maintained
+- **Performance**: Sub-millisecond overhead retained
+
+### **Enhanced Coverage**:
+- **Mathematical Operations**: Add logging for RSI, MACD, MA calculations
+- **BTC Correlation**: Log correlation analysis steps
+- **Volume Analysis**: Log volume profile calculations
+- **Complete Visibility**: 25-30 logs per operation instead of 6
+
+## Risk Assessment
+
+### **Low Risk Factors**:
+- **File Logging**: Core [`configure_ai_logging()`](src/market_data/logging_integration.py:52) functionality preserved
+- **JSON Format**: [`MarketDataLogger`](src/market_data/logging_integration.py:61) remains unchanged
+- **Error Protection**: Fallback mechanisms maintained
+- **Performance**: No impact on execution speed
+
+### **Mitigation Strategies**:
+- **Incremental Implementation**: Phase-by-phase rollout
+- **Testing Validation**: Comprehensive test suite execution
+- **Rollback Capability**: Git commits at each phase
+- **Backward Compatibility**: Default behavior preservation
+
+## Strategic Significance
+
+**ARCHITECTURAL EVOLUTION**: This simplification represents a maturation of the logging architecture from complex integration patterns to clean, maintainable Dependency Injection.
+
+**TECHNICAL DEBT REDUCTION**:
+1. **Complexity Elimination**: Remove unnecessary abstraction layers
+2. **Pattern Improvement**: Service Locator → Dependency Injection
+3. **Code Clarity**: Direct method calls instead of monkey patching
+4. **Test Coverage**: Enable proper unit testing with mocks
+
+**BUSINESS VALUE**:
+- **Development Velocity**: Simpler code → faster development
+- **Maintenance Cost**: Reduced complexity → lower maintenance
+- **Quality Assurance**: Better testability → higher quality
+- **Team Productivity**: Clear patterns → easier onboarding
+
+**OPERATIONAL EXCELLENCE**:
+- **Debugging Efficiency**: More complete logging coverage
+- **Performance Monitoring**: Enhanced mathematical operation visibility
+- **Production Confidence**: Simpler, more reliable architecture
+
+## Next Steps
+1. **Implementation**: Execute 4-phase simplification plan
+2. **Testing**: Validate file logging functionality preservation
+3. **Documentation**: Update architecture documentation
+4. **Deployment**: Production deployment with enhanced logging coverage
+
+**MILESTONE STATUS**: ✅ STRATEGY DEFINED - Ready for implementation with comprehensive plan and risk mitigation strategies established.
+
 **ПОДОЗРЕНИЕ**: Backtesting тесты могут быть преждевременными без actual trading strategies
