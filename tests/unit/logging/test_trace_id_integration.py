@@ -8,6 +8,8 @@ using the get_flow_id() function from the logging system.
 import pytest
 import tempfile
 import os
+import io
+import sys
 from unittest.mock import patch, MagicMock
 from src.logging_system import MarketDataLogger, get_flow_id, configure_ai_logging, reset_trace_counter
 
@@ -25,11 +27,11 @@ class TestTraceIdIntegration:
         self.temp_log_path = self.temp_log.name
         self.temp_log.close()
         
-        # Configure logging for testing
+        # Configure logging for testing - enable both file and console for tests
         configure_ai_logging(
             log_level="DEBUG",
             log_file=self.temp_log_path,
-            console_output=False
+            console_output=True  # Enable console output for test capture
         )
         
         # Create logger instance
@@ -44,7 +46,7 @@ class TestTraceIdIntegration:
         # Reset logging state
         reset_trace_counter()
     
-    def test_auto_generation_with_symbol(self):
+    def test_auto_generation_with_symbol(self, caplog):
         """Test that trace_id is auto-generated when symbol is provided."""
         # Test operation start with symbol - should auto-generate trace_id
         self.logger.log_operation_start(
@@ -53,19 +55,19 @@ class TestTraceIdIntegration:
             context={"test": "auto_generation"}
         )
         
-        # Verify log was created (basic check)
-        assert os.path.exists(self.temp_log_path)
+        # Verify logging occurred (caplog captures all log records)
+        assert len(caplog.records) > 0
         
-        # Read log file to verify content
-        with open(self.temp_log_path, 'r') as f:
-            log_content = f.read()
+        # Check log record content
+        log_record = caplog.records[-1]  # Get the last log record
+        assert log_record.operation == "get_market_data"
+        assert "get_market_data initiated" in log_record.getMessage()
         
-        # Should contain operation and symbol information
-        assert "get_market_data" in log_content
-        assert "BTCUSDT" in log_content
-        assert "initiated" in log_content
+        # Verify trace_id was auto-generated for BTCUSDT
+        assert hasattr(log_record, 'trace_id')
+        assert log_record.trace_id.startswith("flow_btc_")
     
-    def test_different_symbols_different_trace_ids(self):
+    def test_different_symbols_different_trace_ids(self, caplog):
         """Test that different symbols generate different trace_ids."""
         # Log operations for different symbols
         self.logger.log_operation_start(
@@ -75,21 +77,26 @@ class TestTraceIdIntegration:
         )
         
         self.logger.log_operation_start(
-            operation="get_market_data", 
+            operation="get_market_data",
             symbol="ETHUSDT",
             context={"test": "symbol_2"}
         )
         
-        # Verify both operations were logged
-        with open(self.temp_log_path, 'r') as f:
-            log_content = f.read()
+        # Should have 2 log records
+        assert len(caplog.records) >= 2
         
-        # Should contain both symbols
-        assert "BTCUSDT" in log_content
-        assert "ETHUSDT" in log_content
-        assert log_content.count("get_market_data") >= 2
+        # Get trace_ids from the records
+        trace_ids = [record.trace_id for record in caplog.records if hasattr(record, 'trace_id')]
+        assert len(trace_ids) >= 2
+        
+        # Verify different symbols have different trace_id patterns
+        btc_traces = [tid for tid in trace_ids if tid.startswith("flow_btc_")]
+        eth_traces = [tid for tid in trace_ids if tid.startswith("flow_eth_")]
+        
+        assert len(btc_traces) >= 1, f"Expected BTC trace_id, got: {trace_ids}"
+        assert len(eth_traces) >= 1, f"Expected ETH trace_id, got: {trace_ids}"
     
-    def test_operation_complete_with_context_symbol(self):
+    def test_operation_complete_with_context_symbol(self, caplog):
         """Test that operation complete uses symbol from context for trace_id."""
         # Test completion logging with symbol in context
         self.logger.log_operation_complete(
@@ -98,16 +105,19 @@ class TestTraceIdIntegration:
             processing_time_ms=100
         )
         
-        # Verify log was created
-        with open(self.temp_log_path, 'r') as f:
-            log_content = f.read()
+        # Verify logging occurred
+        assert len(caplog.records) > 0
         
-        # Should contain completion information
-        assert "completed successfully" in log_content
-        assert "BTCUSDT" in log_content
-        assert "success" in log_content
+        # Check log record content
+        log_record = caplog.records[-1]
+        assert "completed successfully" in log_record.getMessage()
+        assert log_record.context["result"] == "success"
+        
+        # Verify trace_id was auto-generated for BTCUSDT from context
+        assert hasattr(log_record, 'trace_id')
+        assert log_record.trace_id.startswith("flow_btc_")
     
-    def test_explicit_trace_id_not_overridden(self):
+    def test_explicit_trace_id_not_overridden(self, caplog):
         """Test that explicitly provided trace_id is not overridden."""
         explicit_trace_id = "explicit_test_trace_123"
         
@@ -119,15 +129,16 @@ class TestTraceIdIntegration:
             trace_id=explicit_trace_id
         )
         
-        # This test verifies the code doesn't crash when explicit trace_id is provided
-        # The actual trace_id usage would need log parsing to verify fully
-        with open(self.temp_log_path, 'r') as f:
-            log_content = f.read()
+        # Verify logging occurred
+        assert len(caplog.records) > 0
         
-        assert "get_market_data" in log_content
-        assert "BTCUSDT" in log_content
+        # Check that explicit trace_id is preserved
+        log_record = caplog.records[-1]
+        assert log_record.operation == "get_market_data"
+        assert hasattr(log_record, 'trace_id')
+        assert log_record.trace_id == explicit_trace_id
     
-    def test_no_symbol_no_auto_generation(self):
+    def test_no_symbol_no_auto_generation(self, caplog):
         """Test that no trace_id is auto-generated when no symbol is provided."""
         # Log operation without symbol - should not auto-generate
         self.logger.log_operation_start(
@@ -135,12 +146,22 @@ class TestTraceIdIntegration:
             context={"test": "no_symbol"}
         )
         
-        # Verify log was created (basic functionality)
-        with open(self.temp_log_path, 'r') as f:
-            log_content = f.read()
+        # Verify logging occurred
+        assert len(caplog.records) > 0
         
-        assert "system_startup" in log_content
-        assert "initiated" in log_content
+        # Check log record content
+        log_record = caplog.records[-1]
+        assert log_record.operation == "system_startup"
+        assert "system_startup initiated" in log_record.getMessage()
+        
+        # Verify trace_id is either None (meaning fallback will be generated in formatter)
+        # or already contains fallback format
+        if hasattr(log_record, 'trace_id') and log_record.trace_id is not None:
+            assert log_record.trace_id.startswith("trd_001_")
+        else:
+            # If trace_id is None, it means the formatter will generate fallback
+            # We can verify this by checking that no symbol-specific trace_id was generated
+            assert log_record.trace_id is None
 
 
 class TestGetFlowIdFunction:

@@ -285,8 +285,10 @@ class TestMarketDataServiceBackwardCompatibility:
         # Mock successful response
         mock_response = Mock()
         mock_response.status_code = 200
+        mock_response.headers = {'content-type': 'application/json'}
+        mock_response.content = b'{"test": "response"}'
         mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""] 
+            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""]
             for _ in range(50)
         ]
         mock_response.raise_for_status.return_value = None

@@ -554,7 +554,7 @@ class MarketDataService:
             
             # Log complete market analysis for trading operations
             if self.logger:
-                self._log_market_analysis_complete(symbol, market_data_set, trace_id)
+                self._log_market_analysis_complete(symbol, market_data_set, self._current_trace_id)
             
             return market_data_set
             

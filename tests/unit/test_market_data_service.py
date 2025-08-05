@@ -112,6 +112,14 @@ class TestMarketDataService:
             mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
             
+            # Add proper headers and content for logging compatibility
+            mock_response.headers = {
+                'content-type': 'application/json',
+                'x-mbx-used-weight': '1',
+                'x-mbx-used-weight-1m': '1'
+            }
+            mock_response.content = b'{"test": "response"}'
+            
             if interval == '1d':
                 mock_response.json.return_value = daily_data
             elif interval == '4h':
@@ -157,6 +165,14 @@ class TestMarketDataService:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.raise_for_status.return_value = None
+            
+            # Add proper headers and content for logging compatibility
+            mock_response.headers = {
+                'content-type': 'application/json',
+                'x-mbx-used-weight': '1',
+                'x-mbx-used-weight-1m': '1'
+            }
+            mock_response.content = b'{"test": "response"}'
             
             if interval == '1d':
                 mock_response.json.return_value = daily_data
@@ -462,6 +478,15 @@ class TestMarketDataServiceIntegration:
             mock_resp.status_code = 200
             mock_resp.raise_for_status.return_value = None
             mock_resp.json.return_value = test_klines
+            
+            # Add proper headers and content for logging compatibility
+            mock_resp.headers = {
+                'content-type': 'application/json',
+                'x-mbx-used-weight': '1',
+                'x-mbx-used-weight-1m': '1'
+            }
+            mock_resp.content = b'{"test": "response"}'
+            
             return mock_resp
         
         mock_get.side_effect = mock_side_effect

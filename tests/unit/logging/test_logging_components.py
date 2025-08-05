@@ -411,7 +411,7 @@ class TestJSONSchemaValidation:
                 },
                 "trace_id": {
                     "type": "string",
-                    "pattern": r"^trd_\d{3}_\d{14}\d{4}$"
+                    "pattern": r"^(trd_\d{3}_\d{14}\d{4}|flow_[a-z]{3}_\d{14}\d{3})$"
                 },
                 "context": {
                     "type": "object"

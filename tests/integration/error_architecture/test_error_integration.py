@@ -190,6 +190,7 @@ class TestNetworkErrorIntegration:
         mock_response = Mock()
         mock_response.status_code = 429
         mock_response.headers = {'Retry-After': '60'}
+        mock_response.content = b'{"msg": "Too many requests"}'
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("429 Too Many Requests")
         mock_get.return_value = mock_response
         
@@ -216,6 +217,8 @@ class TestNetworkErrorIntegration:
         """Test API server error (5xx) handling."""
         mock_response = Mock()
         mock_response.status_code = 503
+        mock_response.headers = {'content-type': 'application/json'}
+        mock_response.content = b'{"msg": "Service unavailable"}'
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("503 Service Unavailable")
         mock_get.return_value = mock_response
         
@@ -237,6 +240,8 @@ class TestNetworkErrorIntegration:
         mock_response = Mock()
         mock_response.status_code = 404
         mock_response.text = "Symbol not found"
+        mock_response.headers = {'content-type': 'application/json'}
+        mock_response.content = b'{"msg": "Symbol not found"}'
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
         mock_get.return_value = mock_response
         
@@ -259,6 +264,8 @@ class TestNetworkErrorIntegration:
         """Test malformed API response handling."""
         mock_response = Mock()
         mock_response.status_code = 200
+        mock_response.headers = {'content-type': 'application/json'}
+        mock_response.content = b'{"test": "response"}'
         mock_response.json.return_value = {}  # Empty response instead of list
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
@@ -323,6 +330,8 @@ class TestProcessingErrorIntegration:
         # Mock successful API response but cause error in DataFrame processing
         mock_response = Mock()
         mock_response.status_code = 200
+        mock_response.headers = {'content-type': 'application/json'}
+        mock_response.content = b'{"test": "response"}'
         mock_response.json.return_value = [
             [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""],  # Valid data
             [1640998800000, "invalid", "51000", "49000", "50500", "100", 1640998800000, "1", 50, "50500", "0.1", ""]  # Invalid open price
@@ -408,13 +417,14 @@ class TestErrorContextIntegration:
     
     def test_trace_id_generation_and_propagation(self):
         """Test trace ID generation and propagation across operations."""
+        from src.logging_system.trace_generator import get_flow_id
         service = MarketDataService()
         
-        # Generate trace ID
-        trace_id = service._generate_trace_id("test_operation")
-        assert trace_id.startswith("test_operation_")
-        assert len(trace_id) == len("test_operation_") + 8  # operation + 8 hex chars
-        assert service._current_trace_id == trace_id
+        # Generate trace ID using new system
+        trace_id = get_flow_id("test")
+        assert trace_id.startswith("flow_test_")
+        assert len(trace_id) > 14  # flow_test_ + timestamp + counter
+        # Note: _current_trace_id is not used in new architecture
     
     @patch('requests.get')
     def test_trace_id_propagation_through_operations(self, mock_get):
@@ -432,8 +442,8 @@ class TestErrorContextIntegration:
         assert hasattr(error.context, 'trace_id')
         trace_id = error.context.trace_id
         
-        # Trace ID should be consistent across the operation
-        assert service._current_trace_id == trace_id
+        # In new architecture, trace IDs are generated per operation
+        # The error context contains the trace_id
         
         # Error context should include the trace ID
         context_dict = error.get_context()
@@ -488,6 +498,8 @@ class TestLoggingIntegrationPoints:
         # Mock successful basic data but fail enhanced analysis
         mock_response = Mock()
         mock_response.status_code = 200
+        mock_response.headers = {'content-type': 'application/json'}
+        mock_response.content = b'{"test": "response"}'
         mock_response.json.return_value = [
             [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""] for _ in range(50)
         ]

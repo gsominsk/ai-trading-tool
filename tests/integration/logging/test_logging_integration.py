@@ -531,9 +531,9 @@ class TestCompleteLoggingWorkflows:
         unique_flow_ids = set(filter(None, flow_ids))
         assert len(unique_flow_ids) >= 1, "Should have consistent flow IDs"
         
-        # Verify trace IDs are present and properly formatted
+        # Verify trace IDs are present and properly formatted (both old and new formats)
         trace_ids = [log.get("trace_id") for log in json_logs]
-        assert all(trace_id and trace_id.startswith("trd_") for trace_id in trace_ids)
+        assert all(trace_id and (trace_id.startswith("trd_") or trace_id.startswith("flow_")) for trace_id in trace_ids)
     
     def test_edge_cases_integration(self, capfd):
         """Test edge cases in complete integration."""
