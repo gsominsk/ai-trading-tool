@@ -43,6 +43,8 @@ class AITradingTestRunner:
                     'tests/unit/error_architecture/test_error_exceptions.py',
                     'tests/unit/logging/test_core_logging.py',
                     'tests/unit/logging/test_logging_components.py',
+                    'tests/unit/logging/test_http_filter.py',
+                    'tests/unit/logging/test_operation_context.py',
                     'tests/unit/market_data/test_market_data_core.py',
                     'tests/unit/market_data/test_market_data_api.py',
                     'tests/unit/market_data/test_market_data_edge_cases.py',
