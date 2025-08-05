@@ -36,6 +36,9 @@ from .exceptions import (
     DataInsufficientError
 )
 
+# Logging integration imports for trading operations
+from .logging_integration import integrate_with_market_data_service, MarketDataServiceLogging
+
 
 @dataclass
 class MarketDataSet:
@@ -361,7 +364,8 @@ MA Trend: {self.ma_trend.upper()}
 class MarketDataService:
     """Service for aggregating multi-timeframe cryptocurrency market data."""
     
-    def __init__(self, cache_dir: str = "data/cache", enable_logging: bool = False, fail_fast: bool = False):
+    def __init__(self, cache_dir: str = "data/cache", enable_logging: bool = True,
+                 log_level: str = "INFO", fail_fast: bool = False):
         self.cache_dir = cache_dir
         self.base_url = "https://api.binance.com/api/v3"
         self._ensure_cache_dir()
@@ -371,13 +375,26 @@ class MarketDataService:
         
         # Logging integration points (Phase 2 - Integration)
         self._enable_logging = enable_logging
+        self._log_level = log_level.upper()  # CRITICAL, ERROR, WARNING, INFO, DEBUG
         self._operation_metrics = {}  # For future performance tracking
+        self._logging_integration = None  # Will be set by integrate_with_market_data_service
         
         # Fail-fast vs recovery strategy configuration (Phase 2 - Integration)
         self._fail_fast = fail_fast
         self._critical_failures = {"symbol_validation", "api_connection", "data_validation", "basic_data_processing"}
         self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators", "enhanced_analysis", "market_sentiment"}
         
+        # Integrate logging system if enabled
+        if self._enable_logging:
+            self._logging_integration = integrate_with_market_data_service(self, log_level=self._log_level)
+        
+    def _should_log(self, level: str) -> bool:
+        """Check if message should be logged based on current log level."""
+        log_levels = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
+        current_level = log_levels.get(self._log_level, 20)  # Default to INFO
+        message_level = log_levels.get(level.upper(), 20)
+        return message_level >= current_level
+    
     def _generate_trace_id(self, operation: str = "market_data") -> str:
         """Generate a new trace ID for error tracking and logging integration."""
         import uuid
@@ -391,33 +408,55 @@ class MarketDataService:
             self._generate_trace_id(operation)
         
         # Logging integration point: capture operation start
-        self._log_operation_start(operation, **kwargs)
+        # Extract symbol for logging if present
+        symbol = kwargs.get('symbol', '')
+        context = {k: v for k, v in kwargs.items() if k != 'symbol'}
+        self._log_operation_start(operation, symbol=symbol, **context)
         
         return ErrorContext(trace_id=self._current_trace_id, operation=operation)
     
-    def _log_operation_start(self, operation: str, **kwargs):
+    def _log_operation_start(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
         """Logging integration point: Log operation start with context."""
-        if self._enable_logging:
-            # Future logging implementation will go here
-            # For now, this is a placeholder that maintains current functionality
-            pass
+        if self._enable_logging and self._logging_integration:
+            # Use actual logging integration (it handles level checking internally)
+            self._logging_integration.log_operation_start(
+                operation=operation,
+                symbol=symbol,
+                context=kwargs,
+                trace_id=self._current_trace_id,
+                level=level
+            )
         
         # Store operation metrics for future logging integration
         if operation not in self._operation_metrics:
             self._operation_metrics[operation] = {"count": 0, "errors": 0}
         self._operation_metrics[operation]["count"] += 1
     
-    def _log_operation_success(self, operation: str, **kwargs):
+    def _log_operation_success(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
         """Logging integration point: Log successful operation completion."""
-        if self._enable_logging:
-            # Future logging implementation will go here
-            pass
+        if self._enable_logging and self._logging_integration:
+            # Use actual logging integration (it handles level checking internally)
+            self._logging_integration.log_operation_success(
+                operation=operation,
+                symbol=symbol,
+                context=kwargs,
+                trace_id=self._current_trace_id,
+                level=level
+            )
     
-    def _log_operation_error(self, operation: str, error: Exception, **kwargs):
+    def _log_operation_error(self, operation: str, error: Exception, symbol: str = "", level: str = "ERROR", **kwargs):
         """Logging integration point: Log operation error with rich context."""
-        if self._enable_logging:
-            # Future logging implementation will go here
-            pass
+        if self._enable_logging and self._logging_integration:
+            # Use actual logging integration (it handles level checking internally)
+            self._logging_integration.log_operation_error(
+                operation=operation,
+                error=error,
+                symbol=symbol,
+                context=kwargs,
+                trace_id=self._current_trace_id,
+                error_type=kwargs.get('error_type', 'unknown'),
+                level=level
+            )
         
         # Track error metrics for future logging integration
         if operation in self._operation_metrics:
@@ -489,18 +528,22 @@ class MarketDataService:
             )
             
             # Logging integration point: successful operation completion
-            self._log_operation_success("get_market_data", symbol=symbol, data_points=len(h1_data))
+            self._log_operation_success("get_market_data", symbol=symbol, level="INFO", data_points=len(h1_data))
+            
+            # Log complete market analysis for trading operations
+            if self._logging_integration:
+                self._log_market_analysis_complete(symbol, market_data_set, trace_id)
             
             return market_data_set
             
         except (ValidationError, NetworkError, ProcessingError) as e:
             # Logging integration point: structured error
-            self._log_operation_error("get_market_data", e, symbol=symbol, error_type=type(e).__name__)
+            self._log_operation_error("get_market_data", e, symbol=symbol, level="ERROR", error_type=type(e).__name__)
             # Re-raise our custom exceptions to preserve rich error context chain
             raise
         except Exception as e:
             # Logging integration point: unexpected error
-            self._log_operation_error("get_market_data", e, symbol=symbol, error_type="unexpected")
+            self._log_operation_error("get_market_data", e, symbol=symbol, level="CRITICAL", error_type="unexpected")
             # Wrap unexpected errors in ProcessingError with rich context
             raise ProcessingError(
                 message=f"Unexpected error during market data aggregation: {str(e)}",
@@ -671,10 +714,11 @@ Contact support if this error persists.
             "limit": limit
         }
         
+        # Generate trace ID for this network operation
+        trace_id = self._generate_trace_id("get_klines")
+        error_context = self._get_error_context("get_klines", symbol=symbol, interval=interval, limit=limit)
+        
         try:
-            # Generate trace ID for this network operation
-            trace_id = self._generate_trace_id("get_klines")
-            error_context = self._get_error_context("get_klines", symbol=symbol, interval=interval, limit=limit)
             
             response = requests.get(url, params=params, timeout=30)
             
@@ -744,9 +788,10 @@ Contact support if this error persists.
             
             result_df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
             
-            # Logging integration point: successful API call
-            self._log_operation_success("get_klines", symbol=symbol, interval=interval,
-                                      rows_returned=len(result_df), status_code=response.status_code)
+            # Logging integration point: successful API call (DEBUG level for performance)
+            self._log_operation_success("get_klines", symbol=symbol, level="DEBUG",
+                                      interval=interval, rows_returned=len(result_df),
+                                      status_code=response.status_code)
             
             return result_df
             
@@ -759,7 +804,7 @@ Contact support if this error persists.
                 timeout_duration=30
             )
             # Logging integration point: timeout error
-            self._log_operation_error("get_klines", timeout_error, symbol=symbol,
+            self._log_operation_error("get_klines", timeout_error, symbol=symbol, level="WARNING",
                                     error_type="timeout", endpoint=url)
             raise timeout_error
         except requests.exceptions.ConnectionError as e:
@@ -771,7 +816,7 @@ Contact support if this error persists.
                 connection_error=str(e)
             )
             # Logging integration point: connection error
-            self._log_operation_error("get_klines", connection_error, symbol=symbol,
+            self._log_operation_error("get_klines", connection_error, symbol=symbol, level="ERROR",
                                     error_type="connection", endpoint=url)
             raise connection_error
         except requests.exceptions.RequestException as e:
@@ -1186,6 +1231,137 @@ Contact support if this error persists.
         # Keep only last 100 degradation events to prevent memory growth
         if len(self._degradation_history) > 100:
             self._degradation_history = self._degradation_history[-100:]
+    
+    def _log_market_analysis_complete(self, symbol: str, market_data: MarketDataSet, trace_id: str = None):
+        """Log complete market analysis for AI trading strategy optimization."""
+        if not self._logging_integration:
+            return
+            
+        try:
+            # Prepare comprehensive analysis data for AI
+            analysis_data = {
+                "technical_indicators": {
+                    "rsi_14": float(market_data.rsi_14),
+                    "macd_signal": market_data.macd_signal,
+                    "ma_20": float(market_data.ma_20) if market_data.ma_20 else None,
+                    "ma_50": float(market_data.ma_50) if market_data.ma_50 else None,
+                    "ma_trend": market_data.ma_trend
+                },
+                "market_context": {
+                    "btc_correlation": float(market_data.btc_correlation) if market_data.btc_correlation else None,
+                    "volume_profile": market_data.volume_profile,
+                    "support_level": float(market_data.support_level) if market_data.support_level else None,
+                    "resistance_level": float(market_data.resistance_level) if market_data.resistance_level else None
+                },
+                "data_quality": {
+                    "daily_candles_count": len(market_data.daily_candles),
+                    "h4_candles_count": len(market_data.h4_candles),
+                    "h1_candles_count": len(market_data.h1_candles),
+                    "timestamp": market_data.timestamp.isoformat()
+                }
+            }
+            
+            # Calculate basic trading decision confidence
+            confidence = self._calculate_analysis_confidence(market_data)
+            decision = self._get_basic_trading_decision(market_data)
+            
+            # Log market analysis with trading context
+            self._logging_integration.log_market_analysis(
+                symbol=symbol,
+                analysis_data=analysis_data,
+                decision=decision,
+                confidence=confidence,
+                trace_id=trace_id
+            )
+            
+        except Exception as e:
+            # Don't let logging errors affect main functionality
+            self._log_operation_error("market_analysis_logging", e, symbol=symbol)
+    
+    def _calculate_analysis_confidence(self, market_data: MarketDataSet) -> float:
+        """Calculate confidence level of market analysis based on data quality and indicators."""
+        confidence_factors = []
+        
+        # Data quality factor (30% weight)
+        data_quality = min(len(market_data.h1_candles) / 48.0, 1.0)  # Full confidence at 48+ candles
+        confidence_factors.append(data_quality * 0.3)
+        
+        # Technical indicators confidence (40% weight)
+        rsi_confidence = 1.0 if 20 <= market_data.rsi_14 <= 80 else 0.5  # RSI in normal range
+        macd_confidence = 1.0 if market_data.macd_signal != "neutral" else 0.5
+        ma_confidence = 1.0 if market_data.ma_trend != "sideways" else 0.5
+        
+        tech_avg = (rsi_confidence + macd_confidence + ma_confidence) / 3
+        confidence_factors.append(tech_avg * 0.4)
+        
+        # Market context factor (30% weight)
+        context_confidence = 0.8  # Base confidence
+        if market_data.btc_correlation is not None:
+            context_confidence += 0.1  # Bonus for BTC correlation data
+        if market_data.volume_profile in ["high", "low"]:  # Clear volume signal
+            context_confidence += 0.1
+        
+        confidence_factors.append(min(context_confidence, 1.0) * 0.3)
+        
+        return min(sum(confidence_factors), 1.0)
+    
+    def _get_basic_trading_decision(self, market_data: MarketDataSet) -> str:
+        """Get basic trading decision based on technical indicators."""
+        bullish_signals = 0
+        bearish_signals = 0
+        
+        # RSI signals
+        if market_data.rsi_14 < Decimal('30'):
+            bullish_signals += 1  # Oversold
+        elif market_data.rsi_14 > Decimal('70'):
+            bearish_signals += 1  # Overbought
+        
+        # MACD signals
+        if market_data.macd_signal == "bullish":
+            bullish_signals += 1
+        elif market_data.macd_signal == "bearish":
+            bearish_signals += 1
+        
+        # MA trend signals
+        if market_data.ma_trend == "uptrend":
+            bullish_signals += 1
+        elif market_data.ma_trend == "downtrend":
+            bearish_signals += 1
+        
+        # Decision logic
+        if bullish_signals > bearish_signals:
+            return "buy"
+        elif bearish_signals > bullish_signals:
+            return "sell"
+        else:
+            return "hold"
+    
+    def log_trading_operation(self, operation_type: str, symbol: str, trade_data: dict, result: str = "success"):
+        """Public method to log trading operations from external components."""
+        if self._logging_integration:
+            self._logging_integration.log_trading_operation(
+                operation_type=operation_type,
+                symbol=symbol,
+                trade_data=trade_data,
+                result=result,
+                trace_id=self._current_trace_id
+            )
+    
+    def log_order_execution(self, order_id: str, symbol: str, order_type: str,
+                           amount: str, price: str, status: str = "executed",
+                           execution_time_ms: int = None):
+        """Public method to log order executions from trading components."""
+        if self._logging_integration:
+            self._logging_integration.log_order_execution(
+                order_id=order_id,
+                symbol=symbol,
+                order_type=order_type,
+                amount=amount,
+                price=price,
+                status=status,
+                execution_time_ms=execution_time_ms,
+                trace_id=self._current_trace_id
+            )
     
     def _calculate_technical_indicators(self, df: pd.DataFrame) -> dict:
         """

@@ -4,8 +4,10 @@ Central configuration for MarketDataService logging system
 """
 
 import logging
+import logging.handlers
 import sys
 import threading
+import os
 from typing import Dict, Any, Optional
 from .json_formatter import get_logger, StructuredLogger
 from .flow_context import flow_operation, get_flow_summary
@@ -26,17 +28,21 @@ class LoggerConfig:
         self._loggers_lock = threading.Lock()
         self._log_level = logging.DEBUG
     
-    def configure_logging(self, 
+    def configure_logging(self,
                          log_level: str = "DEBUG",
                          log_file: Optional[str] = None,
-                         console_output: bool = True):
+                         console_output: bool = True,
+                         max_bytes: int = 10*1024*1024,  # 10MB
+                         backup_count: int = 5):
         """
-        Configure global logging for AI optimization.
+        Configure global logging for AI optimization with file rotation.
         
         Args:
             log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-            log_file: Optional file path for log output
+            log_file: Optional file path for log output with rotation
             console_output: Whether to output to console
+            max_bytes: Maximum file size before rotation (default: 10MB)
+            backup_count: Number of backup files to keep (default: 5)
         """
         if self._configured:
             return
@@ -58,9 +64,20 @@ class LoggerConfig:
             console_handler.setLevel(numeric_level)
             root_logger.addHandler(console_handler)
         
-        # Add file handler if requested
+        # Add rotating file handler if requested
         if log_file:
-            file_handler = logging.FileHandler(log_file)
+            # Ensure log directory exists
+            log_dir = os.path.dirname(log_file)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
+            
+            # Use RotatingFileHandler for automatic log rotation
+            file_handler = logging.handlers.RotatingFileHandler(
+                log_file,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding='utf-8'
+            )
             file_handler.setLevel(numeric_level)
             root_logger.addHandler(file_handler)
         
@@ -110,16 +127,20 @@ _logger_config = LoggerConfig()
 
 def configure_ai_logging(log_level: str = "DEBUG",
                         log_file: Optional[str] = None,
-                        console_output: bool = True):
+                        console_output: bool = True,
+                        max_bytes: int = 10*1024*1024,
+                        backup_count: int = 5):
     """
-    Configure AI-optimized logging system.
+    Configure AI-optimized logging system with file rotation.
     
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        log_file: Optional file path for log output  
+        log_file: Optional file path for log output with rotation
         console_output: Whether to output to console
+        max_bytes: Maximum file size before rotation (default: 10MB)
+        backup_count: Number of backup files to keep (default: 5)
     """
-    _logger_config.configure_logging(log_level, log_file, console_output)
+    _logger_config.configure_logging(log_level, log_file, console_output, max_bytes, backup_count)
 
 
 def get_ai_logger(name: str, service_name: str = "MarketDataService") -> StructuredLogger:
