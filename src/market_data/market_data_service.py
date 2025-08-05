@@ -413,16 +413,26 @@ class MarketDataService:
         return message_level >= current_level
     
     def _generate_trace_id(self, operation: str = "market_data") -> str:
-        """Generate a new trace ID for error tracking and logging integration."""
+        """Generate a new trace ID only if none exists, otherwise return current trace ID."""
+        # If we already have a trace_id, don't generate a new one (preserve master trace_id)
+        if self._current_trace_id:
+            return self._current_trace_id
+        
+        # Generate new trace_id only for master operations
         import uuid
         trace_id = f"{operation}_{uuid.uuid4().hex[:8]}"
         self._current_trace_id = trace_id
         return trace_id
     
-    def _get_error_context(self, operation: str, **kwargs) -> ErrorContext:
+    def _get_error_context(self, operation: str, parent_trace_id: str = None, **kwargs) -> ErrorContext:
         """Create ErrorContext with current trace ID and operation details."""
         if not self._current_trace_id:
             self._generate_trace_id(operation)
+        
+        # Store parent trace_id for hierarchical logging if provided
+        if parent_trace_id:
+            # For sub-operations, we can track the parent relationship
+            kwargs['parent_trace_id'] = parent_trace_id
         
         # Direct logging: capture operation start
         symbol = kwargs.get('symbol', '')
@@ -432,23 +442,30 @@ class MarketDataService:
         return ErrorContext(trace_id=self._current_trace_id, operation=operation)
     
     def _log_operation_start(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
-        """Direct logging: Log operation start with context."""
+        """Direct logging: Log operation start with context and hierarchical tracing."""
         if self.logger:
             try:
+                # Extract parent_trace_id from kwargs if provided
+                parent_trace_id = kwargs.pop('parent_trace_id', None)
+                
                 self.logger.log_operation_start(
                     operation=operation,
                     symbol=symbol,
                     context=kwargs,
-                    trace_id=self._current_trace_id
+                    trace_id=self._current_trace_id,
+                    parent_trace_id=parent_trace_id
                 )
             except Exception:
                 # Graceful degradation: logging failures should not crash operations
                 pass
     
     def _log_operation_success(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
-        """Direct logging: Log successful operation completion."""
+        """Direct logging: Log successful operation completion with hierarchical tracing."""
         if self.logger:
             try:
+                # Extract parent_trace_id from kwargs if provided
+                parent_trace_id = kwargs.pop('parent_trace_id', None)
+                
                 self.logger.log_operation_complete(
                     operation=operation,
                     processing_time_ms=kwargs.get('processing_time_ms', 0),
@@ -457,7 +474,8 @@ class MarketDataService:
                         'status': 'success',
                         **kwargs
                     },
-                    trace_id=self._current_trace_id
+                    trace_id=self._current_trace_id,
+                    parent_trace_id=parent_trace_id
                 )
             except Exception:
                 # Graceful degradation: logging failures should not crash operations
@@ -601,9 +619,11 @@ class MarketDataService:
     
     def get_enhanced_context(self, symbol: str) -> str:
         """Get enhanced market context with candlestick analysis and structured error handling."""
-        # Generate trace ID for this enhanced context operation
-        trace_id = self._generate_trace_id("get_enhanced_context")
-        error_context = self._get_error_context("get_enhanced_context", symbol=symbol)
+        # Use existing trace_id (inherited from master operation) or generate new one for standalone calls
+        if not self._current_trace_id:
+            self._generate_trace_id("get_enhanced_context")
+        master_trace_id = self._current_trace_id
+        error_context = self._get_error_context("get_enhanced_context", parent_trace_id=master_trace_id, symbol=symbol)
         
         try:
             # Get market data - this may raise various structured exceptions
@@ -730,9 +750,9 @@ Contact support if this error persists.
             "limit": limit
         }
         
-        # Generate trace ID for this network operation
-        trace_id = self._generate_trace_id("get_klines")
-        error_context = self._get_error_context("get_klines", symbol=symbol, interval=interval, limit=limit)
+        # Use existing trace_id (inherited from master operation) and pass master as parent
+        master_trace_id = self._current_trace_id
+        error_context = self._get_error_context("get_klines", parent_trace_id=master_trace_id, symbol=symbol, interval=interval, limit=limit)
         
         try:
             
@@ -1115,9 +1135,9 @@ Contact support if this error persists.
             )
         
         try:
-            # Generate trace ID for this correlation operation
-            trace_id = self._generate_trace_id("btc_correlation")
-            error_context = self._get_error_context("btc_correlation", symbol=symbol, data_points=len(df))
+            # Use existing trace_id (inherited from master operation) and pass master as parent
+            master_trace_id = self._current_trace_id
+            error_context = self._get_error_context("btc_correlation", parent_trace_id=master_trace_id, symbol=symbol, data_points=len(df))
             
             # Fetch BTC data for correlation calculation - error context is preserved from _get_klines
             btc_data = self._get_klines("BTCUSDT", "1h", len(df))
@@ -1292,9 +1312,9 @@ Contact support if this error persists.
             Dict with basic_data and enhanced features (correlation, volume_profile, etc.)
         """
         try:
-            # Generate trace ID for this fallback operation
-            trace_id = self._generate_trace_id("get_market_data_with_fallback")
-            error_context = self._get_error_context("get_market_data_with_fallback", symbol=symbol)
+            # Use existing trace_id (inherited from master operation) and pass master as parent
+            master_trace_id = self._current_trace_id
+            error_context = self._get_error_context("get_market_data_with_fallback", parent_trace_id=master_trace_id, symbol=symbol)
             
             # Try to get basic market data with manual graceful degradation
             try:

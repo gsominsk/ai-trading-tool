@@ -181,27 +181,39 @@ class MarketDataLogger:
         self.logger = get_ai_logger(module_name)
         self.module_name = module_name
     
-    def log_operation_start(self, operation: str, symbol: str = "", 
+    def log_operation_start(self, operation: str, symbol: str = "",
                            context: Optional[Dict[str, Any]] = None,
-                           trace_id: Optional[str] = None):
-        """Log start of major operation with flow context."""
+                           trace_id: Optional[str] = None,
+                           parent_trace_id: Optional[str] = None):
+        """Log start of major operation with flow context and hierarchical tracing."""
+        ctx = context or {"symbol": symbol}
+        
+        # Add parent_trace_id to context if provided for hierarchical tracing
+        if parent_trace_id:
+            ctx["parent_trace_id"] = parent_trace_id
+            
         self.logger.info(
             f"{operation} initiated",
             operation=operation,
-            context=context or {"symbol": symbol},
+            context=ctx,
             tags=["flow_start", operation.lower().replace("_", "")],
             flow=get_flow_summary(),
             trace_id=trace_id
         )
     
-    def log_operation_complete(self, operation: str, 
+    def log_operation_complete(self, operation: str,
                               processing_time_ms: Optional[int] = None,
                               context: Optional[Dict[str, Any]] = None,
-                              trace_id: Optional[str] = None):
-        """Log successful completion of operation."""
+                              trace_id: Optional[str] = None,
+                              parent_trace_id: Optional[str] = None):
+        """Log successful completion of operation with hierarchical tracing."""
         ctx = context or {}
         if processing_time_ms:
             ctx["processing_time_ms"] = processing_time_ms
+        
+        # Add parent_trace_id to context if provided for hierarchical tracing
+        if parent_trace_id:
+            ctx["parent_trace_id"] = parent_trace_id
             
         self.logger.info(
             f"{operation} completed successfully",

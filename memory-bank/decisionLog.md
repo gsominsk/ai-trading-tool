@@ -262,3 +262,31 @@ Successfully implemented comprehensive logging simplification using proper Depen
 - ✅ Reduced complexity and maintenance burden
 - ✅ Proper test categorization for development workflow
 - ✅ System validated and ready for deployment
+
+
+**[2025-08-05 22:59:18] - TRACE_ID UNIFICATION ARCHITECTURE DECISION**
+
+**DECISION**: Implement master trace_id inheritance pattern for unified operation tracing
+
+**RATIONALE**: 
+- Original system generated separate trace_id for each operation causing fragmented tracing
+- Required unified tracing for complete operation flow visibility
+- Need hierarchical parent-child relationships for complex operations
+
+**IMPLEMENTATION**:
+1. **Modified `_generate_trace_id()`**: Preserve existing trace_id, only generate new for master operations
+2. **Added `parent_trace_id` parameter**: Support hierarchical tracing in logging system
+3. **Updated error contexts**: Pass parent trace_id information through operation chain
+4. **Removed sub-operation trace_id generation**: All sub-ops inherit master trace_id
+
+**IMPLICATIONS**:
+- ✅ Complete operation traceability with single trace_id
+- ✅ Hierarchical operation relationships preserved
+- ✅ Improved debugging and monitoring capabilities
+- ✅ AI log analysis with unified context
+
+**FILES MODIFIED**:
+- `src/market_data/market_data_service.py`: trace_id inheritance logic
+- `src/logging_system/logger_config.py`: parent_trace_id support
+
+**TESTING**: 20 operations successfully unified under single trace_id with hierarchy support
