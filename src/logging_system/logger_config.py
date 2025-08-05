@@ -84,7 +84,8 @@ class LoggerConfig:
             except Exception as e:
                 # Логи сломались - останавливаем сервис
                 print(f"CRITICAL: Failed to configure file logging - shutting down service: {e}", file=sys.stderr)
-                os._exit(1)
+                # Graceful exit вместо os._exit(1)
+                raise SystemExit(1)
         
         self._configured = True
     

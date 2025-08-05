@@ -22,6 +22,7 @@ class TraceGenerator:
         self.session_id = session_id
         self._trace_counter = 0
         self._lock = threading.Lock()
+        self._generation_lock = threading.Lock()  # Дополнительный lock для thread safety
     
     def generate_trace_id(self) -> str:
         """
@@ -30,7 +31,7 @@ class TraceGenerator:
         Format: trd_{session}_{timestamp}{sequence}
         Example: "trd_001_2025080421450001"
         """
-        with self._lock:
+        with self._generation_lock:
             self._trace_counter += 1
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
             sequence = f"{self._trace_counter:04d}"
@@ -45,13 +46,14 @@ class TraceGenerator:
         - "flow_btc_20250804214500"
         - "flow_enh_20250804214500"
         """
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-        identifier = symbol.lower().replace("usdt", "") if symbol else operation
-        return f"flow_{identifier}_{timestamp}"
+        with self._generation_lock:
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            identifier = symbol.lower().replace("usdt", "") if symbol else operation
+            return f"flow_{identifier}_{timestamp}"
     
     def reset_counter(self):
         """Reset trace counter (for testing purposes)."""
-        with self._lock:
+        with self._generation_lock:
             self._trace_counter = 0
 
 

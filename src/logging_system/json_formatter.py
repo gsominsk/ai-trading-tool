@@ -93,7 +93,11 @@ class AIOptimizedJSONFormatter(logging.Formatter):
                 "traceback": self.formatException(record.exc_info)
             }
         
-        return json.dumps(log_entry, ensure_ascii=False, separators=(',', ':'))
+        try:
+            return json.dumps(log_entry, ensure_ascii=False, separators=(',', ':'))
+        except (TypeError, ValueError) as e:
+            # Fallback: если JSON serialization не удалась, возвращаем простой текст
+            return f'{{"timestamp":"{datetime.utcnow().isoformat()}Z","level":"{record.levelname}","service":"{self.service_name}","message":"FALLBACK_LOG: {record.getMessage()}","serialization_error":"{str(e)}"}}'
 
 
 class StructuredLogger:
@@ -113,11 +117,12 @@ class StructuredLogger:
     
     def _configure_logger(self):
         """Configure logger with AI-optimized JSON formatter."""
-        # Check if global logging is configured via LoggerConfig
-        from .logger_config import _logger_config
+        # Исправление handler accumulation - проверяем наличие handlers
+        if self.logger.handlers:
+            self.logger.handlers.clear()
         
-        # Clear existing handlers to avoid accumulation
-        self.logger.handlers.clear()
+        # Lazy import чтобы избежать circular imports
+        from .logger_config import _logger_config
         
         if _logger_config.is_configured():
             # Create handler with service-specific formatter
@@ -162,8 +167,8 @@ class StructuredLogger:
         except Exception as e:
             # Логи сломались - останавливаем сервис
             print(f"CRITICAL: Logging system failed - shutting down service: {e}", file=sys.stderr)
-            # Выходим из процесса
-            os._exit(1)
+            # Graceful exit вместо os._exit(1)
+            raise SystemExit(1)
     
     def trace(self, message: str, operation: str = "",
               context: Optional[Dict[str, Any]] = None,
@@ -217,7 +222,8 @@ class StructuredLogger:
             except Exception as e:
                 # Логи сломались - останавливаем сервис
                 print(f"CRITICAL: Logging system failed - shutting down service: {e}", file=sys.stderr)
-                os._exit(1)
+                # Graceful exit вместо os._exit(1)
+                raise SystemExit(1)
         else:
             self._log(logging.ERROR, message, operation, context, tags, flow, trace_id)
     
