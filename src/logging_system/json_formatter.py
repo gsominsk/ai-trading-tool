@@ -6,6 +6,7 @@ Creates structured JSON logs with semantic tags for AI searchability
 import json
 import logging
 import sys
+import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from .trace_generator import get_trace_id
@@ -141,7 +142,7 @@ class StructuredLogger:
             # Consistent behavior: always allow propagation for test compatibility
             self.logger.propagate = True
     
-    def _log(self, level: int, message: str, operation: str = "", 
+    def _log(self, level: int, message: str, operation: str = "",
              context: Optional[Dict[str, Any]] = None,
              tags: Optional[List[str]] = None,
              flow: Optional[Dict[str, Any]] = None,
@@ -156,7 +157,13 @@ class StructuredLogger:
             'trace_id': trace_id
         }
         
-        self.logger.log(level, message, extra=extra)
+        try:
+            self.logger.log(level, message, extra=extra)
+        except Exception as e:
+            # Логи сломались - останавливаем сервис
+            print(f"CRITICAL: Logging system failed - shutting down service: {e}", file=sys.stderr)
+            # Выходим из процесса
+            os._exit(1)
     
     def trace(self, message: str, operation: str = "",
               context: Optional[Dict[str, Any]] = None,
@@ -191,7 +198,7 @@ class StructuredLogger:
         """Log WARNING level - potential issues."""
         self._log(logging.WARNING, message, operation, context, tags, flow, trace_id)
     
-    def error(self, message: str, operation: str = "", 
+    def error(self, message: str, operation: str = "",
               context: Optional[Dict[str, Any]] = None,
               tags: Optional[List[str]] = None,
               flow: Optional[Dict[str, Any]] = None,
@@ -199,13 +206,18 @@ class StructuredLogger:
               exc_info: bool = False):
         """Log ERROR level - errors affecting functionality."""
         if exc_info:
-            self.logger.error(message, extra={
-                'operation': operation,
-                'context': context or {},
-                'tags': tags or [],
-                'flow': flow or {},
-                'trace_id': trace_id
-            }, exc_info=True)
+            try:
+                self.logger.error(message, extra={
+                    'operation': operation,
+                    'context': context or {},
+                    'tags': tags or [],
+                    'flow': flow or {},
+                    'trace_id': trace_id
+                }, exc_info=True)
+            except Exception as e:
+                # Логи сломались - останавливаем сервис
+                print(f"CRITICAL: Logging system failed - shutting down service: {e}", file=sys.stderr)
+                os._exit(1)
         else:
             self._log(logging.ERROR, message, operation, context, tags, flow, trace_id)
     

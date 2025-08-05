@@ -66,20 +66,25 @@ class LoggerConfig:
         
         # Add rotating file handler if requested
         if log_file:
-            # Ensure log directory exists
-            log_dir = os.path.dirname(log_file)
-            if log_dir:
-                os.makedirs(log_dir, exist_ok=True)
-            
-            # Use RotatingFileHandler for automatic log rotation
-            file_handler = logging.handlers.RotatingFileHandler(
-                log_file,
-                maxBytes=max_bytes,
-                backupCount=backup_count,
-                encoding='utf-8'
-            )
-            file_handler.setLevel(numeric_level)
-            root_logger.addHandler(file_handler)
+            try:
+                # Ensure log directory exists
+                log_dir = os.path.dirname(log_file)
+                if log_dir:
+                    os.makedirs(log_dir, exist_ok=True)
+                
+                # Use RotatingFileHandler for automatic log rotation
+                file_handler = logging.handlers.RotatingFileHandler(
+                    log_file,
+                    maxBytes=max_bytes,
+                    backupCount=backup_count,
+                    encoding='utf-8'
+                )
+                file_handler.setLevel(numeric_level)
+                root_logger.addHandler(file_handler)
+            except Exception as e:
+                # Логи сломались - останавливаем сервис
+                print(f"CRITICAL: Failed to configure file logging - shutting down service: {e}", file=sys.stderr)
+                os._exit(1)
         
         self._configured = True
     
