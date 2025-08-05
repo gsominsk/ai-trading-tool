@@ -141,9 +141,10 @@ def configure_ai_logging(log_level: str = "DEBUG",
                         log_file: Optional[str] = None,
                         console_output: bool = True,
                         max_bytes: int = 10*1024*1024,
-                        backup_count: int = 5):
+                        backup_count: int = 5,
+                        filter_http_noise: bool = True):
     """
-    Configure AI-optimized logging system with file rotation.
+    Configure AI-optimized logging system with file rotation and HTTP noise filtering.
     
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -151,8 +152,45 @@ def configure_ai_logging(log_level: str = "DEBUG",
         console_output: Whether to output to console
         max_bytes: Maximum file size before rotation (default: 10MB)
         backup_count: Number of backup files to keep (default: 5)
+        filter_http_noise: Filter out verbose HTTP logs from urllib3/requests (default: True)
     """
     _logger_config.configure_logging(log_level, log_file, console_output, max_bytes, backup_count)
+    
+    # Filter HTTP noise for cleaner AI logs
+    if filter_http_noise:
+        _configure_http_logging_filters()
+
+
+def _configure_http_logging_filters():
+    """
+    Configure HTTP logging filters to reduce noise in AI logs.
+    
+    Filters out verbose HTTP connection logs from urllib3 and requests
+    while preserving ERROR level messages for debugging network issues.
+    """
+    # Filter urllib3 connection pool logs (the main source of "unknown" operations)
+    urllib3_logger = logging.getLogger('urllib3.connectionpool')
+    urllib3_logger.setLevel(logging.WARNING)  # Only show warnings and errors
+    
+    # Filter requests logs
+    requests_logger = logging.getLogger('requests')
+    requests_logger.setLevel(logging.WARNING)  # Only show warnings and errors
+    
+    # Filter general urllib3 logs
+    urllib3_base_logger = logging.getLogger('urllib3')
+    urllib3_base_logger.setLevel(logging.WARNING)  # Only show warnings and errors
+    
+    # Optional: Add more specific filters if needed
+    # These loggers are common sources of HTTP noise
+    http_loggers = [
+        'urllib3.util.retry',
+        'urllib3.util.connection',
+        'requests.packages.urllib3.connectionpool'
+    ]
+    
+    for logger_name in http_loggers:
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.ERROR)  # Only critical HTTP errors
 
 
 def get_ai_logger(name: str, service_name: str = "MarketDataService") -> StructuredLogger:

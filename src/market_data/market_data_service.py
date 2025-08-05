@@ -390,7 +390,8 @@ class MarketDataService:
                     log_file="logs/trading_operations.log",
                     console_output=True,
                     max_bytes=50*1024*1024,
-                    backup_count=10
+                    backup_count=10,
+                    filter_http_noise=True  # Включаем HTTP фильтрацию
                 )
                 self.logger = MarketDataLogger("market_data_service")
             except Exception as e:
