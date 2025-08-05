@@ -226,6 +226,11 @@ class MarketDataLogger:
         """Log start of major operation with flow context and hierarchical tracing."""
         ctx = context or {"symbol": symbol}
         
+        # Auto-generate trace_id using get_flow_id if not provided and symbol is available
+        if trace_id is None and symbol:
+            from .trace_generator import get_flow_id
+            trace_id = get_flow_id(symbol, operation)
+        
         # Add parent_trace_id to context if provided for hierarchical tracing
         if parent_trace_id:
             ctx["parent_trace_id"] = parent_trace_id
@@ -248,6 +253,11 @@ class MarketDataLogger:
         ctx = context or {}
         if processing_time_ms:
             ctx["processing_time_ms"] = processing_time_ms
+        
+        # Auto-generate trace_id using get_flow_id if not provided and symbol is available in context
+        if trace_id is None and ctx.get("symbol"):
+            from .trace_generator import get_flow_id
+            trace_id = get_flow_id(ctx["symbol"], operation)
         
         # Add parent_trace_id to context if provided for hierarchical tracing
         if parent_trace_id:

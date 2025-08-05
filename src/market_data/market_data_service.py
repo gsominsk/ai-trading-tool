@@ -413,23 +413,9 @@ class MarketDataService:
         message_level = log_levels.get(level.upper(), 20)
         return message_level >= current_level
     
-    def _generate_trace_id(self, operation: str = "market_data") -> str:
-        """Generate a new trace ID only if none exists, otherwise return current trace ID."""
-        # If we already have a trace_id, don't generate a new one (preserve master trace_id)
-        if self._current_trace_id:
-            return self._current_trace_id
-        
-        # Generate new trace_id only for master operations
-        import uuid
-        trace_id = f"{operation}_{uuid.uuid4().hex[:8]}"
-        self._current_trace_id = trace_id
-        return trace_id
     
     def _get_error_context(self, operation: str, parent_trace_id: str = None, **kwargs) -> ErrorContext:
         """Create ErrorContext with current trace ID and operation details."""
-        if not self._current_trace_id:
-            self._generate_trace_id(operation)
-        
         # Store parent trace_id for hierarchical logging if provided
         if parent_trace_id:
             # For sub-operations, we can track the parent relationship
@@ -440,7 +426,9 @@ class MarketDataService:
         context = {k: v for k, v in kwargs.items() if k != 'symbol'}
         self._log_operation_start(operation, symbol=symbol, **context)
         
-        return ErrorContext(trace_id=self._current_trace_id, operation=operation)
+        # Use a simple trace_id for error context - logging system will handle auto-generation
+        trace_id = self._current_trace_id or f"{operation}_context"
+        return ErrorContext(trace_id=trace_id, operation=operation)
     
     def _log_operation_start(self, operation: str, symbol: str = "", level: str = "INFO", **kwargs):
         """Direct logging: Log operation start with context and hierarchical tracing."""
@@ -511,8 +499,7 @@ class MarketDataService:
         Returns:
             MarketDataSet with all timeframes and indicators
         """
-        # Generate trace ID for this main operation
-        trace_id = self._generate_trace_id("get_market_data")
+        # Set up error context for this main operation
         error_context = self._get_error_context("get_market_data", symbol=symbol)
         
         try:
@@ -620,9 +607,7 @@ class MarketDataService:
     
     def get_enhanced_context(self, symbol: str) -> str:
         """Get enhanced market context with candlestick analysis and structured error handling."""
-        # Use existing trace_id (inherited from master operation) or generate new one for standalone calls
-        if not self._current_trace_id:
-            self._generate_trace_id("get_enhanced_context")
+        # Use existing trace_id (inherited from master operation) for standalone calls
         master_trace_id = self._current_trace_id
         error_context = self._get_error_context("get_enhanced_context", parent_trace_id=master_trace_id, symbol=symbol)
         

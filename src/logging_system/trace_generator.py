@@ -21,6 +21,7 @@ class TraceGenerator:
     def __init__(self, session_id: str = "001"):
         self.session_id = session_id
         self._trace_counter = 0
+        self._flow_counter = 0  # Добавляем счетчик для flow_id
         self._lock = threading.Lock()
         self._generation_lock = threading.Lock()  # Дополнительный lock для thread safety
     
@@ -41,20 +42,23 @@ class TraceGenerator:
         """
         Generate flow ID for grouping all logs from single request.
         
-        Format: flow_{symbol}_{timestamp} or flow_{operation}_{timestamp}
-        Examples: 
-        - "flow_btc_20250804214500"
-        - "flow_enh_20250804214500"
+        Format: flow_{symbol}_{timestamp}{counter} or flow_{operation}_{timestamp}{counter}
+        Examples:
+        - "flow_btc_202508042145001"
+        - "flow_enh_202508042145002"
         """
         with self._generation_lock:
+            self._flow_counter += 1
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
             identifier = symbol.lower().replace("usdt", "") if symbol else operation
-            return f"flow_{identifier}_{timestamp}"
+            counter = f"{self._flow_counter:03d}"  # 3-digit counter for uniqueness
+            return f"flow_{identifier}_{timestamp}{counter}"
     
     def reset_counter(self):
-        """Reset trace counter (for testing purposes)."""
+        """Reset trace and flow counters (for testing purposes)."""
         with self._generation_lock:
             self._trace_counter = 0
+            self._flow_counter = 0
 
 
 # Global trace generator instance
