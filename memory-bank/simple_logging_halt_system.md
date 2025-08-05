@@ -76,6 +76,10 @@ python3 tests/test_logging_halt_on_failure.py
 - [`examples/simple_logging_demo.py`](examples/simple_logging_demo.py) - демонстрация работы
 - [`tests/test_logging_halt_on_failure.py`](tests/test_logging_halt_on_failure.py) - автоматические тесты
 
+### Диагностика и устранение неисправностей:
+- [`memory-bank/logging_troubleshooting_guide.md`](memory-bank/logging_troubleshooting_guide.md) - пошаговое руководство по диагностике
+- [`src/logging_system/troubleshooting.py`](src/logging_system/troubleshooting.py) - Python утилиты для автоматической диагностики
+
 ### Удаленные файлы:
 - `src/trading_safety/` - удалена вся папка TradingGuard
 - `tests/test_trading_guard.py` - удален
