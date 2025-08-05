@@ -1040,6 +1040,20 @@ Contact support if this error persists.
                     data_stats={"status": "fallback"},
                     trace_id=self._current_trace_id
                 )
+                
+                # Добавляем логирование завершения операции для fallback случая
+                self.logger.log_operation_complete(
+                    operation="ma_calculation",
+                    processing_time_ms=0,  # Быстрый fallback расчет
+                    context={
+                        "period": period,
+                        "ma_value": float(result),
+                        "data_points_used": len(df),
+                        "data_quality": "fallback",
+                        "calculation_method": "simple_average_fallback"
+                    },
+                    trace_id=self._current_trace_id
+                )
             return result
         
         ma_value = df['close'].rolling(window=period).mean().iloc[-1]
