@@ -741,8 +741,14 @@ Contact support if this error persists.
         error_context = self._get_error_context("get_klines", parent_trace_id=master_trace_id, symbol=symbol, interval=interval, limit=limit)
         
         try:
+            # Task 8.4: Add timing and enhanced API metrics tracking
+            import time
+            start_time = time.time()
             
             response = requests.get(url, params=params, timeout=30)
+            
+            # Calculate request timing
+            request_duration_ms = int((time.time() - start_time) * 1000)
             
             # Handle specific HTTP status codes with rich error context
             if response.status_code == 429:
@@ -774,6 +780,60 @@ Contact support if this error persists.
             response.raise_for_status()
             
             data = response.json()
+            
+            # Task 8.2 & 8.4: Log raw API response data with enhanced metrics
+            if self.logger:
+                # Extract key performance and rate limit headers
+                rate_limit_headers = {
+                    "x-mbx-used-weight": response.headers.get("x-mbx-used-weight"),
+                    "x-mbx-used-weight-1m": response.headers.get("x-mbx-used-weight-1m"),
+                    "retry-after": response.headers.get("retry-after"),
+                    "x-mbx-order-count-1s": response.headers.get("x-mbx-order-count-1s"),
+                    "x-mbx-order-count-1m": response.headers.get("x-mbx-order-count-1m")
+                }
+                
+                # Performance metrics
+                performance_metrics = {
+                    "request_duration_ms": request_duration_ms,
+                    "content_length": len(response.content),
+                    "response_time_category": (
+                        "fast" if request_duration_ms < 500 else
+                        "normal" if request_duration_ms < 1000 else
+                        "slow" if request_duration_ms < 2000 else "very_slow"
+                    ),
+                    "compression": response.headers.get("content-encoding"),
+                    "cache_status": response.headers.get("x-cache", "unknown")
+                }
+                
+                self.logger.log_raw_data(
+                    data_type="binance_api_response",
+                    data_sample={
+                        "endpoint": url,
+                        "symbol": symbol,
+                        "interval": interval,
+                        "limit": limit,
+                        "response_size": len(data) if isinstance(data, list) else 1,
+                        "status_code": response.status_code,
+                        "headers": dict(response.headers),
+                        "rate_limit_headers": rate_limit_headers,
+                        "performance_metrics": performance_metrics,
+                        "first_candle": data[0] if isinstance(data, list) and len(data) > 0 else None,
+                        "last_candle": data[-1] if isinstance(data, list) and len(data) > 0 else None,
+                        "request_params": params
+                    },
+                    data_stats={
+                        "endpoint": "klines",
+                        "symbol": symbol,
+                        "interval": interval,
+                        "response_candles": len(data) if isinstance(data, list) else 0,
+                        "status_code": response.status_code,
+                        "content_length": len(response.content),
+                        "request_duration_ms": request_duration_ms,
+                        "rate_limit_weight": response.headers.get("x-mbx-used-weight", "unknown"),
+                        "performance_category": performance_metrics["response_time_category"]
+                    },
+                    trace_id=self._current_trace_id
+                )
             
             # Validate API response structure
             if not isinstance(data, list) or len(data) == 0:
