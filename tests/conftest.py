@@ -1,15 +1,19 @@
 """
 Pytest configuration and shared fixtures for AI Trading System tests.
 
-This module provides common test fixtures and configuration for all test modules.
+This module provides common test fixtures and configuration for all test modules
+in the reorganized test structure: unit/, integration/, and performance/.
 """
 
 import pytest
 import json
+import tempfile
+import os
 from decimal import Decimal
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from unittest.mock import Mock, MagicMock
+from pathlib import Path
 
 # Test configuration
 pytest_plugins = []
@@ -180,9 +184,73 @@ def test_config() -> Dict[str, Any]:
     }
 
 
+@pytest.fixture
+def temp_log_dir():
+    """Temporary directory for logging tests."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield tmpdir
+
+
+@pytest.fixture
+def mock_logger():
+    """Mock logger for testing logging components."""
+    mock_logger = Mock()
+    mock_logger.debug = Mock()
+    mock_logger.info = Mock()
+    mock_logger.warning = Mock()
+    mock_logger.error = Mock()
+    mock_logger.critical = Mock()
+    return mock_logger
+
+
+@pytest.fixture
+def sample_log_record():
+    """Sample log record for testing formatters and handlers."""
+    return {
+        "timestamp": "2025-01-05T14:00:00.000Z",
+        "level": "INFO",
+        "service": "MarketDataService",
+        "operation": "get_market_data",
+        "message": "Test log message",
+        "context": {"symbol": "BTCUSDT", "test": True},
+        "flow": {"flow_id": "test_flow_123", "stage": "testing"},
+        "tags": ["test", "unit"],
+        "trace_id": "test_trace_456"
+    }
+
+
+@pytest.fixture
+def mock_market_data_service():
+    """Mock MarketDataService for integration tests."""
+    mock_service = Mock()
+    mock_service.get_market_data.return_value = {
+        "symbol": "BTCUSDT",
+        "current_price": Decimal("50000.00"),
+        "daily_data": [],
+        "technical_indicators": {}
+    }
+    return mock_service
+
+
+@pytest.fixture
+def sample_error_context():
+    """Sample error context for testing error architecture."""
+    return {
+        "trace_id": "error_trace_789",
+        "operation": "test_operation",
+        "symbol": "BTCUSDT",
+        "timestamp": datetime.utcnow(),
+        "system_info": {
+            "python_version": "3.9.0",
+            "platform": "test_platform"
+        }
+    }
+
+
 # Test markers for categorizing tests
 def pytest_configure(config):
-    """Configure pytest markers."""
+    """Configure pytest markers for reorganized test structure."""
+    # Primary test categories (by structure)
     config.addinivalue_line(
         "markers", "unit: Unit tests for individual components"
     )
@@ -190,14 +258,41 @@ def pytest_configure(config):
         "markers", "integration: Integration tests for cross-component functionality"
     )
     config.addinivalue_line(
+        "markers", "performance: Performance and load tests"
+    )
+    
+    # Component-specific markers
+    config.addinivalue_line(
+        "markers", "logging: Tests for logging system components"
+    )
+    config.addinivalue_line(
+        "markers", "market_data: Tests for market data service components"
+    )
+    config.addinivalue_line(
+        "markers", "error_architecture: Tests for error handling system"
+    )
+    
+    # Functional markers
+    config.addinivalue_line(
         "markers", "financial: Tests involving financial calculations"
     )
     config.addinivalue_line(
         "markers", "llm: Tests involving LLM providers"
     )
     config.addinivalue_line(
-        "markers", "slow: Slow-running tests (backtesting, etc.)"
+        "markers", "slow: Slow-running tests (backtesting, performance)"
     )
     config.addinivalue_line(
         "markers", "external: Tests requiring external API calls"
+    )
+    
+    # Infrastructure markers
+    config.addinivalue_line(
+        "markers", "memory_leak: Tests for memory leak detection"
+    )
+    config.addinivalue_line(
+        "markers", "thread_safety: Tests for concurrent access patterns"
+    )
+    config.addinivalue_line(
+        "markers", "production: Tests simulating production conditions"
     )
