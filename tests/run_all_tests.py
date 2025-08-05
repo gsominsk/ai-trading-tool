@@ -113,6 +113,20 @@ class AITradingTestRunner:
                     'tests/test_volume_relationship_decimal_fix.py',
                     'tests/test_rsi_debug.py',
                 ]
+            },
+            'logging_system': {
+                'description': 'AI-Optimized Logging System comprehensive tests',
+                'tests': [
+                    'tests/test_logging_system.py',
+                    'tests/test_logging_system_fixed.py',
+                    'tests/test_logging_system_critical_fixes.py',
+                    'tests/test_logging_json_schema_validation.py',
+                    'tests/test_stderr_integration.py',
+                    'tests/test_production_configuration.py',
+                    'tests/test_memory_leak_detection.py',
+                    'tests/test_encoding_unicode.py',
+                    'tests/test_error_recovery.py',
+                ]
             }
         }
     

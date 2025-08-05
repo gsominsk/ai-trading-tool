@@ -133,10 +133,10 @@ _flow_context = FlowContext()
 
 
 @contextmanager
-def flow_operation(symbol: str = "", operation: str = "", 
+def flow_operation(symbol: str = "", operation: str = "",
                    initial_stage: str = "initiation"):
     """
-    Context manager for operation flow tracking.
+    Context manager for operation flow tracking with nested operation support.
     
     Usage:
         with flow_operation("BTCUSDT", "get_market_data"):
@@ -144,6 +144,9 @@ def flow_operation(symbol: str = "", operation: str = "",
             advance_to_stage("data_collection")
             # more operation code
     """
+    # Store previous flow for nested operations
+    previous_flow = _flow_context.current_flow
+    
     flow_id = _flow_context.start_flow(symbol, operation, initial_stage)
     try:
         yield flow_id
@@ -151,7 +154,11 @@ def flow_operation(symbol: str = "", operation: str = "",
         _flow_context.terminate_flow(f"exception: {type(e).__name__}")
         raise
     finally:
-        _flow_context.clear_flow()
+        # Restore previous flow instead of clearing (for nested operations)
+        if previous_flow:
+            _flow_context._local.flow = previous_flow
+        else:
+            _flow_context.clear_flow()
 
 
 def get_current_flow() -> Optional[Dict[str, Any]]:

@@ -5,6 +5,7 @@ Central configuration for MarketDataService logging system
 
 import logging
 import sys
+import threading
 from typing import Dict, Any, Optional
 from .json_formatter import get_logger, StructuredLogger
 from .flow_context import flow_operation, get_flow_summary
@@ -22,6 +23,7 @@ class LoggerConfig:
     def __init__(self):
         self._configured = False
         self._loggers: Dict[str, StructuredLogger] = {}
+        self._loggers_lock = threading.Lock()
         self._log_level = logging.DEBUG
     
     def configure_logging(self, 
@@ -50,9 +52,9 @@ class LoggerConfig:
         # Clear existing handlers
         root_logger.handlers.clear()
         
-        # Add console handler if requested
+        # Add console handler if requested (JSON logs go to stderr for AI searchability)
         if console_output:
-            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler = logging.StreamHandler(sys.stderr)
             console_handler.setLevel(numeric_level)
             root_logger.addHandler(console_handler)
         
@@ -75,13 +77,31 @@ class LoggerConfig:
         Returns:
             StructuredLogger instance configured for AI analysis
         """
-        if name not in self._loggers:
-            self._loggers[name] = get_logger(name, service_name)
-        return self._loggers[name]
+        with self._loggers_lock:
+            # Use combination of name and service_name as cache key to support multiple services
+            cache_key = f"{name}:{service_name}"
+            if cache_key not in self._loggers:
+                logger = get_logger(name, service_name)
+                # Ensure logger respects the configured log level
+                if self._configured:
+                    logger.logger.setLevel(self._log_level)
+                self._loggers[cache_key] = logger
+            return self._loggers[cache_key]
     
     def is_configured(self) -> bool:
         """Check if logging system is configured."""
         return self._configured
+    
+    def reset(self):
+        """Reset logger configuration for testing."""
+        with self._loggers_lock:
+            self._configured = False
+            self._loggers.clear()
+            
+            # Clear all handlers from root logger
+            root_logger = logging.getLogger()
+            root_logger.handlers.clear()
+            root_logger.setLevel(logging.WARNING)  # Reset to default
 
 
 # Global logger configuration instance
@@ -264,3 +284,8 @@ class MarketDataLogger:
             flow=get_flow_summary(),
             trace_id=trace_id
         )
+
+
+def reset_logging_state():
+    """Reset global logging state for testing."""
+    _logger_config.reset()
