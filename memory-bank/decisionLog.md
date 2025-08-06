@@ -509,3 +509,6 @@ Successfully implemented comprehensive logging simplification using proper Depen
 
 [2025-08-06 16:56:00] - Refactored `examples/phase6_final_demo.py` to eliminate redundant API calls by fetching market data once and reusing the `MarketDataSet` object. This resolves a critical performance inefficiency.
 [2025-08-06 16:56:00] - Fixed a logging bug in `_analyze_volume_profile` where the `symbol` was not being logged. The method signature was updated to accept the symbol, and all related calls (including in unit tests) were modified accordingly to ensure log consistency.
+
+[2025-08-06 23:16:41] - Принято решение реализовать персистентность OMS через паттерн "Репозиторий". Создается отдельный класс `OrderRepository` для инкапсуляции логики сохранения/загрузки состояния ордеров. Это разделяет ответственности и повышает гибкость системы по сравнению с хранением логики персистентности внутри `OMS`.
+
