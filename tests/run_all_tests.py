@@ -68,6 +68,7 @@ class AITradingTestRunner:
                     'tests/integration/refactoring/test_api_call_efficiency.py',
                     'tests/integration/system/test_backward_compatibility.py',
                     'tests/integration/system/test_comprehensive_integration.py',
+                    'tests/integration/trading/test_contracts.py',
                 ]
             }
         }
