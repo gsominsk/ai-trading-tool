@@ -215,4 +215,24 @@ Recent 5, Extremes, High Volume, Big Moves, Patterns, S/R Tests, Deduplication
 - **Complete History**: Available in [`memory-bank/archive/systemPatterns.md`](memory-bank/archive/systemPatterns.md)
 
 ---
+
+### **Complete Operation Coverage Demonstration Pattern**
+- **Rule**: Demo scripts must showcase ALL service operations, not just basic examples
+- **Rationale**: Comprehensive demonstrations provide complete operational visibility for production deployment
+- **Implementation**: Systematic mapping of all service methods with categorized demo modules
+
+### **Dual Trace_ID Hierarchy Pattern**
+- **Rule**: Separate trace_id namespaces for business operations vs raw data capture
+- **Rationale**: Clean separation enables AI analysis while maintaining operational traceability
+- **Implementation**: `flow_xxx` for main operations, `trd_001_xxx` for raw data logging
+
+### **AI-Optimized Demonstration Logging Pattern**
+- **Rule**: Demo logs must be structured for automated AI analysis, not just human readability
+- **Rationale**: Demonstration infrastructure should validate real-world AI analysis capabilities
+- **Implementation**: Complete JSON structure with semantic tags, lifecycle tracking, and multi-symbol validation
+
+---
+
+[2025-08-06 02:57:00] - Added Comprehensive MarketDataService Logging Demonstration patterns following successful Phase 6 completion
+
 *Optimized 2025-08-05: Reduced from 599 lines to essential patterns + archive reference*
