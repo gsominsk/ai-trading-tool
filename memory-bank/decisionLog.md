@@ -7,6 +7,13 @@ Complete decision history with full details (1,155 lines) archived in [`memory-b
 
 ## Recent Architectural Decisions (Condensed Format)
 
+### [2025-08-06 18:41:00] - **Architectural Decision: Trading Engine Simplification**
+**Problem**: The initial 8-module design for the Trading Engine was deemed too complex for the initial implementation ("слишком много модулей"). Key areas of concern were the necessity of a separate `AI_Strategist` and a real-time `PositionMonitor`.
+**Solution**: The architecture was refactored and simplified into 4 core modules by merging responsibilities.
+1.  **`TradingCycle`** now absorbs the logic of `AI_Strategist` (prompt engineering) and `TradeLogger` (CSV operations).
+2.  The real-time `PositionMonitor` was replaced by a synchronous check at the beginning of each cycle, where `TradingCycle` queries the `OMS` for the actual status of any pending orders. This was deemed an acceptable trade-off as the user confirmed that a 15-minute reaction delay is not critical for the chosen trading strategy.
+**Result**: A significantly simpler 4-module architecture (`Scheduler`, `MarketDataService`, `OMS`, `TradingCycle`) that is easier to implement and maintain for the MVP, while still addressing the core problem of state synchronization. This decision accelerates development by reducing initial complexity.
+
 ### [2025-08-06 14:58:00] - **Architectural Decision: Defensive Data Validation in `get_market_data`**
 **Problem**: The integration test `test_api_call_efficiency.py` revealed a critical production vulnerability. When the underlying `_get_klines` method returns an empty DataFrame (e.g., due to an API issue or for a new, low-liquidity symbol), the `get_market_data` method proceeds with calculations, attempting to call `.min()` on an empty Series. This raises a `decimal.InvalidOperation` error because `min()` on an empty sequence returns `NaN`, which cannot be converted to a `Decimal`.
 **Solution**: Implement a defensive check at the beginning of the `get_market_data` method. Before any calculations are performed, the service will now validate that the `daily_data` and `h1_data` DataFrames are not empty. If either is empty, a `DataInsufficientError` will be raised immediately.

@@ -7,6 +7,14 @@ Complete project history (1,208 lines) archived in [`memory-bank/archive/activeC
 **✅ PROJECT STABLE: Ready for Trading Engine Development**
 - All critical bug fixes and performance optimizations are complete.
 ## Recent Changes (Last 10 Entries)
+[2025-08-06 18:42:00] - **ARCHITECTURAL DECISION: Trading Engine MVP Plan Finalized**
+- **Context**: После обсуждения сложности первоначального 8-модульного дизайна, была принята и утверждена упрощенная 4-модульная архитектура.
+- **Key Decisions**:
+    - Архитектура сокращена до 4-х ключевых модулей: `Scheduler`, `MarketDataService`, `OrderManagementSystem (OMS)`, и `TradingCycle`.
+    - `TradingCycle` становится центральным "супер-модулем", инкапсулируя логику общения с ИИ и ведения лога сделок.
+    - Отказались от асинхронного `PositionMonitor` в пользу синхронной проверки статуса ордера в начале каждого цикла.
+- **Outcome**: План реализации утвержден. Создан TODO-лист из 8 шагов для разработки MVP. Проект переходит от фазы проектирования к фазе имплементации.
+
 [2025-08-06 17:44:00] - **ARCHITECTURAL DESIGN: Trading Engine**
 - **Context**: Проведен детальный архитектурный анализ и проектирование нового Торгового Движка.
 - **Key Decisions**:
