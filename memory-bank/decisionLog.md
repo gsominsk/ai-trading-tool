@@ -7,6 +7,14 @@ Complete decision history with full details (1,155 lines) archived in [`memory-b
 
 ## Recent Architectural Decisions (Condensed Format)
 
+### [2025-08-06 23:16:00] - **Architectural Decision: OMS Persistence via Repository Pattern**
+**Problem**: The `OrderManagementSystem (OMS)` was stateless, losing all order information between script runs. This made it impossible to test the full order lifecycle (e.g., from `PENDING` to `FILLED`) and rendered manual testing ineffective. A simple file-based persistence within the `OMS` itself would violate the Single Responsibility Principle and tightly couple the `OMS` to a specific storage mechanism (e.g., JSON).
+**Solution**: The Repository Pattern was implemented to decouple the persistence logic from the core business logic of the `OMS`.
+1.  **`OrderRepository` Created**: A new class, `OrderRepository`, was created in [`src/trading/repository.py`](src/trading/repository.py) with the sole responsibility of handling the serialization (`save`) and deserialization (`load`) of the OMS state to and from a JSON file.
+2.  **Dependency Injection**: The `OMS` was refactored to accept an `OrderRepository` instance via its constructor. It no longer has any knowledge of how or where the data is stored.
+3.  **State Synchronization**: The `OMS` now calls `repository.load()` on initialization to restore its state and `repository.save()` after any state-mutating operation (e.g., `place_order`, `cancel_order`).
+**Result**: This architecture provides a clean separation of concerns, making the `OMS` more modular, easier to test (by injecting a mock repository), and more flexible for future changes (e.g., switching to a database by simply creating a new repository implementation). It solves the state persistence problem without polluting the core business logic.
+
 ### [2025-08-06 18:41:00] - **Architectural Decision: Trading Engine Simplification**
 **Problem**: The initial 8-module design for the Trading Engine was deemed too complex for the initial implementation ("слишком много модулей"). Key areas of concern were the necessity of a separate `AI_Strategist` and a real-time `PositionMonitor`.
 **Solution**: The architecture was refactored and simplified into 4 core modules by merging responsibilities.

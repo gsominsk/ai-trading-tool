@@ -70,6 +70,7 @@ class AITradingTestRunner:
                     'tests/integration/system/test_backward_compatibility.py',
                     'tests/integration/system/test_comprehensive_integration.py',
                     'tests/integration/trading/test_contracts.py',
+                    'tests/integration/trading/test_trading_cycle_integration.py',
                 ]
             }
         }

@@ -189,6 +189,15 @@ Recent 5, Extremes, High Volume, Big Moves, Patterns, S/R Tests, Deduplication
 **Архитектурный принцип**: "Preserve what works, organize what's scattered"
 
 ## Token Optimization Patterns
+### **Repository Pattern for Persistence**
+- **Problem**: Business logic components (like an `OrderManagementSystem`) should not be responsible for how their state is saved or loaded. Tightly coupling business logic with persistence logic (e.g., writing to a JSON file directly within a business class) violates the Single Responsibility Principle, reduces testability, and makes future changes (like moving to a database) difficult.
+- **Solution**: Abstract the persistence logic into a separate `Repository` class.
+    - The `Repository`'s only job is to handle data storage and retrieval (e.g., `load()` and `save()` methods).
+    - The business logic class receives the repository instance via **Dependency Injection**, usually in its constructor.
+    - The business class calls the repository's methods to manage its state, without knowing the underlying storage mechanism.
+- **Architectural Principle**: "Separate business logic from data access logic."
+- **Result**: A clean, decoupled architecture that is more modular, flexible, and easier to test. The storage mechanism can be changed without altering the business logic simply by providing a different repository implementation.
+
 
 ### **Archive Strategy Pattern**
 - **Rule**: Move historical content to archive/, keep recent entries active

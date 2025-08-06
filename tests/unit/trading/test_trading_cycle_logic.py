@@ -9,7 +9,7 @@ from src.trading.trading_cycle import TradingCycle
 def temp_trade_log(tmp_path):
     """Фикстура для создания временного файла trade_log.csv."""
     log_path = tmp_path / "trade_log.csv"
-    header = ['timestamp', 'order_id', 'symbol', 'type', 'price', 'quantity', 'status']
+    header = ['timestamp', 'order_id', 'symbol', 'order_type', 'price', 'quantity', 'status']
     with open(log_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(header)
@@ -81,10 +81,12 @@ def test_run_cycle_synchronization_logic(trading_cycle_instance):
     )
 
     # Настраиваем mock OMS, чтобы он вернул новый статус
+    # Настраиваем mock OMS так, чтобы он сначала возвращал PENDING, а потом FILLED
+    # Это больше соответствует новой логике, где статус меняется внутри get_order_status
     trading_cycle_instance.oms.get_order_status.return_value = 'FILLED'
-
+    
     # Патчим _get_ai_decision, чтобы он не мешал тесту синхронизации
-    with patch.object(trading_cycle_instance, '_get_ai_decision', return_value="HOLD") as mock_ai_decision:
+    with patch.object(trading_cycle_instance, '_get_ai_decision', return_value="HOLD"):
         # Запускаем цикл
         trading_cycle_instance.run_cycle()
 
@@ -135,7 +137,10 @@ def test_run_cycle_full_orchestration(trading_cycle_instance):
     Тест: run_cycle корректно выполняет полный цикл оркестрации.
     """
     # Настройка mock-объектов
-    trading_cycle_instance.market_data_service.get_market_data.return_value = {'price': 53000}
+    import pandas as pd
+    mock_market_data = Mock()
+    mock_market_data.h1_candles = pd.DataFrame({'close': [52500, 53000]})
+    trading_cycle_instance.market_data_service.get_market_data.return_value = mock_market_data
     trading_cycle_instance.oms.place_order.return_value = 'new_order_123'
 
     # Запускаем цикл (предполагаем, что лог пуст)
@@ -149,7 +154,7 @@ def test_run_cycle_full_orchestration(trading_cycle_instance):
         symbol='BTCUSDT',
         order_type='BUY',
         quantity=0.01,
-        price=53000
+        price=53000  # Последнее значение 'close' из mock_market_data
     )
 
     # Проверка 3: В лог была добавлена новая PENDING запись

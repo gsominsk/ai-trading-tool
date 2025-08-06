@@ -14,7 +14,7 @@ import json
 import io
 import sys
 from unittest.mock import patch, Mock
-from src.logging_system import MarketDataLogger, get_flow_id, configure_ai_logging, reset_trace_counter
+from src.logging_system import MarketDataLogger, get_flow_id, configure_ai_logging, reset_trace_counter, reset_logging_state
 from src.market_data.market_data_service import MarketDataService
 
 
@@ -23,24 +23,24 @@ class TestTraceArchitectureIntegration:
     
     def setup_method(self):
         """Setup integration test environment."""
-        # Reset trace counter for clean tests
+        # Reset logging and tracing to ensure test isolation
+        reset_logging_state()
         reset_trace_counter()
         
-        # Create temporary log file
-        self.temp_log = tempfile.NamedTemporaryFile(mode='w+', suffix='.log', delete=False)
-        self.temp_log_path = self.temp_log.name
-        self.temp_log.close()
+        self.temp_log_path = "temp_integration_test.log"
         
-        # Configure logging for integration testing
+        # Configure logging specifically for this test
         configure_ai_logging(
             log_level="DEBUG",
             log_file=self.temp_log_path,
-            console_output=True  # Enable console output for test validation
+            console_output=True
         )
-    
+
     def teardown_method(self):
         """Cleanup after integration tests."""
-        # Clean up temporary log file
+        # This properly resets the logging system without a global shutdown
+        reset_logging_state()
+        
         if os.path.exists(self.temp_log_path):
             os.unlink(self.temp_log_path)
         

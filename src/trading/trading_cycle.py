@@ -12,17 +12,20 @@ class TradingCycle:
         self.oms = oms
         self.market_data_service = market_data_service
         self.trade_log_path = trade_log_path
-        self.header = ['timestamp', 'order_id', 'symbol', 'type', 'price', 'quantity', 'status']
+        self.header = ['timestamp', 'order_id', 'symbol', 'order_type', 'price', 'quantity', 'status']
 
     def _get_current_position(self):
         """Читает последнюю запись из лога для определения текущей позиции."""
         try:
             with open(self.trade_log_path, 'r', newline='') as f:
                 reader = csv.DictReader(f)
-                records = list(reader)
-                if not records:
-                    return None  # Нет позиции
-                return records[-1]
+                last_record = None
+                for row in reader:
+                    # DictReader может возвращать строки с None в качестве значений для пустых строк,
+                    # поэтому мы проверяем, есть ли хотя бы одно непустое значение.
+                    if any(field for field in row.values()):
+                        last_record = row
+                return last_record
         except FileNotFoundError:
             return None
 
@@ -34,7 +37,7 @@ class TradingCycle:
                 'timestamp': datetime.utcnow().isoformat(),
                 'order_id': order_id,
                 'symbol': symbol,
-                'type': order_type,
+                'order_type': order_type,
                 'price': price,
                 'quantity': quantity,
                 'status': status
@@ -77,13 +80,15 @@ class TradingCycle:
                     self._update_log(
                         order_id=order_id,
                         symbol=current_position['symbol'],
-                        order_type=current_position['type'],
+                        order_type=current_position['order_type'],
                         price=current_position['price'],
                         quantity=current_position['quantity'],
                         status=actual_status
                     )
                     print(f"Статус ордера {order_id} обновлен в логе на {actual_status}.")
                     current_position = self._get_current_position()
+                    # Завершаем цикл, так как основное действие - синхронизация - выполнено
+                    return
                 
             except Exception as e:
                 print(f"Ошибка при получении статуса ордера {order_id}: {e}")
@@ -100,7 +105,7 @@ class TradingCycle:
             # В реальной системе параметры будут браться из market_data и решения ИИ
             symbol = "BTCUSDT"
             quantity = 0.01
-            price = market_data.get('price', 52000) # Пример
+            price = market_data.h1_candles['close'].iloc[-1] if not market_data.h1_candles.empty else 52000
             
             print(f"ИИ принял решение BUY. Размещаю ордер: {symbol} {quantity} @ {price}")
             

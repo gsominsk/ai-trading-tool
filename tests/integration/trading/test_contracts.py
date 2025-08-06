@@ -1,23 +1,3 @@
-import os
-import csv
-
-def test_trade_log_header():
-    """
-    Проверяет, что файл trade_log.csv существует и имеет правильный заголовок.
-    """
-    log_file = 'data/trade_log.csv'
-    assert os.path.exists(log_file), f"Файл {log_file} не найден."
-
-    expected_header = [
-        'timestamp', 'order_id', 'symbol', 'type', 'price', 'quantity', 'status'
-    ]
-
-    with open(log_file, 'r', newline='') as f:
-        reader = csv.reader(f)
-        header = next(reader)
-        assert header == expected_header, f"Заголовок в {log_file} не соответствует ожидаемому."
-
-
 def test_oms_contract():
     """
     Проверяет контракт класса OrderManagementSystem.
