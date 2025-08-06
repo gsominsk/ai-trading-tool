@@ -49,6 +49,7 @@ Complete [description] history ([X] lines) archived in [`memory-bank/archive/[fi
 - Skip git commits
 - Lose timestamps or connections
 
+- **DO NOT OPTIMIZE `systemPatterns.md`**. This file must remain in its complete, original state.
 **✅ ALWAYS:**
 - Archive FIRST, optimize SECOND
 - Preserve 100% historical context
