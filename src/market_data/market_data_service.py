@@ -406,6 +406,10 @@ class MarketDataService:
         self._critical_failures = {"symbol_validation", "api_connection", "data_validation", "basic_data_processing"}
         self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators", "enhanced_analysis", "market_sentiment"}
         
+        # Initialize metrics attributes to prevent AttributeError
+        self._operation_metrics: Dict[str, Dict[str, int]] = {}
+        self._degradation_history: List[Dict[str, Any]] = []
+        
     def _should_log(self, level: str) -> bool:
         """Check if message should be logged based on current log level."""
         log_levels = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
@@ -711,7 +715,7 @@ Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 ❌ Unable to fetch market data for {symbol}
 Error: {str(e)[:200]}
-Trace ID: {trace_id}
+Trace ID: {self._current_trace_id or "unknown"}
 Operation: get_enhanced_context
 
 Error Details:
@@ -1425,7 +1429,7 @@ Contact support if this error persists.
                     "get_market_data_with_fallback",
                     failed_component="btc_correlation",
                     fallback_used="no_correlation_data",
-                    trace_id=trace_id
+                    trace_id=self._current_trace_id
                 )
             
             # Volume Profile (graceful degradation)
@@ -1438,7 +1442,7 @@ Contact support if this error persists.
                     "get_market_data_with_fallback",
                     failed_component="volume_profile",
                     fallback_used="no_volume_analysis",
-                    trace_id=trace_id
+                    trace_id=self._current_trace_id
                 )
             
             # Technical Indicators (graceful degradation)
@@ -1451,7 +1455,7 @@ Contact support if this error persists.
                     "get_market_data_with_fallback",
                     failed_component="technical_indicators",
                     fallback_used="basic_indicators_only",
-                    trace_id=trace_id
+                    trace_id=self._current_trace_id
                 )
             
             # Merge enhanced features into result

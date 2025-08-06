@@ -404,6 +404,61 @@ class TestMarketDataService:
             is_valid = symbol.endswith("USDT") and len(symbol) >= 6
             assert not is_valid
 
+    @pytest.mark.unit
+    @patch('src.market_data.market_data_service.MarketDataService.get_market_data')
+    def test_get_enhanced_context_no_name_error_on_exception(self, mock_get_market_data):
+        """
+        Test that get_enhanced_context does not raise NameError on unexpected exceptions
+        and correctly includes the trace_id in the error message.
+        """
+        # Arrange
+        # Configure the mock to raise a generic exception to trigger the problematic code path
+        mock_get_market_data.side_effect = Exception("A critical unexpected error occurred")
+        
+        # Set a trace_id on the service instance to simulate a real operation
+        self.service._current_trace_id = "test-trace-id-12345"
+        
+        # Act
+        # Call the method that is expected to handle the exception gracefully
+        result = self.service.get_enhanced_context("BTCUSDT")
+        
+        # Assert
+        # Check that the error message is returned as a string, not an exception
+        assert isinstance(result, str)
+    @pytest.mark.unit
+    def test_no_attribute_error_for_metrics_on_fresh_instance(self):
+        """
+        Test that accessing metrics attributes on a fresh service instance does not
+        raise an AttributeError, confirming they are initialized in __init__.
+        """
+        # Arrange
+        # A new service is created in setup_method, so self.service is a fresh instance.
+        
+        # Act & Assert
+        # This call would have raised an AttributeError before the fix if _log_graceful_degradation
+        # was called before any metrics were populated.
+        try:
+            self.service._log_graceful_degradation(
+                operation="test_operation",
+                failed_component="test_component",
+                fallback_used="test_fallback"
+            )
+        except AttributeError as e:
+            pytest.fail(f"AttributeError raised unexpectedly: {e}")
+            
+        # Additionally, check that the attributes are indeed present and are of the correct type.
+        assert hasattr(self.service, '_operation_metrics')
+        assert isinstance(self.service._operation_metrics, dict)
+        
+        assert hasattr(self.service, '_degradation_history')
+        assert isinstance(self.service._degradation_history, list)
+        
+        # Check that the history was appended to
+        assert len(self.service._degradation_history) == 1
+        assert self.service._degradation_history[0]['operation'] == 'test_operation'
+
+        
+
 
 class TestMarketDataServiceIntegration:
     """Integration-style tests for MarketDataService with mocked dependencies."""

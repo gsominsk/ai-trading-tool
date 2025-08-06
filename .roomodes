@@ -164,7 +164,7 @@ customModes:
       - read
       - command
       - - edit
-        - fileRegex: (\.(ts|js|tsx|jsx|py|java|cpp|c|h|hpp|rs|go|php|rb|swift|kt|css|scss|sass|less|html|vue|svelte)$|memory-bank/.*\.md$)
+        - fileRegex: (\.(ts|js|tsx|jsx|py|java|cpp|c|h|hpp|rs|go|php|rb|swift|kt|css|scss|sass|less|html|vue|svelte)$|memory-bank/.*\.md$|tasks/.*\.(md|txt)$)
           description: Source code files in various programming languages and styles, and Memory Bank files
     customInstructions: |-
       memory_bank_strategy:

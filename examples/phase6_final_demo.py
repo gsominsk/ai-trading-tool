@@ -108,7 +108,7 @@ class Phase6DemoRunner:
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        print(f"\n📈 Processing BTCUSDT with complete operation chain...")
+        print(f"\n📈 Processing ETHUSDT with complete operation chain...")
         print(f"   🔍 Real operations logged:")
         print(f"      • get_market_data (main operation)")
         print(f"      • _validate_symbol_input (input validation)")
@@ -121,10 +121,10 @@ class Phase6DemoRunner:
         
         try:
             start_time = time.time()
-            market_data = service.get_market_data("BTCUSDT")
+            market_data = service.get_market_data("ETHUSDT")
             end_time = time.time()
             
-            print(f"   ✅ BTCUSDT: Complete market data retrieved")
+            print(f"   ✅ ETHUSDT: Complete market data retrieved")
             print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
             print(f"   📊 MA20: ${market_data.ma_20}, MA50: ${market_data.ma_50}")
             print(f"   📊 Volume: {market_data.volume_profile}, Trend: {market_data.ma_trend}")
@@ -192,7 +192,7 @@ class Phase6DemoRunner:
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        print(f"\n📈 Processing ADAUSDT technical indicators...")
+        print(f"\n📈 Processing ETHUSDT technical indicators...")
         print(f"   🔍 Real indicator operations logged:")
         print(f"      • _calculate_rsi: RSI calculation with Decimal precision")
         print(f"      • _calculate_macd_signal: MACD bullish/bearish analysis")
@@ -204,10 +204,10 @@ class Phase6DemoRunner:
         try:
             start_time = time.time()
             # This will trigger all technical indicator calculations with real data
-            market_data = service.get_market_data("ADAUSDT")
+            market_data = service.get_market_data("ETHUSDT")
             end_time = time.time()
             
-            print(f"   ✅ ADAUSDT: All technical indicators calculated with real data")
+            print(f"   ✅ ETHUSDT: All technical indicators calculated with real data")
             print(f"   📊 RSI: {market_data.rsi_14}")
             print(f"   📊 MACD: {market_data.macd_signal}")
             print(f"   📊 MA20: {market_data.ma_20}, MA50: {market_data.ma_50}")
@@ -254,7 +254,7 @@ class Phase6DemoRunner:
             print(f"   📊 Logging sample trading operation...")
             service.log_trading_operation(
                 operation_type="buy_signal",
-                symbol="BTCUSDT",
+                symbol="ETHUSDT",
                 trade_data=sample_trade_data,
                 result="signal_generated"
             )
@@ -262,7 +262,7 @@ class Phase6DemoRunner:
             print(f"   📊 Logging sample order execution...")
             service.log_order_execution(
                 order_id="demo_order_12345",
-                symbol="BTCUSDT",
+                symbol="ETHUSDT",
                 order_type="market_buy",
                 amount="0.1",
                 price="67500.00",
@@ -290,8 +290,8 @@ class Phase6DemoRunner:
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        # Test different symbols to see varying performance
-        test_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
+        # Test ETH symbol performance
+        test_symbols = ["ETHUSDT"]
         
         for i, symbol in enumerate(test_symbols, 1):
             print(f"\n🚀 [{i}/3] Performance Test: {symbol}")
@@ -339,9 +339,9 @@ class Phase6DemoRunner:
         print("🎯 Multi-symbol pipeline with REAL Binance data and ALL operations")
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
-        integration_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT']
+        integration_symbols = ['ETHUSDT']
         
-        print(f"📊 Processing {len(integration_symbols)} symbols with complete operation chain")
+        print(f"📊 Processing {len(integration_symbols)} symbol with complete operation chain")
         self.symbols_tested.extend(integration_symbols)
         
         for i, symbol in enumerate(integration_symbols, 1):

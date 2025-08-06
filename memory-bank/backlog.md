@@ -1,23 +1,42 @@
-# Project Backlog - AI Trading System
+### Задача: Рефакторинг Тестов с Использованием Централизованной Mock Factory
 
-## Archive Reference
-Complete project backlog (67 lines) archived in [`memory-bank/archive/backlog.md`](memory-bank/archive/backlog.md).
+**ID Задачи:** T-003
+**Приоритет:** Высокий (Технический долг)
+**Оценка:** 2-3 дня (инкрементально)
+**Статус:** К выполнению
 
-## Current Priorities
+**1. Проблема:**
+Текущая тестовая база (>25 тестов, >260 использований моков) страдает от хаотичного и неконсистентного создания моков. Логика мокирования API-ответов Binance, логгеров и других зависимостей дублируется в десятках файлов. Это приводит к:
+- **Замедлению разработки:** Написание новых тестов требует копирования и адаптации громоздких конструкций.
+- **Хрупкости тестов:** Изменение в API требует правок во многих местах, что увеличивает риск ошибок.
+- **Плохой читаемости:** Тесты загромождены кодом для настройки моков, что скрывает их основную цель.
 
-### **Medium Priority - Reliability Improvements**
-- **Caching Implementation**: Real cache mechanism (Redis/Memory) with TTL management
-- **Extreme Market Conditions**: Flash crash scenarios, zero volume handling, market gaps
-- **Enhanced Error Recovery**: Circuit breaker pattern, exponential backoff, graceful degradation
+**2. Решение:**
+Создать централизованную **Mock Factory** (`tests/fixtures/mock_factory.py`), которая станет единым источником для генерации всех тестовых моков и данных. Это позволит инкапсулировать логику создания моков и предоставлять консистентные, готовые к использованию мок-объекты для тестов.
 
-### **Low Priority - Future Enhancements** 
-- **Additional Edge Cases**: Multi-timezone, currency precision boundaries
-- **Performance Optimization**: Memory usage, parallel processing for multiple symbols
-- **Advanced Analytics**: Additional indicators, multi-timeframe correlation, sentiment integration
+**3. План Реализации:**
 
-### **Management**
-- **Review**: Monthly priority reevaluation
-- **Dependencies**: Update when core features change
+**Этап 1: Создание Фабрики (2-3 часа)**
+- [ ] Создать файл `tests/fixtures/mock_factory.py`.
+- [ ] Реализовать класс `MockFactory`.
+- [ ] Добавить статические методы для генерации наиболее частых моков:
+    - `create_successful_klines_response(data, symbol)`
+    - `create_rate_limit_response()`
+    - `create_api_error_response(status_code)`
+    - `create_insufficient_data_response()`
+    - `generate_realistic_klines(count, base_price)`
 
----
-*Optimized 2025-08-05: Reduced from 67 lines to essential backlog + archive reference*
+**Этап 2: Инкрементальный Рефакторинг Тестов (2-3 дня)**
+- [ ] **Цель:** Заменить все инлайновые создания `Mock` и `MagicMock` на вызовы `MockFactory`.
+- [ ] **Приоритетные файлы для рефакторинга:**
+    - `tests/integration/error_architecture/test_error_integration.py`
+    - `tests/unit/test_market_data_service.py`
+    - `tests/integration/market_data/test_market_data_integration.py`
+    - `tests/unit/market_data/test_market_data_api.py`
+- [ ] Провести рефакторинг остальных тестов по мере возможности.
+
+**4. Критерии Успеха:**
+- Создан и используется `MockFactory`.
+- >90% созданий моков в тестах заменены на вызовы фабрики.
+- Тестовые файлы стали короче и чище.
+- Запуск всех тестов (`pytest`) проходит успешно после рефакторинга.
