@@ -4,12 +4,21 @@
 Complete project history (1,208 lines) archived in [`memory-bank/archive/activeContext.md`](memory-bank/archive/activeContext.md).
 
 ## Current Focus
-**🚀 PHASE 1 COMPLETE: Foundation & Contracts Established**
-- All foundational files and class skeletons (`OMS`, `TradingCycle`) are in place.
-- A comprehensive contract testing suite (`test_contracts.py`) has been created and is passing 100%.
-- The project is now ready to move into Phase 2: Core `TradingCycle` Logic Implementation.
+**🚀 PHASE 2 COMPLETE: Core TradingCycle Logic Implemented**
+- The core logic of the `TradingCycle` has been implemented, including order status synchronization, interaction with a stubbed AI, and order placement orchestration.
+- A full suite of unit tests has been developed for the new logic, and all tests are passing.
+- The project is now ready for Phase 3, where stubs will be replaced with minimal working implementations for integration testing.
 
 ## Recent Changes (Last 10 Entries)
+[2025-08-06 19:34:00] - **MILESTONE: Phase 2 (Core Logic) Completed**
+- **Context**: The second phase of the Trading Engine implementation, focused on building the core logic within the `TradingCycle`, has been successfully completed.
+- **Key Achievements**:
+    - Implemented methods for reading from and writing to `trade_log.csv`.
+    - Developed the logic for synchronizing the status of pending orders by calling the `OMS`.
+    - Created a stubbed `_get_ai_decision` method to simulate AI interaction.
+    - Implemented the main orchestration logic in `run_cycle` that calls all sub-components in the correct order.
+- **Outcome**: All unit tests for the new `TradingCycle` logic are passing, confirming the correctness of the implementation. The system is ready for Phase 3 integration.
+
 [2025-08-06 19:23:00] - **MILESTONE: Phase 1 (Foundation & Contracts) Completed**
 - **Context**: The first phase of the Trading Engine implementation, focused on establishing a solid architectural foundation and clear module contracts, has been successfully completed.
 - **Key Achievements**:

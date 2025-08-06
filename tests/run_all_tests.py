@@ -54,6 +54,7 @@ class AITradingTestRunner:
                     'tests/unit/market_data/test_market_data_edge_cases.py',
                     'tests/unit/test_timing_validation.py',
                     'tests/unit/logging/test_trace_id_integration_simple.py',
+                    'tests/unit/trading/test_trading_cycle_logic.py',
                 ]
             },
             'integration': {
