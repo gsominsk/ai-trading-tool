@@ -10,130 +10,136 @@ import json
 import io
 import sys
 from unittest.mock import patch, MagicMock
+import logging
 from src.logging_system import MarketDataLogger, get_flow_id, configure_ai_logging, reset_trace_counter
 
 
 class TestTraceIdIntegration:
     """Test suite for trace_id auto-generation in MarketDataLogger."""
     
-    def setup_method(self):
-        """Setup test environment before each test."""
-        # Reset logging state for clean tests
-        reset_trace_counter()
-        
-        # Capture stderr to test actual log output
-        self.captured_logs = []
-        
-        # Create logger instance
-        self.logger = MarketDataLogger("test_module")
-    
     def teardown_method(self):
         """Cleanup after each test."""
         reset_trace_counter()
-    
-    @patch('sys.stderr', new_callable=io.StringIO)
-    def test_auto_generation_with_symbol(self, mock_stderr):
+
+    def test_auto_generation_with_symbol(self, caplog):
         """Test that trace_id is auto-generated when symbol is provided."""
-        # Test operation start with symbol - should auto-generate trace_id
-        self.logger.log_operation_start(
-            operation="get_market_data",
-            symbol="BTCUSDT",
-            context={"test": "auto_generation"}
-        )
-        
-        # Get captured log output
-        log_output = mock_stderr.getvalue()
+        reset_trace_counter()
+        logger = MarketDataLogger("test_module")
+
+        with caplog.at_level(logging.INFO):
+            # Test operation start with symbol - should auto-generate trace_id
+            logger.log_operation_start(
+                operation="get_market_data",
+                symbol="BTCUSDT",
+                context={"test": "auto_generation"}
+            )
         
         # Verify log contains expected information
-        assert "get_market_data" in log_output
-        assert "flow_btc" in log_output  # Auto-generated trace_id for BTC symbol
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert "get_market_data" in record.message
+        assert hasattr(record, 'trace_id')
+        assert "flow_btc" in record.trace_id  # Auto-generated trace_id for BTC symbol
         
-        print(f"✓ Auto-generation test passed. Log output: {log_output.strip()}")
+        print(f"✓ Auto-generation test passed. Log record trace_id: {record.trace_id}")
     
-    @patch('sys.stderr', new_callable=io.StringIO)
-    def test_different_symbols_different_trace_ids(self, mock_stderr):
+    def test_different_symbols_different_trace_ids(self, caplog):
         """Test that different symbols generate different trace_ids."""
-        # Log operations for different symbols
-        self.logger.log_operation_start(
-            operation="get_market_data",
-            symbol="BTCUSDT",
-            context={"test": "symbol_1"}
-        )
+        reset_trace_counter()
+        logger = MarketDataLogger("test_module")
+
+        with caplog.at_level(logging.INFO):
+            # Log operations for different symbols
+            logger.log_operation_start(
+                operation="get_market_data",
+                symbol="BTCUSDT",
+                context={"test": "symbol_1"}
+            )
+            
+            logger.log_operation_start(
+                operation="get_market_data",
+                symbol="ETHUSDT",
+                context={"test": "symbol_2"}
+            )
         
-        self.logger.log_operation_start(
-            operation="get_market_data",
-            symbol="ETHUSDT",
-            context={"test": "symbol_2"}
-        )
-        
-        # Get captured log output
-        log_output = mock_stderr.getvalue()
+        # Verify log contains expected information
+        assert len(caplog.records) == 2
+        trace_ids = [record.trace_id for record in caplog.records]
         
         # Should contain different trace_ids for different symbols
-        assert "flow_btc" in log_output
-        assert "flow_eth" in log_output
-        assert log_output.count("get_market_data") >= 2
+        assert any("flow_btc" in tid for tid in trace_ids)
+        assert any("flow_eth" in tid for tid in trace_ids)
+        assert all("get_market_data" in record.message for record in caplog.records)
         
-        print(f"✓ Different symbols test passed. Log contains both flow_btc and flow_eth")
+        print(f"✓ Different symbols test passed. Log contains trace_ids: {trace_ids}")
     
-    @patch('sys.stderr', new_callable=io.StringIO)
-    def test_operation_complete_with_context_symbol(self, mock_stderr):
+    def test_operation_complete_with_context_symbol(self, caplog):
         """Test that operation complete uses symbol from context for trace_id."""
-        # Test completion logging with symbol in context
-        self.logger.log_operation_complete(
-            operation="get_market_data",
-            context={"symbol": "BTCUSDT", "result": "success"},
-            processing_time_ms=100
-        )
+        reset_trace_counter()
+        logger = MarketDataLogger("test_module")
+
+        with caplog.at_level(logging.INFO):
+            # Test completion logging with symbol in context
+            logger.log_operation_complete(
+                operation="get_market_data",
+                context={"symbol": "BTCUSDT", "result": "success"},
+                processing_time_ms=100
+            )
         
-        # Get captured log output
-        log_output = mock_stderr.getvalue()
+        # Verify log contains expected information
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert "completed successfully" in record.message
+        assert hasattr(record, 'trace_id')
+        assert "flow_btc" in record.trace_id  # Auto-generated from context symbol
         
-        # Should contain completion information and auto-generated trace_id
-        assert "completed successfully" in log_output
-        assert "flow_btc" in log_output  # Auto-generated from context symbol
-        
-        print(f"✓ Operation complete test passed. Context symbol used for trace_id")
+        print(f"✓ Operation complete test passed. Context symbol used for trace_id: {record.trace_id}")
     
-    @patch('sys.stderr', new_callable=io.StringIO)
-    def test_explicit_trace_id_not_overridden(self, mock_stderr):
+    def test_explicit_trace_id_not_overridden(self, caplog):
         """Test that explicitly provided trace_id is not overridden."""
+        reset_trace_counter()
+        logger = MarketDataLogger("test_module")
         explicit_trace_id = "explicit_test_trace_123"
         
-        # Use explicit trace_id - should not be auto-generated
-        self.logger.log_operation_start(
-            operation="get_market_data",
-            symbol="BTCUSDT",
-            context={"test": "explicit_trace"},
-            trace_id=explicit_trace_id
-        )
+        with caplog.at_level(logging.INFO):
+            # Use explicit trace_id - should not be auto-generated
+            logger.log_operation_start(
+                operation="get_market_data",
+                symbol="BTCUSDT",
+                context={"test": "explicit_trace"},
+                trace_id=explicit_trace_id
+            )
         
-        # Get captured log output
-        log_output = mock_stderr.getvalue()
+        # Verify log contains expected information
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert hasattr(record, 'trace_id')
+        assert record.trace_id == explicit_trace_id
         
-        # Should contain explicit trace_id, not auto-generated one
-        assert explicit_trace_id in log_output
-        assert "flow_btc" not in log_output  # Should NOT auto-generate when explicit provided
-        
-        print(f"✓ Explicit trace_id test passed. Used explicit: {explicit_trace_id}")
+        print(f"✓ Explicit trace_id test passed. Used explicit: {record.trace_id}")
     
-    @patch('sys.stderr', new_callable=io.StringIO)
-    def test_no_symbol_no_auto_generation(self, mock_stderr):
+    def test_no_symbol_no_auto_generation(self, caplog):
         """Test that no trace_id is auto-generated when no symbol is provided."""
-        # Log operation without symbol - should not auto-generate
-        self.logger.log_operation_start(
-            operation="system_startup",
-            context={"test": "no_symbol"}
-        )
+        reset_trace_counter()
+        logger = MarketDataLogger("test_module")
+
+        with caplog.at_level(logging.INFO):
+            # Log operation without symbol - should not auto-generate
+            logger.log_operation_start(
+                operation="system_startup",
+                context={"test": "no_symbol"}
+            )
         
-        # Get captured log output
-        log_output = mock_stderr.getvalue()
+        # Verify log contains expected information
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert "system_startup" in record.message
+        assert hasattr(record, 'trace_id')
+        assert record.trace_id is not None
+        assert "flow_" not in record.trace_id  # Should use fallback, not symbol-based
+        assert "trd_" in record.trace_id
         
-        # Should contain operation but use fallback trace_id (not symbol-based)
-        assert "system_startup" in log_output
-        assert "flow_" not in log_output or "trd_" in log_output  # Should use fallback, not symbol-based
-        
-        print(f"✓ No symbol test passed. Used fallback trace_id")
+        print(f"✓ No symbol test passed. Used fallback trace_id: {record.trace_id}")
 
 
 class TestGetFlowIdFunction:
@@ -193,44 +199,46 @@ class TestTraceIdIntegrationWithMarketDataService:
         """Cleanup for integration tests."""
         reset_trace_counter()
     
-    @patch('sys.stderr', new_callable=io.StringIO)
-    def test_marketdata_service_pattern(self, mock_stderr):
+    def test_marketdata_service_pattern(self, caplog):
         """Test integration pattern similar to MarketDataService usage."""
         logger = MarketDataLogger("MarketDataService")
         
-        # Simulate market data service operations
-        symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
-        
-        for symbol in symbols:
-            # Start operation with symbol
-            logger.log_operation_start(
-                operation="get_market_data",
-                symbol=symbol,
-                context={"exchange": "binance", "timeframe": "1m"}
-            )
+        with caplog.at_level(logging.INFO):
+            # Simulate market data service operations
+            symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
             
-            # Complete operation with context symbol
-            logger.log_operation_complete(
-                operation="get_market_data",
-                context={
-                    "symbol": symbol,
-                    "result": "success",
-                    "data_points": 100
-                },
-                processing_time_ms=150
-            )
+            for symbol in symbols:
+                # Start operation with symbol
+                logger.log_operation_start(
+                    operation="get_market_data",
+                    symbol=symbol,
+                    context={"exchange": "binance", "timeframe": "1m"}
+                )
+                
+                # Complete operation with context symbol
+                logger.log_operation_complete(
+                    operation="get_market_data",
+                    context={
+                        "symbol": symbol,
+                        "result": "success",
+                        "data_points": 100
+                    },
+                    processing_time_ms=150
+                )
         
         # Get captured log output
-        log_output = mock_stderr.getvalue()
+        log_records = caplog.records
+        trace_ids = [record.trace_id for record in log_records]
+        messages = [record.message for record in log_records]
         
         # Should contain all symbols with their respective trace_ids
-        assert "flow_btc" in log_output
-        assert "flow_eth" in log_output
-        assert "flow_ada" in log_output
+        assert any("flow_btc" in tid for tid in trace_ids)
+        assert any("flow_eth" in tid for tid in trace_ids)
+        assert any("flow_ada" in tid for tid in trace_ids)
         
         # Should have both start and complete operations
-        assert log_output.count("initiated") >= 3
-        assert log_output.count("completed successfully") >= 3
+        assert messages.count("get_market_data initiated") >= 3
+        assert messages.count("get_market_data completed successfully") >= 3
         
         print(f"✓ MarketDataService integration test passed for {len(symbols)} symbols")
 

@@ -53,9 +53,15 @@ class AIOptimizedJSONFormatter(logging.Formatter):
             "message": record.getMessage()
         }
         
-        # Add context data if provided
+        # Add context data if provided, and handle hierarchical tracing
         if hasattr(record, 'context') and record.context:
-            log_entry["context"] = record.context
+            context_data = record.context.copy()  # Work with a copy
+            parent_trace_id = context_data.pop('parent_trace_id', None)
+            if parent_trace_id:
+                log_entry['parent_trace_id'] = parent_trace_id
+            
+            if context_data: # Add context only if it's not empty after popping
+                log_entry["context"] = context_data
         
         # Add flow information - ensure consistent flow context
         flow_data = getattr(record, 'flow', None)
@@ -83,6 +89,8 @@ class AIOptimizedJSONFormatter(logging.Formatter):
                 flow_data["trace_id"] = trace_id
                 log_entry["flow"] = flow_data
         
+        # Ensure trace_id is attached to the record for other handlers/tests
+        record.trace_id = trace_id
         log_entry["trace_id"] = trace_id
         
         # Add exception information if present

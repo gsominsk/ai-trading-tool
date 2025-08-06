@@ -43,7 +43,7 @@ try:
     file_logger.info("Это должно вызвать сбой")
     print("❌ Система не остановилась как ожидалось")
     
-except Exception as e:
-    print(f"✅ Ошибка перехвачена: {e}")
+except SystemExit as e:
+    print(f"✅ Ошибка SystemExit(1) перехвачена, как и ожидалось.")
 
 print("\n3. Тест завершен")

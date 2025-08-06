@@ -112,19 +112,13 @@ Scheduler → Trading Script → MarketDataService → LLM Provider → OrderExe
 
 ## Logging Patterns
 
-### **Structured Logging Pattern**
-- **Format**: JSON with trace_id, timestamp, component, operation, context
-- **Levels**: CRITICAL (financial) → DEBUG → TRACE (algorithm details)
-- **Implementation**: Complete data flow traceability
-
-### **Flow Context Pattern для ИИ-анализа логов**
-**Проблема**: Традиционное логирование создает разрозненные записи без связи между ними.
-**Решение**: Система отслеживания "потока выполнения" с тремя компонентами:
-- **Flow ID**: уникальный идентификатор запроса
-- **Stage Tracking**: отслеживание этапов выполнения
-- **Context Preservation**: сохранение данных между этапами
-
-**Архитектурный принцип**: Flow Context = GPS навигатор для ИИ по операционным логам
+### **Unified & Hierarchical Tracing Pattern**
+- **Problem**: A simple list of log events is not enough. We need to understand both the entire lifecycle of a request and the specific parent-child relationships between operations within that request.
+- **Solution**: A unified tracing model using `trace_id` and `parent_trace_id`.
+    - **`trace_id` (Unified Lifecycle)**: A single, unique `trace_id` is generated for a top-level operation (e.g., `get_market_data`). This same `trace_id` is inherited by *all* subsequent sub-operations (API calls, calculations, etc.). This groups all related events into a single, traceable flow.
+    - **`parent_trace_id` (Hierarchical Relationship)**: To create a clear execution tree, a sub-operation's log entry includes a `parent_trace_id` field, which contains the `trace_id` of the operation that initiated it.
+- **Architectural Principle**: "Every log entry must tell you what it is, what flow it belongs to, and what caused it."
+- **Result**: This creates a powerful, tree-like structure for logs that allows for easy debugging, performance analysis of entire operational flows, and advanced AI-based analysis of system behavior.
 
 ### **Exception Isolation Pattern для защиты торговых операций**
 **Проблема**: Сбои вспомогательных компонентов не должны прерывать критические торговые операции.

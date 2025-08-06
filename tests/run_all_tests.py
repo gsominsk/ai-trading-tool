@@ -52,6 +52,8 @@ class AITradingTestRunner:
                     'tests/unit/market_data/test_market_data_core.py',
                     'tests/unit/market_data/test_market_data_api.py',
                     'tests/unit/market_data/test_market_data_edge_cases.py',
+                    'tests/unit/test_timing_validation.py',
+                    'tests/unit/logging/test_trace_id_integration_simple.py',
                 ]
             },
             'integration': {
@@ -61,7 +63,9 @@ class AITradingTestRunner:
                     'tests/integration/logging/test_logging_integration.py',
                     'tests/integration/logging/test_logging_production.py',
                     'tests/integration/logging/test_trace_architecture_integration.py',
+                    'tests/integration/logging/test_hierarchical_tracing.py',
                     'tests/integration/market_data/test_market_data_integration.py',
+                    'tests/integration/refactoring/test_api_call_efficiency.py',
                     'tests/integration/system/test_backward_compatibility.py',
                     'tests/integration/system/test_comprehensive_integration.py',
                 ]

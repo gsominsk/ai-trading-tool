@@ -1,4 +1,5 @@
 import pytest
+import pandas as pd
 from unittest.mock import patch, MagicMock
 from src.market_data.market_data_service import MarketDataService
 
@@ -12,9 +13,16 @@ def test_get_enhanced_context_avoids_redundant_api_calls():
 
     # Mock the internal method that makes the actual API calls
     with patch.object(service, '_get_klines', autospec=True) as mock_get_klines:
-        # Create a mock DataFrame to be returned by the mocked method
-        mock_df = MagicMock()
-        mock_df.empty = False
+        # Create a mock DataFrame with enough data to pass validation (30 rows for daily)
+        mock_data = {
+            'timestamp': pd.to_datetime(pd.date_range(start='2023-01-01', periods=30)),
+            'open': [100 + i for i in range(30)],
+            'high': [105 + i for i in range(30)],
+            'low': [99 + i for i in range(30)],
+            'close': [102 + i for i in range(30)],
+            'volume': [1000 + i * 10 for i in range(30)]
+        }
+        mock_df = pd.DataFrame(mock_data)
         mock_get_klines.return_value = mock_df
 
         # 1. First, get the market data. This is expected to make API calls.

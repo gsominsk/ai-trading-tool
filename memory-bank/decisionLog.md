@@ -7,6 +7,20 @@ Complete decision history with full details (1,155 lines) archived in [`memory-b
 
 ## Recent Architectural Decisions (Condensed Format)
 
+### [2025-08-06 14:58:00] - **Architectural Decision: Defensive Data Validation in `get_market_data`**
+**Problem**: The integration test `test_api_call_efficiency.py` revealed a critical production vulnerability. When the underlying `_get_klines` method returns an empty DataFrame (e.g., due to an API issue or for a new, low-liquidity symbol), the `get_market_data` method proceeds with calculations, attempting to call `.min()` on an empty Series. This raises a `decimal.InvalidOperation` error because `min()` on an empty sequence returns `NaN`, which cannot be converted to a `Decimal`.
+**Solution**: Implement a defensive check at the beginning of the `get_market_data` method. Before any calculations are performed, the service will now validate that the `daily_data` and `h1_data` DataFrames are not empty. If either is empty, a `DataInsufficientError` will be raised immediately.
+**Result**: This change prevents the `decimal.InvalidOperation` crash, making the service more robust. It provides a clear, specific error (`DataInsufficientError`) when core data is missing, improving diagnostics and preventing the system from operating on incomplete or invalid data. This ensures that all downstream calculations are only performed on valid, non-empty datasets.
+
+### [2025-08-06 14:46:00] - **Architectural Decision: Hierarchical Tracing Implementation**
+**Problem**: The existing logging system treated every operation as a flat, independent event. This made it impossible to understand the causal relationships between a primary operation (e.g., `get_market_data`) and the multiple sub-operations it triggers (e.g., `_get_klines`, `_calculate_rsi`). The lack of a parent-child link obscured the execution flow, making debugging and performance analysis difficult.
+**Solution**: A hierarchical tracing pattern was implemented by introducing a `parent_trace_id` field into the logging schema.
+1.  **Trace Inheritance**: Child operations now inherit the `trace_id` from their parent.
+2.  **Parent ID**: The `parent_trace_id` field explicitly links a sub-operation to its initiator.
+3.  **Logging System Update**: The `StructuredLogger` and `AIOptimizedJSONFormatter` were updated to include and correctly process the `parent_trace_id`.
+4.  **Integration Test**: A dedicated integration test (`test_hierarchical_tracing.py`) was created to validate that parent-child relationships are correctly established and logged. The test captures `sys.stderr` to reliably verify the final log output.
+**Result**: The system now produces logs that form a clear execution tree. This provides full observability into complex operations, simplifies debugging by showing the exact sequence of events, and enables more accurate performance analysis by allowing the aggregation of timings for a parent and all its children.
+
 ### [2025-08-06 14:23:00] - **Refactoring `get_enhanced_context` for API Efficiency**
 **Problem**: The `get_enhanced_context` method was inefficiently making a second, redundant API call to fetch market data that had already been retrieved by the calling context. This increased latency and API usage costs.
 **Solution**: The method signature was changed from `get_enhanced_context(self, symbol: str)` to `get_enhanced_context(self, market_data: MarketDataSet)`. This enforces a cleaner data flow where the caller must first fetch the data via `get_market_data()` and then pass the resulting `MarketDataSet` object for enhancement.
