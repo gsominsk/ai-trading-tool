@@ -162,7 +162,8 @@ class Phase6DemoRunner:
         
         try:
             start_time = time.time()
-            enhanced_context = service.get_enhanced_context("ETHUSDT")
+            market_data = service.get_market_data("ETHUSDT")
+            enhanced_context = service.get_enhanced_context(market_data)
             end_time = time.time()
             
             print(f"   ✅ ETHUSDT: Enhanced context generated with real data")
@@ -359,7 +360,7 @@ class Phase6DemoRunner:
                 market_data = service.get_market_data(symbol)
                 
                 # Enhanced context (triggers candlestick analysis) with real API
-                enhanced_context = service.get_enhanced_context(symbol)
+                enhanced_context = service.get_enhanced_context(market_data)
                 
                 # Sample trading operation
                 service.log_trading_operation(

@@ -510,7 +510,8 @@ class TestLoggingIntegrationPoints:
         
         # This should succeed and provide basic context even if enhanced analysis fails
         try:
-            result = service.get_enhanced_context("BTCUSDT")
+            market_data = service.get_market_data("BTCUSDT")
+            result = service.get_enhanced_context(market_data)
             assert isinstance(result, str)
             assert "BTCUSDT" in result
             # Should contain basic market data even if enhanced analysis fails

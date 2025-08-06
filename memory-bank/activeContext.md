@@ -4,9 +4,15 @@
 Complete project history (1,208 lines) archived in [`memory-bank/archive/activeContext.md`](memory-bank/archive/activeContext.md).
 
 ## Current Focus
-Logger Configuration & Initialization (Task 24) - in progress
+**Phase 2: Architectural Refactoring** - Task 2.2: Hierarchical Tracing (in progress)
 
 ## Recent Changes (Last 10 Entries)
+
+[2025-08-06 14:23:00] - **Task 2.1 COMPLETED: Redundant API Call Elimination**
+- **Refactoring**: Changed `get_enhanced_context` to accept a `MarketDataSet` object instead of a `symbol` string.
+- **Efficiency**: Eliminated redundant API calls, improving performance and reducing costs.
+- **Validation**: Updated all call sites in the codebase (tests, examples, scripts) and created a new integration test (`test_api_call_efficiency.py`) to verify the fix.
+- **Result**: Cleaner, more efficient, and logical data flow within the `MarketDataService`.
 
 [2025-08-04 22:12:30] - **TASK #23 COMPLETED**: Error Architecture Testing Suite Validation
 - Successfully validated all error architecture tests with comprehensive bug fixes

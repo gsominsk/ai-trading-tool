@@ -164,7 +164,7 @@ class TestSystemIntegrationComprehensive:
         assert result.symbol == "BTCUSDT"
         
         # Test enhanced context with pattern analysis
-        enhanced_context = service.get_enhanced_context("BTCUSDT")
+        enhanced_context = service.get_enhanced_context(result)
         
         assert len(enhanced_context) > len(result.to_llm_context_basic())
         assert "CANDLESTICK ANALYSIS" in enhanced_context
@@ -201,7 +201,7 @@ class TestSystemIntegrationComprehensive:
         
         # Verify context generation works
         basic_context = result.to_llm_context_basic()
-        enhanced_context = service.get_enhanced_context("BTCUSDT")
+        enhanced_context = service.get_enhanced_context(result)
         
         assert len(basic_context) > 0
         assert len(enhanced_context) > len(basic_context)

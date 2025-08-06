@@ -48,7 +48,7 @@ def test_no_state_pollution():
         
         # Проверяем enhanced context (если будет работать)
         try:
-            btc_enhanced = service.get_enhanced_context("BTCUSDT")
+            btc_enhanced = service.get_enhanced_context(btc_data)
             print("✅ Enhanced context для BTC работает")
         except Exception as e:
             print(f"⚠️ Enhanced context ошибка: {e}")

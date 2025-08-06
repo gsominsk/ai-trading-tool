@@ -7,8 +7,13 @@ Complete decision history with full details (1,155 lines) archived in [`memory-b
 
 ## Recent Architectural Decisions (Condensed Format)
 
+### [2025-08-06 14:23:00] - **Refactoring `get_enhanced_context` for API Efficiency**
+**Problem**: The `get_enhanced_context` method was inefficiently making a second, redundant API call to fetch market data that had already been retrieved by the calling context. This increased latency and API usage costs.
+**Solution**: The method signature was changed from `get_enhanced_context(self, symbol: str)` to `get_enhanced_context(self, market_data: MarketDataSet)`. This enforces a cleaner data flow where the caller must first fetch the data via `get_market_data()` and then pass the resulting `MarketDataSet` object for enhancement.
+**Result**: Complete elimination of redundant API calls, reduced latency, lower API costs, and a more logical and explicit data flow within the service. All call sites (tests, examples, manual scripts) were updated to conform to the new, more efficient pattern.
+
 ### [2025-08-05 20:32:00] - **Стратегия упрощения системы логирования MarketDataService**
-**Problem**: 569-строчный logging_integration.py создает избыточную сложность, monkey patching anti-pattern, неполное покрытие математических операций  
+**Problem**: 569-строчный logging_integration.py создает избыточную сложность, monkey patching anti-pattern, неполное покрытие математических операций
 **Solution**: Dependency Injection с constructor injection, удаление Service Locator, прямые self.logger.log_*() вызовы  
 **Result**: 90% сокращение кода (569→50 строк), улучшенная тестируемость, enhanced математическое логирование
 

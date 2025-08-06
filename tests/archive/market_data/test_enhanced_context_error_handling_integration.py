@@ -55,7 +55,8 @@ def test_complete_market_data_failure():
         mock_get_data.side_effect = Exception("API connection completely failed")
         
         try:
-            result = service.get_enhanced_context("ETHUSDT")
+            market_data = service.get_market_data("ETHUSDT")
+            result = service.get_enhanced_context(market_data)
             print(f"   ❌ ERROR: Should raise ProcessingError for complete failure, got result")
             return False
         except Exception as e:
@@ -81,9 +82,9 @@ def test_enhanced_analysis_failure_with_basic_fallback():
         with patch.object(service, '_select_key_candles') as mock_select:
             mock_select.side_effect = Exception("Key candles selection failed")
             
-            result = service.get_enhanced_context("ETHUSDT")
+            result = service.get_enhanced_context(market_data)
             
-            if ("MARKET DATA ANALYSIS FOR ETHUSDT" in result and 
+            if ("MARKET DATA ANALYSIS FOR ETHUSDT" in result and
                 "RSI(14): 55.50" in result and
                 "Enhanced analysis unavailable" in result):
                 print("   ✅ Graceful fallback to basic context")
@@ -117,7 +118,7 @@ def test_individual_component_failures():
                 with patch.object(service, '_identify_patterns') as mock_patterns:
                     mock_patterns.side_effect = Exception("Pattern analysis error")
                     
-                    result = service.get_enhanced_context("ETHUSDT")
+                    result = service.get_enhanced_context(market_data)
                     
                     if ("CANDLESTICK ANALYSIS" in result and
                         "Recent Trend: Analysis failed (Trend analysis error" in result and
@@ -157,7 +158,7 @@ def test_graceful_degradation_mixed_success():
                         with patch.object(service, '_analyze_volume_relationship') as mock_volume:
                             mock_volume.side_effect = Exception("Volume error")  # This fails
                             
-                            result = service.get_enhanced_context("ETHUSDT")
+                            result = service.get_enhanced_context(market_data)
                             
                             if ("Recent Trend: Strong Uptrend" in result and
                                 "S/R Tests: No recent S/R tests" in result and
@@ -230,7 +231,7 @@ def test_missing_support_resistance_levels():
         with patch.object(service, '_select_key_candles') as mock_select:
             mock_select.return_value = key_candles
             
-            result = service.get_enhanced_context("ETHUSDT")
+            result = service.get_enhanced_context(market_data)
             
             if "S/R Tests: Support/resistance levels unavailable" in result:
                 print("   ✅ Missing S/R levels handled gracefully")

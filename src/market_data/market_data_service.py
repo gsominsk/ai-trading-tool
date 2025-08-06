@@ -609,15 +609,14 @@ class MarketDataService:
             # Wrap unexpected errors in SymbolValidationError for consistency
             raise SymbolValidationError(f"Unexpected error during symbol validation: {str(e)}", symbol=str(symbol))
     
-    def get_enhanced_context(self, symbol: str) -> str:
+    def get_enhanced_context(self, market_data: MarketDataSet) -> str:
         """Get enhanced market context with candlestick analysis and structured error handling."""
         # Use existing trace_id (inherited from master operation) for standalone calls
         master_trace_id = self._current_trace_id
+        symbol = market_data.symbol
         error_context = self._get_error_context("get_enhanced_context", parent_trace_id=master_trace_id, symbol=symbol)
         
         try:
-            # Get market data - this may raise various structured exceptions
-            market_data = self.get_market_data(symbol)
             
             # Fallback to basic context if enhanced analysis fails
             basic_context = market_data.to_llm_context_basic()
@@ -2168,7 +2167,7 @@ if __name__ == "__main__":
         
         # Test with enhanced candlestick analysis
         print("=== BTC Market Data Test (Enhanced) ===")
-        print(service.get_enhanced_context("BTCUSDT"))
+        print(service.get_enhanced_context(btc_data))
         
     except Exception as e:
         print(f"Test failed: {e}")

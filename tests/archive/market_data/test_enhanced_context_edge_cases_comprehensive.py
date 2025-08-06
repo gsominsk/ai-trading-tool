@@ -134,7 +134,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
             start_time = time.time()
             
             # Test enhanced context generation
-            enhanced_context = self.service.get_enhanced_context("BTCUSDT")
+            enhanced_context = self.service.get_enhanced_context(large_dataset)
             
             processing_time = time.time() - start_time
             
@@ -156,7 +156,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         # Mock get_market_data to return minimal dataset
         with patch.object(self.service, 'get_market_data', return_value=minimal_dataset):
             # Test enhanced context generation
-            enhanced_context = self.service.get_enhanced_context("TESTUSDT")
+            enhanced_context = self.service.get_enhanced_context(minimal_dataset)
             
             # Content assertions
             assert enhanced_context is not None, "Enhanced context should not be None for minimal dataset"
@@ -175,7 +175,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         # Test enhanced context generation with multiple datasets in memory
         for i, dataset in enumerate(large_datasets):
             with patch.object(self.service, 'get_market_data', return_value=dataset):
-                enhanced_context = self.service.get_enhanced_context(f"TEST{i}USDT")
+                enhanced_context = self.service.get_enhanced_context(dataset)
                 
                 # Should handle memory pressure gracefully
                 assert enhanced_context is not None, f"Enhanced context should not be None for dataset {i}"
@@ -197,7 +197,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
                 dataset.symbol = f"TEST{symbol_suffix}USDT"
                 
                 with patch.object(self.service, 'get_market_data', return_value=dataset):
-                    enhanced_context = self.service.get_enhanced_context(dataset.symbol)
+                    enhanced_context = self.service.get_enhanced_context(dataset)
                     results.append({
                         'symbol': dataset.symbol,
                         'context_length': len(enhanced_context),
@@ -237,16 +237,13 @@ class TestEnhancedContextEdgeCasesComprehensive:
         """Test enhanced context fallback behavior when API fails."""
         # Mock API failure
         mock_get_market_data.side_effect = Exception("API connection failed")
+
+        # With the refactoring, the API call is handled before get_enhanced_context.
+        # This test now verifies that the exception from get_market_data is propagated.
+        with pytest.raises(Exception) as excinfo:
+            self.service.get_market_data("FAILUSDT")
         
-        # Test enhanced context generation with API failure
-        enhanced_context = self.service.get_enhanced_context("FAILUSDT")
-        
-        # Should return error context instead of crashing
-        assert enhanced_context is not None, "Enhanced context should not be None even on API failure"
-        assert len(enhanced_context) > 0, "Enhanced context should not be empty on API failure"
-        assert "CRITICAL ERROR" in enhanced_context, "Enhanced context should indicate critical error"
-        assert "FAILUSDT" in enhanced_context, "Enhanced context should include the symbol"
-        assert "Unable to fetch market data" in enhanced_context, "Enhanced context should explain the error"
+        assert "API connection failed" in str(excinfo.value)
     
     @pytest.mark.unit
     def test_enhanced_context_malformed_data_handling(self):
@@ -262,7 +259,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         # Mock get_market_data to return malformed dataset
         with patch.object(self.service, 'get_market_data', return_value=malformed_dataset):
             # Should handle malformed data gracefully
-            enhanced_context = self.service.get_enhanced_context("MALFORMEDUSDT")
+            enhanced_context = self.service.get_enhanced_context(malformed_dataset)
 
             # Should return some context (fallback to basic context)
             assert enhanced_context is not None, "Enhanced context should handle malformed data"
@@ -284,7 +281,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         # Mock get_market_data to return extreme dataset
         with patch.object(self.service, 'get_market_data', return_value=extreme_dataset):
             # Should handle extreme values gracefully
-            enhanced_context = self.service.get_enhanced_context("EXTREMEUSDT")
+            enhanced_context = self.service.get_enhanced_context(extreme_dataset)
             
             assert enhanced_context is not None, "Enhanced context should handle extreme values"
             assert len(enhanced_context) > 0, "Enhanced context should not be empty with extreme values"
@@ -304,7 +301,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         
         for i, dataset in enumerate(datasets):
             with patch.object(self.service, 'get_market_data', return_value=dataset):
-                enhanced_context = self.service.get_enhanced_context(f"TOKEN{i}USDT")
+                enhanced_context = self.service.get_enhanced_context(dataset)
                 
                 # Estimate token count (rough approximation: 1 token ≈ 4 characters)
                 estimated_tokens = len(enhanced_context) / 4
@@ -330,7 +327,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         # Mock get_market_data to return problematic dataset
         with patch.object(self.service, 'get_market_data', return_value=problematic_dataset):
             # Should fall back to basic context
-            enhanced_context = self.service.get_enhanced_context("PROBLEMATICUSDT")
+            enhanced_context = self.service.get_enhanced_context(problematic_dataset)
 
             assert enhanced_context is not None, "Should not be None even with problematic data"
             assert len(enhanced_context) > 0, "Should not be empty even with problematic data"
@@ -351,7 +348,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         # Mock get_market_data to return Unicode dataset
         with patch.object(self.service, 'get_market_data', return_value=unicode_dataset):
             # Should handle Unicode gracefully
-            enhanced_context = self.service.get_enhanced_context("TEST№USDT")
+            enhanced_context = self.service.get_enhanced_context(unicode_dataset)
             
             assert enhanced_context is not None, "Should handle Unicode symbols"
             assert len(enhanced_context) > 0, "Should not be empty with Unicode"
@@ -368,7 +365,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
             # Generate enhanced context multiple times
             contexts = []
             for i in range(3):
-                enhanced_context = self.service.get_enhanced_context("CONSISTENTUSDT")
+                enhanced_context = self.service.get_enhanced_context(consistent_dataset)
                 contexts.append(enhanced_context)
             
             # All contexts should be identical (deterministic)
@@ -388,7 +385,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
             with patch.object(self.service, '_analyze_recent_trend', side_effect=Exception("Trend analysis failed")):
                 with patch.object(self.service, '_identify_patterns', side_effect=Exception("Pattern analysis failed")):
                     # Should still return context with available information
-                    enhanced_context = self.service.get_enhanced_context("DEGRADEUSDT")
+                    enhanced_context = self.service.get_enhanced_context(original_dataset)
 
                     assert enhanced_context is not None, "Should not be None even with partial failures"
                     assert len(enhanced_context) > 0, "Should not be empty with partial failures"

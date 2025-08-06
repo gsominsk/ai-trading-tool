@@ -215,7 +215,7 @@ def test_pattern_recognition():
         
         # Тестируем enhanced context с паттернами
         print(f"\n🧪 Тестируем Enhanced Context с паттернами:")
-        enhanced_context = service.get_enhanced_context("BTCUSDT")
+        enhanced_context = service.get_enhanced_context(result)
         
         if "CANDLESTICK ANALYSIS" in enhanced_context:
             print(f"✅ Enhanced context содержит анализ паттернов")

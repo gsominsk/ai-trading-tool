@@ -420,7 +420,11 @@ class TestMarketDataService:
         
         # Act
         # Call the method that is expected to handle the exception gracefully
-        result = self.service.get_enhanced_context("BTCUSDT")
+        # We now need to pass a MarketDataSet object, so we mock it
+        mock_market_data = MagicMock(spec=MarketDataSet)
+        mock_market_data.symbol = "BTCUSDT"
+        
+        result = self.service.get_enhanced_context(mock_market_data)
         
         # Assert
         # Check that the error message is returned as a string, not an exception
