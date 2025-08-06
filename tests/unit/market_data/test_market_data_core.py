@@ -185,7 +185,7 @@ class TestMarketDataServiceCore:
             'volume': volumes
         })
         
-        result = self.service._analyze_volume_profile(df)
+        result = self.service._analyze_volume_profile("BTCUSDT", df)
         assert result == "high"
     
     def test_volume_profile_low_volume(self):
@@ -202,7 +202,7 @@ class TestMarketDataServiceCore:
             'volume': volumes
         })
         
-        result = self.service._analyze_volume_profile(df)
+        result = self.service._analyze_volume_profile("BTCUSDT", df)
         assert result == "low"
     
     def test_volume_profile_normal_volume(self):
@@ -219,7 +219,7 @@ class TestMarketDataServiceCore:
             'volume': volumes
         })
         
-        result = self.service._analyze_volume_profile(df)
+        result = self.service._analyze_volume_profile("BTCUSDT", df)
         assert result == "normal"
     
     def test_volume_profile_zero_volume_protection(self):
@@ -236,7 +236,7 @@ class TestMarketDataServiceCore:
             'volume': volumes
         })
         
-        result = self.service._analyze_volume_profile(df)
+        result = self.service._analyze_volume_profile("BTCUSDT", df)
         assert result in ["high", "normal"]  # Should handle gracefully
         
         # All zero volume
@@ -251,7 +251,7 @@ class TestMarketDataServiceCore:
             'volume': volumes_zero
         })
         
-        result_zero = self.service._analyze_volume_profile(df_zero)
+        result_zero = self.service._analyze_volume_profile("BTCUSDT", df_zero)
         assert result_zero == "normal"  # Default for no meaningful comparison
     
     # =================

@@ -571,7 +571,7 @@ class MarketDataService:
             
             # Get market context with graceful degradation
             btc_correlation = self._calculate_btc_correlation_with_fallback(symbol, h1_data, parent_trace_id=main_trace_id) if symbol != "BTCUSDT" else None
-            volume_profile = self._analyze_volume_profile_with_fallback(h1_data, parent_trace_id=main_trace_id)
+            volume_profile = self._analyze_volume_profile_with_fallback(symbol, h1_data, parent_trace_id=main_trace_id)
             
             market_data_set = MarketDataSet(
                 symbol=symbol,
@@ -1269,13 +1269,13 @@ Please check system logs and contact support.
                                     error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
             return None  # Graceful degradation: no correlation data
 
-    def _analyze_volume_profile_with_fallback(self, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
+    def _analyze_volume_profile_with_fallback(self, symbol: str, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
         """Analyze volume profile with graceful degradation for calculation failures."""
         try:
-            return self._analyze_volume_profile(df, parent_trace_id=parent_trace_id)
+            return self._analyze_volume_profile(symbol, df, parent_trace_id=parent_trace_id)
         except Exception as e:
             # Graceful degradation: default to "normal" volume profile
-            self._log_operation_error("volume_profile_fallback", e,
+            self._log_operation_error("volume_profile_fallback", e, symbol=symbol,
                                     error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
             return "normal"  # Safe default value
 
@@ -1703,11 +1703,12 @@ Please check system logs and contact support.
                                         strategy="fail_fast_default", operation_type=operation_type)
                 raise
     
-    def _analyze_volume_profile(self, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
+    def _analyze_volume_profile(self, symbol: str, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
         """Analyze volume profile (high/normal/low)."""
         trace_id = self._start_operation(
             "volume_analysis",
             parent_trace_id=parent_trace_id,
+            symbol=symbol,
             data_points=len(df)
         )
 
@@ -1775,6 +1776,7 @@ Please check system logs and contact support.
         # Log volume analysis completion
         self._log_operation_success(
             "volume_analysis",
+            symbol=symbol,
             volume_profile=result,
             recent_volume=float(recent_volume),
             historical_volume=float(historical_volume),

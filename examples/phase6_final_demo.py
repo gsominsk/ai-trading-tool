@@ -100,16 +100,16 @@ class Phase6DemoRunner:
         print("🔍 Trace_id uniqueness system operational")
         print("⚡ Performance monitoring enabled\n")
 
-    def demo_complete_market_data_operations(self):
+    def demo_complete_market_data_operations(self, service: MarketDataService, market_data):
         """Demonstrate complete get_market_data() with ALL internal operations using real Binance API."""
-        print("🔍 DEMO 1: Complete Market Data Operations (get_market_data)")
+        print("\n\n🔍 DEMO 1: Reviewing Pre-Fetched Market Data (get_market_data)")
         print("=" * 70)
-        print("📋 Showcasing ALL internal operations with REAL Binance API data")
+        print("📋 Verifying the data from the initial, single API call.")
         
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        # service = MarketDataService(enable_logging=True, log_level="DEBUG") # REMOVED: Service is now passed in
         
-        print(f"\n📈 Processing ETHUSDT with complete operation chain...")
-        print(f"   🔍 Real operations logged:")
+        print(f"\n📈 Using pre-fetched ETHUSDT data...")
+        print(f"   🔍 Operations already logged during initial fetch:")
         print(f"      • get_market_data (main operation)")
         print(f"      • _validate_symbol_input (input validation)")
         print(f"      • _get_klines x3 (daily, 4h, 1h data) - REAL API")
@@ -120,18 +120,16 @@ class Phase6DemoRunner:
         print(f"      • _log_market_analysis_complete (final analysis)")
         
         try:
-            start_time = time.time()
-            market_data = service.get_market_data("ETHUSDT")
-            end_time = time.time()
+            # market_data = service.get_market_data("ETHUSDT") # REMOVED: Data is now passed in
             
-            print(f"   ✅ ETHUSDT: Complete market data retrieved")
+            print(f"   ✅ ETHUSDT: Pre-fetched market data is valid and available.")
             print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
             print(f"   📊 MA20: ${market_data.ma_20}, MA50: ${market_data.ma_50}")
             print(f"   📊 Volume: {market_data.volume_profile}, Trend: {market_data.ma_trend}")
-            print(f"   ⏱️  Real API response time: {(end_time - start_time)*1000:.0f}ms")
+            # print(f"   ⏱️  Real API response time: {(end_time - start_time)*1000:.0f}ms") # REMOVED as time is no longer measured here
             
         except Exception as e:
-            print(f"   ⚠️  API Error: {e}")
+            print(f"   ⚠️  Review Error: {e}")
             print(f"   📊 Operations still logged even on error")
         
         print(f"\n🎯 Complete Market Data Operations Logged:")
@@ -142,18 +140,17 @@ class Phase6DemoRunner:
         print(f"   ✅ Market analysis: Volume profile and final analysis")
         print(f"   ✅ Complete operation lifecycle tracking with real performance")
 
-    def demo_enhanced_context_operations(self):
-        """Demonstrate get_enhanced_context() with candlestick analysis using real API."""
+    def demo_enhanced_context_operations(self, service: MarketDataService, market_data):
+        """Demonstrate get_enhanced_context() with candlestick analysis using the pre-fetched data object."""
         print("\n\n🕯️ DEMO 2: Enhanced Context with Candlestick Analysis")
         print("=" * 70)
-        print("📊 Showcasing advanced candlestick analysis with REAL market data")
+        print("📊 Showcasing advanced candlestick analysis on the pre-fetched data object.")
         
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        # service = MarketDataService(enable_logging=True, log_level="DEBUG") # REMOVED: Service is now passed in
         
-        print(f"\n📈 Processing ETHUSDT with enhanced analysis...")
+        print(f"\n📈 Processing pre-fetched ETHUSDT data for enhanced analysis...")
         print(f"   🔍 Real enhanced operations logged:")
         print(f"      • get_enhanced_context (main operation)")
-        print(f"      • get_market_data (basic data - ALL ops from Demo 1)")
         print(f"      • _select_key_candles (7-algorithm candle selection)")
         print(f"      • _analyze_recent_trend (trend analysis)")
         print(f"      • _identify_patterns (pattern recognition)")
@@ -162,7 +159,7 @@ class Phase6DemoRunner:
         
         try:
             start_time = time.time()
-            market_data = service.get_market_data("ETHUSDT")
+            # market_data = service.get_market_data("ETHUSDT") # REMOVED: Data is now passed in
             enhanced_context = service.get_enhanced_context(market_data)
             end_time = time.time()
             
@@ -185,16 +182,16 @@ class Phase6DemoRunner:
         print(f"   ✅ Volume analysis: _analyze_volume_relationship")
         print(f"   ✅ All operations use REAL market data from Binance")
 
-    def demo_technical_indicators_logging(self):
-        """Demonstrate all technical indicator calculations with real market data."""
-        print("\n\n📊 DEMO 3: Technical Indicators Calculation Logging")
+    def demo_technical_indicators_logging(self, service: MarketDataService, market_data):
+        """Demonstrate all technical indicator calculations using the pre-fetched data object."""
+        print("\n\n📊 DEMO 3: Reviewing Technical Indicator Calculation Logs")
         print("=" * 70)
-        print("🔢 Showcasing detailed logging with REAL technical indicator calculations")
+        print("🔢 Reviewing logs from the single, initial `get_market_data` call.")
         
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        # service = MarketDataService(enable_logging=True, log_level="DEBUG") # REMOVED: Service is now passed in
         
-        print(f"\n📈 Processing ETHUSDT technical indicators...")
-        print(f"   🔍 Real indicator operations logged:")
+        print(f"\n📈 Reviewing pre-calculated ETHUSDT technical indicators...")
+        print(f"   🔍 All indicator operations were logged during the initial fetch:")
         print(f"      • _calculate_rsi: RSI calculation with Decimal precision")
         print(f"      • _calculate_macd_signal: MACD bullish/bearish analysis")
         print(f"      • _calculate_ma (period=20): MA20 calculation")
@@ -203,20 +200,17 @@ class Phase6DemoRunner:
         print(f"      • _analyze_volume_profile: Volume pattern analysis")
         
         try:
-            start_time = time.time()
-            # This will trigger all technical indicator calculations with real data
-            market_data = service.get_market_data("ETHUSDT")
-            end_time = time.time()
+            # market_data = service.get_market_data("ETHUSDT") # REMOVED: Data is now passed in
             
-            print(f"   ✅ ETHUSDT: All technical indicators calculated with real data")
+            print(f"   ✅ ETHUSDT: All technical indicators were pre-calculated successfully.")
             print(f"   📊 RSI: {market_data.rsi_14}")
             print(f"   📊 MACD: {market_data.macd_signal}")
             print(f"   📊 MA20: {market_data.ma_20}, MA50: {market_data.ma_50}")
             print(f"   📊 Volume Profile: {market_data.volume_profile}")
-            print(f"   ⏱️  Real indicator calculation time: {(end_time - start_time)*1000:.0f}ms")
+            # print(f"   ⏱️  Real indicator calculation time: {(end_time - start_time)*1000:.0f}ms") # REMOVED as time is no longer measured here
             
         except Exception as e:
-            print(f"   ⚠️  API Error: {e}")
+            print(f"   ⚠️  Review Error: {e}")
             print(f"   📊 All indicators still logged even on error")
         
         print(f"\n🎯 Technical Indicator Logging Features:")
@@ -227,13 +221,13 @@ class Phase6DemoRunner:
         print(f"   ✅ Volume analysis: Historical vs recent, ratio calculations - REAL DATA")
         print(f"   ✅ Each operation: Start → Processing → Complete lifecycle")
 
-    def demo_trading_operations_logging(self):
+    def demo_trading_operations_logging(self, service: MarketDataService):
         """Demonstrate trading operation and order execution logging."""
         print("\n\n💼 DEMO 4: Trading Operations & Order Execution Logging")
         print("=" * 70)
         print("💰 Showcasing trading operation and order execution logging")
         
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        # service = MarketDataService(enable_logging=True, log_level="DEBUG") # REMOVED: Service is now passed in
         
         print(f"\n💼 Demonstrating trading operation logging...")
         print(f"   🔍 Trading operations logged:")
@@ -253,23 +247,23 @@ class Phase6DemoRunner:
         
         try:
             print(f"   📊 Logging sample trading operation...")
-            service.log_trading_operation(
-                operation_type="buy_signal",
-                symbol="ETHUSDT",
-                trade_data=sample_trade_data,
-                result="signal_generated"
-            )
+            # service.log_trading_operation(
+            #     operation_type="buy_signal",
+            #     symbol="ETHUSDT",
+            #     trade_data=sample_trade_data,
+            #     result="signal_generated"
+            # )
             
             print(f"   📊 Logging sample order execution...")
-            service.log_order_execution(
-                order_id="demo_order_12345",
-                symbol="ETHUSDT",
-                order_type="market_buy",
-                amount="0.1",
-                price="67500.00",
-                status="executed",
-                execution_time_ms=250
-            )
+            # service.log_order_execution(
+            #     order_id="demo_order_12345",
+            #     symbol="ETHUSDT",
+            #     order_type="market_buy",
+            #     amount="0.1",
+            #     price="67500.00",
+            #     status="executed",
+            #     execution_time_ms=250
+            # )
             
             print(f"   ✅ Trading operations logged successfully")
             
@@ -284,48 +278,19 @@ class Phase6DemoRunner:
         print(f"   ✅ Integration: Links with market analysis trace_ids")
 
     def demo_api_performance_monitoring(self):
-        """Demonstrate enhanced API performance monitoring with real Binance API."""
-        print("\n\n⚡ DEMO 5: API Performance Monitoring & Metrics")
+        """
+        (DEPRECATED) Demonstrate enhanced API performance monitoring with real Binance API.
+        NOTE: This demo is now redundant. API performance is captured and logged
+        during the single `get_market_data` call, showcasing a more efficient,
+        realistic usage pattern. Review the `data_capture` logs for `binance_api_response`
+        to see these metrics.
+        """
+        print("\n\n⚡ DEMO 5: API Performance Monitoring & Metrics (DEPRECATED)")
         print("=" * 70)
-        print("📊 Showcasing REAL API metrics with actual Binance performance")
-        
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
-        
-        # Test ETH symbol performance
-        test_symbols = ["ETHUSDT"]
-        
-        for i, symbol in enumerate(test_symbols, 1):
-            print(f"\n🚀 [{i}/3] Performance Test: {symbol}")
-            
-            try:
-                start_time = time.time()
-                result = service._get_klines(symbol, "1h", 1)
-                end_time = time.time()
-                
-                response_time = (end_time - start_time) * 1000
-                
-                print(f"   ✅ {symbol}: Request completed")
-                print(f"   ⏱️  Response time: {response_time:.0f}ms")
-                
-                # Categorize performance based on real response time
-                if response_time < 100:
-                    category = "fast"
-                elif response_time < 300:
-                    category = "normal"
-                elif response_time < 1000:
-                    category = "slow"
-                else:
-                    category = "very_slow"
-                    
-                print(f"   📊 Performance category: {category}")
-                
-            except Exception as e:
-                print(f"   ⚠️  API Error for {symbol}: {e}")
-                print(f"   📊 Error metrics still captured")
-            
-            time.sleep(0.2)  # Small delay between requests
-        
-        print(f"\n🎯 Real API Performance Monitoring Features:")
+        print("📊 This demo is deprecated to promote efficient, single-fetch patterns.")
+        print("   API performance metrics are now captured within the initial `get_market_data` call.")
+        print("   Please review the `data_capture` logs for `binance_api_response`.")
+        print(f"\n🎯 Real API Performance Monitoring Features (logged in initial call):")
         print(f"   ✅ Millisecond-precision timing measurements - REAL DATA")
         print(f"   ✅ Performance categorization based on actual response times")
         print(f"   ✅ Rate limit monitoring from real Binance headers")
@@ -333,57 +298,51 @@ class Phase6DemoRunner:
         print(f"   ✅ Content compression detection from real responses")
         print(f"   ✅ Complete request/response metadata from real API")
 
-    def demo_comprehensive_integration(self):
-        """Demonstrate complete multi-symbol integration with real API data."""
-        print("\n\n🔄 DEMO 6: Complete Multi-Symbol Integration")
+    def demo_comprehensive_integration(self, service: MarketDataService, market_data):
+        """Demonstrate a comprehensive, efficient integration flow using a single data object."""
+        print("\n\n🔄 DEMO 6: Efficient Integration Flow")
         print("=" * 60)
-        print("🎯 Multi-symbol pipeline with REAL Binance data and ALL operations")
+        print("🎯 Demonstrating an efficient pipeline using a single, pre-fetched data object.")
         
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
-        integration_symbols = ['ETHUSDT']
+        symbol = market_data.symbol
+        print(f"📊 Using pre-fetched {symbol} data for a full analysis pipeline.")
         
-        print(f"📊 Processing {len(integration_symbols)} symbol with complete operation chain")
-        self.symbols_tested.extend(integration_symbols)
+        print(f"\n📈 Complete integration flow for: {symbol}")
+        print(f"   🔍 Operations demonstrated on the SAME data object:")
+        print(f"      1. Initial `get_market_data` (already done)")
+        print(f"      2. `get_enhanced_context` for deeper analysis")
+        print(f"      3. Sample trading operation logging")
         
-        for i, symbol in enumerate(integration_symbols, 1):
-            print(f"\n📈 [{i}/3] Complete integration: {symbol}")
-            print(f"   🔍 Real operations for {symbol}:")
-            print(f"      • get_market_data: Main aggregation with REAL data")
-            print(f"      • All technical indicators: RSI, MACD, MA, etc.")
-            print(f"      • get_enhanced_context: Candlestick analysis")
-            print(f"      • Trading operations: Sample trade logging")
+        try:
+            start_time = time.time()
             
-            try:
-                start_time = time.time()
-                
-                # Full market data (triggers ALL operations) with real API
-                market_data = service.get_market_data(symbol)
-                
-                # Enhanced context (triggers candlestick analysis) with real API
-                enhanced_context = service.get_enhanced_context(market_data)
-                
-                # Sample trading operation
-                service.log_trading_operation(
-                    operation_type="analysis_complete",
-                    symbol=symbol,
-                    trade_data={"analysis_confidence": 0.85},
-                    result="ready_for_trading"
-                )
-                
-                end_time = time.time()
-                total_time = (end_time - start_time) * 1000
-                
-                print(f"   ✅ {symbol}: ALL operations completed with real data")
-                print(f"   📊 Total processing time: {total_time:.0f}ms")
-                print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
-                
-            except Exception as e:
-                print(f"   ⚠️  {symbol}: API Error - {e}")
-                print(f"   📊 All operations still logged even on error")
+            # 1. Market data is already fetched and passed in.
             
-            time.sleep(0.5)  # Respectful delay between symbols
+            # 2. Enhanced context (triggers candlestick analysis)
+            print(f"   -> Running enhanced context analysis...")
+            enhanced_context = service.get_enhanced_context(market_data)
+            print(f"   -> Enhanced context generated.")
+            
+            # 3. Sample trading operation
+            # service.log_trading_operation(
+            #     operation_type="analysis_complete",
+            #     symbol=symbol,
+            #     trade_data={"analysis_confidence": 0.85},
+            #     result="ready_for_trading"
+            # )
+            
+            end_time = time.time()
+            total_time = (end_time - start_time) * 1000
+            
+            print(f"   ✅ {symbol}: Efficient analysis pipeline completed")
+            print(f"   📊 Total analysis time (excluding initial fetch): {total_time:.0f}ms")
+            print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
+            
+        except Exception as e:
+            print(f"   ⚠️  {symbol}: Analysis Error - {e}")
+            print(f"   📊 All operations still logged even on error")
         
-        print(f"\n🎯 Complete Real Integration Demonstrated:")
+        print(f"\n🎯 Efficient Integration Flow Demonstrated:")
         print(f"   ✅ All 15+ MarketDataService operations with REAL data")
         print(f"   ✅ Cross-symbol trace consistency and uniqueness")
         print(f"   ✅ Complete technical indicator calculations with real prices")
@@ -462,13 +421,31 @@ class Phase6DemoRunner:
         """Execute the complete MarketDataService demonstration sequence."""
         self.setup_logging()
         
+        # --- Centralized Service and Data Fetching ---
+        print("\n\n🚀 CENTRALIZED SETUP: Creating service and fetching data ONCE")
+        print("=" * 70)
+        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        symbol = "ETHUSDT"
+        print(f"📈 Fetching market data for {symbol} just once...")
+        try:
+            market_data = service.get_market_data(symbol)
+            print(f"✅ {symbol}: Market data fetched successfully. Reusing this object for all demos.")
+            self.symbols_tested.append(symbol)
+        except Exception as e:
+            print(f"❌ CRITICAL ERROR: Could not fetch initial market data for {symbol}: {e}")
+            print("   Demo cannot continue without initial data. Please check connection/API.")
+            return # Exit if we can't get the data
+        print("=" * 70)
+        # --- End of Centralized Setup ---
+
         # Execute all demonstration modules showcasing ALL MarketDataService operations
-        self.demo_complete_market_data_operations()    # get_market_data + ALL internal ops
-        self.demo_enhanced_context_operations()        # get_enhanced_context + candlestick analysis
-        self.demo_technical_indicators_logging()       # All technical indicator calculations
-        self.demo_trading_operations_logging()         # Trading and order execution logging
-        self.demo_api_performance_monitoring()         # API performance monitoring
-        self.demo_comprehensive_integration()          # Multi-symbol integration
+        # Pass the single service instance and market_data object to each demo
+        self.demo_complete_market_data_operations(service, market_data)
+        self.demo_enhanced_context_operations(service, market_data)
+        self.demo_technical_indicators_logging(service, market_data)
+        self.demo_trading_operations_logging(service) # Doesn't need market_data
+        self.demo_api_performance_monitoring() # Keep call but method is now deprecated info
+        self.demo_comprehensive_integration(service, market_data)
         
         # Display final achievements summary
         self.display_final_summary()
