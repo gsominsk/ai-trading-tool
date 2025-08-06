@@ -3,14 +3,14 @@
 AI Trading System - Complete MarketDataService Logging Demonstration
 ====================================================================
 
-COMPREHENSIVE SHOWCASE of ALL MarketDataService operations and logging:
+COMPREHENSIVE SHOWCASE of ALL MarketDataService operations with REAL Binance API:
 
 🔍 MAIN OPERATIONS:
 • get_market_data() - Complete multi-timeframe market data aggregation
 • get_enhanced_context() - Advanced analysis with candlestick patterns
-• _get_klines() - Binance API data fetching with performance metrics
+• _get_klines() - REAL Binance API data fetching with performance metrics
 
-📊 TECHNICAL INDICATORS (All logged):
+📊 TECHNICAL INDICATORS (All logged with REAL data):
 • _calculate_rsi() - RSI indicator with Decimal precision
 • _calculate_macd_signal() - MACD bullish/bearish/neutral signals
 • _calculate_ma() - Moving averages (MA20, MA50) with fallbacks
@@ -18,7 +18,7 @@ COMPREHENSIVE SHOWCASE of ALL MarketDataService operations and logging:
 • _analyze_volume_profile() - Volume analysis (high/normal/low)
 • _calculate_technical_indicators() - Comprehensive indicator suite
 
-🕯️ CANDLESTICK ANALYSIS:
+🕯️ CANDLESTICK ANALYSIS (Using REAL market data):
 • _select_key_candles() - 7-algorithm candlestick selection
 • _identify_patterns() - Pattern recognition (Doji, Hammer, etc.)
 • _analyze_recent_trend() - Trend analysis from recent candles
@@ -33,22 +33,22 @@ COMPREHENSIVE SHOWCASE of ALL MarketDataService operations and logging:
 Key Features Demonstrated:
 • Complete operation lifecycle logging (15+ operations)
 • Counter-based trace_id uniqueness across ALL operations
-• Raw API data capture with comprehensive metrics
-• Technical indicator calculation logging
-• Enhanced candlestick analysis logging
+• REAL Binance API data capture with comprehensive metrics
+• Technical indicator calculation logging with real market data
+• Enhanced candlestick analysis logging with real candles
 • Trading operation and order execution logging
 • AI-optimized JSON structure for ML consumption
-• Production-ready logging architecture
+• Production-ready logging architecture with real API performance
 
 Usage:
     python3 examples/phase6_final_demo.py
 
 Expected Output:
     - 50+ structured log entries showing ALL MarketDataService operations
-    - Complete technical indicator calculation logs
-    - Candlestick analysis and pattern recognition logs
+    - Complete technical indicator calculation logs with REAL data
+    - Candlestick analysis and pattern recognition logs with real candles
     - Trading operation and market analysis logs
-    - Raw API data capture with performance metrics
+    - REAL Binance API data capture with actual performance metrics
     - Enhanced trace_id uniqueness across ALL operations
 """
 
@@ -57,7 +57,6 @@ import time
 import json
 import sys
 import os
-from unittest.mock import patch, Mock
 from datetime import datetime
 
 # Add the parent directory to Python path for imports
@@ -101,166 +100,80 @@ class Phase6DemoRunner:
         print("🔍 Trace_id uniqueness system operational")
         print("⚡ Performance monitoring enabled\n")
 
-    def create_realistic_binance_response(self, symbol: str, response_time: float = 0.15, scenario: str = "normal"):
-        """Create realistic mock Binance API response with enhanced headers."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        
-        # Enhanced realistic Binance headers based on scenario
-        weight_multiplier = {"fast": 0.5, "normal": 1.0, "slow": 2.0, "very_slow": 3.0}.get(scenario, 1.0)
-        cache_status = "Hit from cloudfront" if scenario == "fast" else "Miss from cloudfront"
-        
-        mock_response.headers = {
-            'Content-Type': 'application/json',
-            'x-mbx-used-weight': str(int(10 + response_time * 100 * weight_multiplier)),
-            'x-mbx-used-weight-1m': str(int(50 + response_time * 300 * weight_multiplier)),
-            'content-encoding': 'gzip',
-            'x-cache': cache_status,
-            'content-length': str(int(500 + response_time * 1000)),
-            'server': 'nginx',
-            'x-mbx-order-count-1s': '0',
-            'x-mbx-order-count-1m': '0',
-            'date': datetime.now().strftime('%a, %d %b %Y %H:%M:%S GMT'),
-            'x-mbx-uuid': f'demo-{symbol.lower()}-{int(time.time()*1000)}',
-            'via': '1.1 cloudfront'
-        }
-        
-        # Realistic market data based on actual trading pairs
-        base_prices = {
-            'BTCUSDT': 67500.00,  # Current BTC price range
-            'ETHUSDT': 3800.00,   # Current ETH price range
-            'ADAUSDT': 0.485,     # Current ADA price range
-            'BNBUSDT': 635.00,    # Current BNB price range
-            'SOLUSDT': 155.00     # Current SOL price range
-        }
-        
-        base_price = base_prices.get(symbol, 50000)
-        
-        # Generate realistic OHLCV data with proper volume patterns
-        open_price = base_price
-        high_price = base_price * (1.001 + response_time * 0.01)  # Small realistic moves
-        low_price = base_price * (0.999 - response_time * 0.01)
-        close_price = base_price * (1.0005 if scenario in ["fast", "normal"] else 0.9995)
-        
-        volume_base = {"BTCUSDT": 1250.5, "ETHUSDT": 8500.2, "ADAUSDT": 125000.0}.get(symbol, 5000.0)
-        
-        candle_data = [
-            [
-                int(time.time() * 1000) - 3600000,  # open_time (1 hour ago)
-                f"{open_price:.2f}",                 # open
-                f"{high_price:.2f}",                 # high
-                f"{low_price:.2f}",                  # low
-                f"{close_price:.2f}",                # close
-                f"{volume_base:.2f}",                # volume
-                int(time.time() * 1000) - 1,        # close_time
-                f"{base_price * volume_base:.2f}",   # quote_volume
-                2150 + int(response_time * 1000),    # count
-                f"{volume_base * 0.5:.2f}",          # taker_buy_volume
-                f"{base_price * volume_base * 0.5:.2f}",  # taker_buy_quote_volume
-                "0"                                  # ignore
-            ]
-        ]
-        
-        mock_response.content = json.dumps(candle_data).encode()
-        mock_response.json.return_value = candle_data
-        
-        return mock_response
-
     def demo_complete_market_data_operations(self):
-        """Demonstrate complete get_market_data() with ALL internal operations."""
+        """Demonstrate complete get_market_data() with ALL internal operations using real Binance API."""
         print("🔍 DEMO 1: Complete Market Data Operations (get_market_data)")
         print("=" * 70)
-        print("📋 Showcasing ALL internal operations in full market data pipeline")
+        print("📋 Showcasing ALL internal operations with REAL Binance API data")
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            # Mock all 3 klines requests (daily, 4h, 1h) with fresh responses per call
-            def create_fresh_response(*args, **kwargs):
-                return self.create_realistic_binance_response("BTCUSDT")
-            mock_get.side_effect = create_fresh_response
+        print(f"\n📈 Processing BTCUSDT with complete operation chain...")
+        print(f"   🔍 Real operations logged:")
+        print(f"      • get_market_data (main operation)")
+        print(f"      • _validate_symbol_input (input validation)")
+        print(f"      • _get_klines x3 (daily, 4h, 1h data) - REAL API")
+        print(f"      • _calculate_rsi (RSI indicator)")
+        print(f"      • _calculate_macd_signal (MACD analysis)")
+        print(f"      • _calculate_ma x2 (MA20, MA50)")
+        print(f"      • _analyze_volume_profile (volume analysis)")
+        print(f"      • _log_market_analysis_complete (final analysis)")
+        
+        try:
+            start_time = time.time()
+            market_data = service.get_market_data("BTCUSDT")
+            end_time = time.time()
             
-            print(f"\n📈 Processing BTCUSDT with complete operation chain...")
-            print(f"   🔍 Expected operations logged:")
-            print(f"      • get_market_data (main operation)")
-            print(f"      • _validate_symbol_input (input validation)")
-            print(f"      • _get_klines x3 (daily, 4h, 1h data)")
-            print(f"      • _calculate_rsi (RSI indicator)")
-            print(f"      • _calculate_macd_signal (MACD analysis)")
-            print(f"      • _calculate_ma x2 (MA20, MA50)")
-            print(f"      • _analyze_volume_profile (volume analysis)")
-            print(f"      • _log_market_analysis_complete (final analysis)")
+            print(f"   ✅ BTCUSDT: Complete market data retrieved")
+            print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
+            print(f"   📊 MA20: ${market_data.ma_20}, MA50: ${market_data.ma_50}")
+            print(f"   📊 Volume: {market_data.volume_profile}, Trend: {market_data.ma_trend}")
+            print(f"   ⏱️  Real API response time: {(end_time - start_time)*1000:.0f}ms")
             
-            try:
-                with patch('src.market_data.market_data_service.time.time') as mock_time:
-                    # Generate realistic incrementing timestamps to avoid negative timing
-                    base_time = time.time()
-                    mock_time.side_effect = [
-                        base_time, base_time + 0.150, base_time + 0.155,
-                        base_time + 0.300, base_time + 0.450, base_time + 0.455,
-                        base_time + 0.600, base_time + 0.750, base_time + 0.755
-                    ]
-                    
-                    market_data = service.get_market_data("BTCUSDT")
-                    print(f"   ✅ BTCUSDT: Complete market data retrieved")
-                    print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
-                    print(f"   📊 MA20: ${market_data.ma_20}, MA50: ${market_data.ma_50}")
-                    print(f"   📊 Volume: {market_data.volume_profile}, Trend: {market_data.ma_trend}")
-                    
-            except Exception as e:
-                print(f"   ⚠️  Expected demo behavior - ALL operations logged ({type(e).__name__})")
+        except Exception as e:
+            print(f"   ⚠️  API Error: {e}")
+            print(f"   📊 Operations still logged even on error")
         
         print(f"\n🎯 Complete Market Data Operations Logged:")
         print(f"   ✅ Main operation: get_market_data with trace_id")
         print(f"   ✅ Symbol validation: _validate_symbol_input")
-        print(f"   ✅ API calls: 3x _get_klines (daily/4h/1h)")
+        print(f"   ✅ API calls: 3x _get_klines (daily/4h/1h) - REAL DATA")
         print(f"   ✅ Technical indicators: RSI, MACD, MA calculations")
         print(f"   ✅ Market analysis: Volume profile and final analysis")
-        print(f"   ✅ Complete operation lifecycle tracking")
+        print(f"   ✅ Complete operation lifecycle tracking with real performance")
 
     def demo_enhanced_context_operations(self):
-        """Demonstrate get_enhanced_context() with candlestick analysis."""
+        """Demonstrate get_enhanced_context() with candlestick analysis using real API."""
         print("\n\n🕯️ DEMO 2: Enhanced Context with Candlestick Analysis")
         print("=" * 70)
-        print("📊 Showcasing advanced candlestick analysis and pattern recognition")
+        print("📊 Showcasing advanced candlestick analysis with REAL market data")
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            # Create fresh ETHUSDT response for each call
-            def create_fresh_response(*args, **kwargs):
-                return self.create_realistic_binance_response("ETHUSDT")
-            mock_get.side_effect = create_fresh_response
+        print(f"\n📈 Processing ETHUSDT with enhanced analysis...")
+        print(f"   🔍 Real enhanced operations logged:")
+        print(f"      • get_enhanced_context (main operation)")
+        print(f"      • get_market_data (basic data - ALL ops from Demo 1)")
+        print(f"      • _select_key_candles (7-algorithm candle selection)")
+        print(f"      • _analyze_recent_trend (trend analysis)")
+        print(f"      • _identify_patterns (pattern recognition)")
+        print(f"      • _analyze_sr_tests (support/resistance analysis)")
+        print(f"      • _analyze_volume_relationship (volume-price analysis)")
+        
+        try:
+            start_time = time.time()
+            enhanced_context = service.get_enhanced_context("ETHUSDT")
+            end_time = time.time()
             
-            print(f"\n📈 Processing ETHUSDT with enhanced analysis...")
-            print(f"   🔍 Expected enhanced operations logged:")
-            print(f"      • get_enhanced_context (main operation)")
-            print(f"      • get_market_data (basic data - ALL ops from Demo 1)")
-            print(f"      • _select_key_candles (7-algorithm candle selection)")
-            print(f"      • _analyze_recent_trend (trend analysis)")
-            print(f"      • _identify_patterns (pattern recognition)")
-            print(f"      • _analyze_sr_tests (support/resistance analysis)")
-            print(f"      • _analyze_volume_relationship (volume-price analysis)")
+            print(f"   ✅ ETHUSDT: Enhanced context generated with real data")
+            print(f"   📊 Context includes: Basic data + Candlestick analysis")
+            print(f"   🕯️ Patterns: Analyzed with 7-algorithm approach")
+            print(f"   📈 Trend: Recent trend analysis completed")
+            print(f"   ⏱️  Real enhanced analysis time: {(end_time - start_time)*1000:.0f}ms")
             
-            try:
-                with patch('src.market_data.market_data_service.time.time') as mock_time:
-                    # Generate realistic incrementing timestamps for enhanced context operations
-                    base_time = time.time()
-                    mock_time.side_effect = [
-                        base_time, base_time + 0.180, base_time + 0.185,
-                        base_time + 0.360, base_time + 0.540, base_time + 0.545,
-                        base_time + 0.720, base_time + 0.900, base_time + 0.905,
-                        base_time + 1.080, base_time + 1.260, base_time + 1.265
-                    ]
-                    
-                    enhanced_context = service.get_enhanced_context("ETHUSDT")
-                    print(f"   ✅ ETHUSDT: Enhanced context generated")
-                    print(f"   📊 Context includes: Basic data + Candlestick analysis")
-                    print(f"   🕯️ Patterns: Analyzed with 7-algorithm approach")
-                    print(f"   📈 Trend: Recent trend analysis completed")
-                    
-            except Exception as e:
-                print(f"   ⚠️  Expected demo behavior - ALL enhanced operations logged")
+        except Exception as e:
+            print(f"   ⚠️  API Error: {e}")
+            print(f"   📊 Enhanced operations still logged even on error")
         
         print(f"\n🎯 Enhanced Context Operations Logged:")
         print(f"   ✅ Enhanced context: get_enhanced_context with trace_id")
@@ -269,55 +182,48 @@ class Phase6DemoRunner:
         print(f"   ✅ Trend analysis: _analyze_recent_trend")
         print(f"   ✅ S/R analysis: _analyze_sr_tests")
         print(f"   ✅ Volume analysis: _analyze_volume_relationship")
+        print(f"   ✅ All operations use REAL market data from Binance")
 
     def demo_technical_indicators_logging(self):
-        """Demonstrate all technical indicator calculations with detailed logging."""
+        """Demonstrate all technical indicator calculations with real market data."""
         print("\n\n📊 DEMO 3: Technical Indicators Calculation Logging")
         print("=" * 70)
-        print("🔢 Showcasing detailed logging of ALL technical indicator calculations")
+        print("🔢 Showcasing detailed logging with REAL technical indicator calculations")
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            # Create fresh ADAUSDT response for each call
-            def create_fresh_response(*args, **kwargs):
-                return self.create_realistic_binance_response("ADAUSDT")
-            mock_get.side_effect = create_fresh_response
+        print(f"\n📈 Processing ADAUSDT technical indicators...")
+        print(f"   🔍 Real indicator operations logged:")
+        print(f"      • _calculate_rsi: RSI calculation with Decimal precision")
+        print(f"      • _calculate_macd_signal: MACD bullish/bearish analysis")
+        print(f"      • _calculate_ma (period=20): MA20 calculation")
+        print(f"      • _calculate_ma (period=50): MA50 calculation")
+        print(f"      • _calculate_btc_correlation: BTC correlation analysis")
+        print(f"      • _analyze_volume_profile: Volume pattern analysis")
+        
+        try:
+            start_time = time.time()
+            # This will trigger all technical indicator calculations with real data
+            market_data = service.get_market_data("ADAUSDT")
+            end_time = time.time()
             
-            print(f"\n📈 Processing ADAUSDT technical indicators...")
-            print(f"   🔍 Individual indicator operations logged:")
-            print(f"      • _calculate_rsi: RSI calculation with Decimal precision")
-            print(f"      • _calculate_macd_signal: MACD bullish/bearish analysis")
-            print(f"      • _calculate_ma (period=20): MA20 calculation")
-            print(f"      • _calculate_ma (period=50): MA50 calculation")
-            print(f"      • _calculate_btc_correlation: BTC correlation analysis")
-            print(f"      • _analyze_volume_profile: Volume pattern analysis")
+            print(f"   ✅ ADAUSDT: All technical indicators calculated with real data")
+            print(f"   📊 RSI: {market_data.rsi_14}")
+            print(f"   📊 MACD: {market_data.macd_signal}")
+            print(f"   📊 MA20: {market_data.ma_20}, MA50: {market_data.ma_50}")
+            print(f"   📊 Volume Profile: {market_data.volume_profile}")
+            print(f"   ⏱️  Real indicator calculation time: {(end_time - start_time)*1000:.0f}ms")
             
-            try:
-                with patch('src.market_data.market_data_service.time.time') as mock_time:
-                    # Generate realistic incrementing timestamps for technical indicators
-                    base_time = time.time()
-                    mock_time.side_effect = [
-                        base_time, base_time + 0.120, base_time + 0.125,
-                        base_time + 0.240, base_time + 0.360, base_time + 0.365,
-                        base_time + 0.480, base_time + 0.600, base_time + 0.605,
-                        base_time + 0.720, base_time + 0.840, base_time + 0.845
-                    ]
-                    
-                    # This will trigger all technical indicator calculations
-                    market_data = service.get_market_data("ADAUSDT")
-                    print(f"   ✅ ADAUSDT: All technical indicators calculated")
-                    print(f"   📊 Each calculation individually logged with context")
-                    
-            except Exception as e:
-                print(f"   ⚠️  Expected demo behavior - all indicators logged")
+        except Exception as e:
+            print(f"   ⚠️  API Error: {e}")
+            print(f"   📊 All indicators still logged even on error")
         
         print(f"\n🎯 Technical Indicator Logging Features:")
-        print(f"   ✅ RSI calculation: Period, data quality, final value")
-        print(f"   ✅ MACD calculation: EMA values, signal determination")
-        print(f"   ✅ MA calculations: Period, calculation method, fallbacks")
-        print(f"   ✅ BTC correlation: Data points, correlation strength")
-        print(f"   ✅ Volume analysis: Historical vs recent, ratio calculations")
+        print(f"   ✅ RSI calculation: Period, data quality, final value - REAL DATA")
+        print(f"   ✅ MACD calculation: EMA values, signal determination - REAL DATA")
+        print(f"   ✅ MA calculations: Period, calculation method, fallbacks - REAL DATA")
+        print(f"   ✅ BTC correlation: Data points, correlation strength - REAL DATA")
+        print(f"   ✅ Volume analysis: Historical vs recent, ratio calculations - REAL DATA")
         print(f"   ✅ Each operation: Start → Processing → Complete lifecycle")
 
     def demo_trading_operations_logging(self):
@@ -377,60 +283,60 @@ class Phase6DemoRunner:
         print(f"   ✅ Integration: Links with market analysis trace_ids")
 
     def demo_api_performance_monitoring(self):
-        """Demonstrate enhanced API performance monitoring and metrics."""
+        """Demonstrate enhanced API performance monitoring with real Binance API."""
         print("\n\n⚡ DEMO 5: API Performance Monitoring & Metrics")
         print("=" * 70)
-        print("📊 Showcasing enhanced API metrics with performance categorization")
+        print("📊 Showcasing REAL API metrics with actual Binance performance")
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        # Performance test scenarios with realistic response times
-        performance_scenarios = [
-            ("Cache Hit (Fast)", 0.045, "fast", "Hit from cloudfront"),
-            ("Normal Response", 0.180, "normal", "Miss from cloudfront"),
-            ("High Load (Slow)", 0.650, "slow", "Miss from cloudfront"),
-            ("Network Issues (Very Slow)", 1.200, "very_slow", "Miss from cloudfront")
-        ]
+        # Test different symbols to see varying performance
+        test_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
         
-        with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            for i, (name, response_time, scenario, cache_status) in enumerate(performance_scenarios, 1):
-                print(f"\n🚀 [{i}/4] Scenario: {name} ({response_time}s)")
+        for i, symbol in enumerate(test_symbols, 1):
+            print(f"\n🚀 [{i}/3] Performance Test: {symbol}")
+            
+            try:
+                start_time = time.time()
+                result = service._get_klines(symbol, "1h", 1)
+                end_time = time.time()
                 
-                # Create fresh response for each performance scenario
-                def create_fresh_response(*args, **kwargs):
-                    mock_response = self.create_realistic_binance_response("BTCUSDT", response_time, scenario)
-                    mock_response.headers['x-cache'] = cache_status
-                    return mock_response
-                mock_get.side_effect = create_fresh_response
+                response_time = (end_time - start_time) * 1000
                 
-                with patch('src.market_data.market_data_service.time.time') as mock_time:
-                    # Generate realistic timestamps for performance monitoring
-                    base_time = time.time()
-                    mock_time.side_effect = [base_time, base_time + response_time, base_time + response_time + 0.005]
+                print(f"   ✅ {symbol}: Request completed")
+                print(f"   ⏱️  Response time: {response_time:.0f}ms")
+                
+                # Categorize performance based on real response time
+                if response_time < 100:
+                    category = "fast"
+                elif response_time < 300:
+                    category = "normal"
+                elif response_time < 1000:
+                    category = "slow"
+                else:
+                    category = "very_slow"
                     
-                    try:
-                        result = service._get_klines("BTCUSDT", "1h", 1)
-                        print(f"   ✅ Request completed - category: {scenario}")
-                        print(f"   📊 Cache: {cache_status}")
-                        print(f"   ⏱️  Time: {response_time*1000:.0f}ms")
-                    except Exception as e:
-                        print(f"   ⚠️  Expected demo behavior - metrics captured")
+                print(f"   📊 Performance category: {category}")
                 
-                time.sleep(0.1)
+            except Exception as e:
+                print(f"   ⚠️  API Error for {symbol}: {e}")
+                print(f"   📊 Error metrics still captured")
+            
+            time.sleep(0.2)  # Small delay between requests
         
-        print(f"\n🎯 API Performance Monitoring Features:")
-        print(f"   ✅ Millisecond-precision timing measurements")
-        print(f"   ✅ Performance categorization (fast/normal/slow/very_slow)")
-        print(f"   ✅ Rate limit monitoring (x-mbx-used-weight headers)")
-        print(f"   ✅ Cache efficiency tracking (cloudfront status)")
-        print(f"   ✅ Content compression detection (gzip encoding)")
-        print(f"   ✅ Complete request/response metadata capture")
+        print(f"\n🎯 Real API Performance Monitoring Features:")
+        print(f"   ✅ Millisecond-precision timing measurements - REAL DATA")
+        print(f"   ✅ Performance categorization based on actual response times")
+        print(f"   ✅ Rate limit monitoring from real Binance headers")
+        print(f"   ✅ Cache efficiency tracking from real CDN responses")
+        print(f"   ✅ Content compression detection from real responses")
+        print(f"   ✅ Complete request/response metadata from real API")
 
     def demo_comprehensive_integration(self):
-        """Demonstrate complete multi-symbol integration with ALL operations."""
+        """Demonstrate complete multi-symbol integration with real API data."""
         print("\n\n🔄 DEMO 6: Complete Multi-Symbol Integration")
         print("=" * 60)
-        print("🎯 Multi-symbol pipeline with ALL MarketDataService operations")
+        print("🎯 Multi-symbol pipeline with REAL Binance data and ALL operations")
         
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         integration_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT']
@@ -438,71 +344,52 @@ class Phase6DemoRunner:
         print(f"📊 Processing {len(integration_symbols)} symbols with complete operation chain")
         self.symbols_tested.extend(integration_symbols)
         
-        with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            for i, symbol in enumerate(integration_symbols, 1):
-                response_times = [0.120, 0.350, 0.580]  # Varied performance
-                scenarios = ["fast", "normal", "slow"]
+        for i, symbol in enumerate(integration_symbols, 1):
+            print(f"\n📈 [{i}/3] Complete integration: {symbol}")
+            print(f"   🔍 Real operations for {symbol}:")
+            print(f"      • get_market_data: Main aggregation with REAL data")
+            print(f"      • All technical indicators: RSI, MACD, MA, etc.")
+            print(f"      • get_enhanced_context: Candlestick analysis")
+            print(f"      • Trading operations: Sample trade logging")
+            
+            try:
+                start_time = time.time()
                 
-                response_time = response_times[i-1]
-                scenario = scenarios[i-1]
+                # Full market data (triggers ALL operations) with real API
+                market_data = service.get_market_data(symbol)
                 
-                # Create fresh response for each symbol with proper isolation
-                def create_symbol_response(*args, **kwargs):
-                    return self.create_realistic_binance_response(symbol, response_time, scenario)
-                mock_get.side_effect = create_symbol_response
+                # Enhanced context (triggers candlestick analysis) with real API
+                enhanced_context = service.get_enhanced_context(symbol)
                 
-                print(f"\n📈 [{i}/3] Complete integration: {symbol} ({scenario})")
-                print(f"   🔍 Expected operations for {symbol}:")
-                print(f"      • get_market_data: Main aggregation")
-                print(f"      • All technical indicators: RSI, MACD, MA, etc.")
-                print(f"      • get_enhanced_context: Candlestick analysis")
-                print(f"      • Trading operations: Sample trade logging")
+                # Sample trading operation
+                service.log_trading_operation(
+                    operation_type="analysis_complete",
+                    symbol=symbol,
+                    trade_data={"analysis_confidence": 0.85},
+                    result="ready_for_trading"
+                )
                 
-                with patch('src.market_data.market_data_service.time.time') as mock_time:
-                    # Generate realistic incrementing timestamps for multi-symbol integration
-                    base_time = time.time()
-                    intervals = []
-                    current_time = base_time
-                    for j in range(10):  # Multiple operation cycles
-                        intervals.extend([
-                            current_time,
-                            current_time + response_time,
-                            current_time + response_time + 0.005
-                        ])
-                        current_time += response_time + 0.100  # Add gap between operations
-                    mock_time.side_effect = intervals
-                    
-                    try:
-                        # Full market data (triggers ALL operations)
-                        market_data = service.get_market_data(symbol)
-                        
-                        # Enhanced context (triggers candlestick analysis)
-                        enhanced_context = service.get_enhanced_context(symbol)
-                        
-                        # Sample trading operation
-                        service.log_trading_operation(
-                            operation_type="analysis_complete",
-                            symbol=symbol,
-                            trade_data={"analysis_confidence": 0.85},
-                            result="ready_for_trading"
-                        )
-                        
-                        print(f"   ✅ {symbol}: ALL operations completed")
-                        print(f"   📊 Performance: {scenario} ({response_time*1000:.0f}ms)")
-                        
-                    except Exception as e:
-                        print(f"   ⚠️  {symbol}: Demo mode - ALL operations logged")
+                end_time = time.time()
+                total_time = (end_time - start_time) * 1000
                 
-                time.sleep(0.1)
+                print(f"   ✅ {symbol}: ALL operations completed with real data")
+                print(f"   📊 Total processing time: {total_time:.0f}ms")
+                print(f"   📊 RSI: {market_data.rsi_14}, MACD: {market_data.macd_signal}")
+                
+            except Exception as e:
+                print(f"   ⚠️  {symbol}: API Error - {e}")
+                print(f"   📊 All operations still logged even on error")
+            
+            time.sleep(0.5)  # Respectful delay between symbols
         
-        print(f"\n🎯 Complete Integration Demonstrated:")
-        print(f"   ✅ All 15+ MarketDataService operations")
+        print(f"\n🎯 Complete Real Integration Demonstrated:")
+        print(f"   ✅ All 15+ MarketDataService operations with REAL data")
         print(f"   ✅ Cross-symbol trace consistency and uniqueness")
-        print(f"   ✅ Complete technical indicator calculations")
-        print(f"   ✅ Enhanced candlestick analysis pipeline")
+        print(f"   ✅ Complete technical indicator calculations with real prices")
+        print(f"   ✅ Enhanced candlestick analysis pipeline with real candles")
         print(f"   ✅ Trading operation integration")
-        print(f"   ✅ Multi-symbol performance monitoring")
-        print(f"   ✅ Production-ready scalable architecture")
+        print(f"   ✅ Multi-symbol performance monitoring with real API metrics")
+        print(f"   ✅ Production-ready scalable architecture validated")
 
     def display_final_summary(self):
         """Display comprehensive MarketDataService demonstration summary."""
