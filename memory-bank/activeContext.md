@@ -818,3 +818,36 @@ AFTER:  get_market_data_fae7705d → get_market_data_fae7705d → get_market_dat
 - No regression in existing functionality
 
 **Next:** Proceeding to Task 1.2 (UUID uniqueness) and Task 1.3 (mock data consistency)
+
+
+## [2025-08-06T10:50:00] - Task 1.2 Completed: Fixed UUID Cross-Symbol Contamination
+
+**Problem Solved:** Fixed cross-symbol UUID contamination where BTC requests received ETH UUIDs (`demo-ethusdt-1754476575895`).
+
+**Root Cause:** Mock response objects were created once and reused across multiple API calls, causing UUID sharing between different symbols. The pattern was:
+```python
+mock_response = self.create_realistic_binance_response("BTCUSDT")
+mock_get.return_value = mock_response  # Same object reused for all calls
+```
+
+**Solution Implemented:**
+- Replaced static mock response assignment with dynamic generation using `side_effect`
+- Each API call now creates a fresh response object with symbol-specific UUID
+- Pattern changed to:
+```python
+def create_fresh_response(*args, **kwargs):
+    return self.create_realistic_binance_response(symbol)
+mock_get.side_effect = create_fresh_response
+```
+
+**Files Modified:**
+- [`examples/phase6_final_demo.py`](examples/phase6_final_demo.py:177) - Fixed 5 demo functions with fresh response generation
+- [`tests/unit/test_uuid_isolation.py`](tests/unit/test_uuid_isolation.py:1) - Created comprehensive UUID isolation tests
+
+**Validation Results:**
+- All 6 UUID isolation tests pass ✅
+- UUIDs now correctly contain symbol: `demo-btcusdt-*` for BTC, `demo-ethusdt-*` for ETH
+- No cross-contamination between symbols
+- All existing tests continue to pass (273 tests ✅)
+
+**Next:** Proceeding to Task 1.3 (mock data consistency across symbols)

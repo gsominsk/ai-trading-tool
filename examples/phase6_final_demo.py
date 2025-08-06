@@ -175,9 +175,10 @@ class Phase6DemoRunner:
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
         with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            # Mock all 3 klines requests (daily, 4h, 1h)
-            mock_response = self.create_realistic_binance_response("BTCUSDT")
-            mock_get.return_value = mock_response
+            # Mock all 3 klines requests (daily, 4h, 1h) with fresh responses per call
+            def create_fresh_response(*args, **kwargs):
+                return self.create_realistic_binance_response("BTCUSDT")
+            mock_get.side_effect = create_fresh_response
             
             print(f"\n📈 Processing BTCUSDT with complete operation chain...")
             print(f"   🔍 Expected operations logged:")
@@ -226,8 +227,10 @@ class Phase6DemoRunner:
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
         with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            mock_response = self.create_realistic_binance_response("ETHUSDT")
-            mock_get.return_value = mock_response
+            # Create fresh ETHUSDT response for each call
+            def create_fresh_response(*args, **kwargs):
+                return self.create_realistic_binance_response("ETHUSDT")
+            mock_get.side_effect = create_fresh_response
             
             print(f"\n📈 Processing ETHUSDT with enhanced analysis...")
             print(f"   🔍 Expected enhanced operations logged:")
@@ -276,8 +279,10 @@ class Phase6DemoRunner:
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
         with patch('src.market_data.market_data_service.requests.get') as mock_get:
-            mock_response = self.create_realistic_binance_response("ADAUSDT")
-            mock_get.return_value = mock_response
+            # Create fresh ADAUSDT response for each call
+            def create_fresh_response(*args, **kwargs):
+                return self.create_realistic_binance_response("ADAUSDT")
+            mock_get.side_effect = create_fresh_response
             
             print(f"\n📈 Processing ADAUSDT technical indicators...")
             print(f"   🔍 Individual indicator operations logged:")
@@ -391,9 +396,12 @@ class Phase6DemoRunner:
             for i, (name, response_time, scenario, cache_status) in enumerate(performance_scenarios, 1):
                 print(f"\n🚀 [{i}/4] Scenario: {name} ({response_time}s)")
                 
-                mock_response = self.create_realistic_binance_response("BTCUSDT", response_time, scenario)
-                mock_response.headers['x-cache'] = cache_status
-                mock_get.return_value = mock_response
+                # Create fresh response for each performance scenario
+                def create_fresh_response(*args, **kwargs):
+                    mock_response = self.create_realistic_binance_response("BTCUSDT", response_time, scenario)
+                    mock_response.headers['x-cache'] = cache_status
+                    return mock_response
+                mock_get.side_effect = create_fresh_response
                 
                 with patch('src.market_data.market_data_service.time.time') as mock_time:
                     # Generate realistic timestamps for performance monitoring
@@ -438,8 +446,10 @@ class Phase6DemoRunner:
                 response_time = response_times[i-1]
                 scenario = scenarios[i-1]
                 
-                mock_response = self.create_realistic_binance_response(symbol, response_time, scenario)
-                mock_get.return_value = mock_response
+                # Create fresh response for each symbol with proper isolation
+                def create_symbol_response(*args, **kwargs):
+                    return self.create_realistic_binance_response(symbol, response_time, scenario)
+                mock_get.side_effect = create_symbol_response
                 
                 print(f"\n📈 [{i}/3] Complete integration: {symbol} ({scenario})")
                 print(f"   🔍 Expected operations for {symbol}:")
