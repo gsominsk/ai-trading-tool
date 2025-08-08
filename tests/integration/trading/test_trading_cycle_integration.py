@@ -5,6 +5,7 @@ from src.trading.trading_cycle import TradingCycle
 from src.trading.oms import OrderManagementSystem
 from src.trading.repository import OrderRepository
 from src.market_data.market_data_service import MarketDataService
+from src.trading.log_repository import TradeLogRepository
 
 @pytest.fixture(scope="function")
 def persistent_storage_cleanup(tmp_path):
@@ -20,8 +21,7 @@ def persistent_storage_cleanup(tmp_path):
         if os.path.exists(f):
             os.remove(f)
     
-    # Create the log file with a header
-    pd.DataFrame(columns=["timestamp", "order_id", "symbol", "order_type", "price", "quantity", "status"]).to_csv(log_file, index=False)
+    # The repository now handles file creation, so we don't need to do it here.
 
     yield str(oms_state_file) # Pass the state file path to the test
 
@@ -41,7 +41,8 @@ def test_trading_cycle_full_integration_with_oms(persistent_storage_cleanup):
     repository = OrderRepository(file_path=oms_state_file)
     oms = OrderManagementSystem(repository=repository)
     market_data_service = MarketDataService()
-    trading_cycle = TradingCycle(oms=oms, market_data_service=market_data_service)
+    log_repository = TradeLogRepository(file_path="data/trade_log.csv")
+    trading_cycle = TradingCycle(oms=oms, market_data_service=market_data_service, log_repository=log_repository)
 
     # 2. Execute the first trading cycle to place the order
     trading_cycle.run_cycle()

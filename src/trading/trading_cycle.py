@@ -1,47 +1,36 @@
 import csv
 from datetime import datetime
 from src.trading.oms import OrderManagementSystem
-from src.market_data.market_data_service import MarketDataService
+from src.market_data.market_data_service import MarketDataService, MarketDataError
+from src.trading.log_repository import TradeLogRepository
+from src.logging_system import MarketDataLogger
 
 
 class TradingCycle:
     """
     Основной цикл торговой логики.
     """
-    def __init__(self, oms: OrderManagementSystem, market_data_service: MarketDataService, trade_log_path: str = 'data/trade_log.csv'):
+    def __init__(self, oms: OrderManagementSystem, market_data_service: MarketDataService, log_repository: TradeLogRepository):
         self.oms = oms
         self.market_data_service = market_data_service
-        self.trade_log_path = trade_log_path
-        self.header = ['timestamp', 'order_id', 'symbol', 'order_type', 'price', 'quantity', 'status']
+        self.log_repository = log_repository
+        self.logger = MarketDataLogger("trading_cycle")
 
     def _get_current_position(self):
-        """Читает последнюю запись из лога для определения текущей позиции."""
-        try:
-            with open(self.trade_log_path, 'r', newline='') as f:
-                reader = csv.DictReader(f)
-                last_record = None
-                for row in reader:
-                    # DictReader может возвращать строки с None в качестве значений для пустых строк,
-                    # поэтому мы проверяем, есть ли хотя бы одно непустое значение.
-                    if any(field for field in row.values()):
-                        last_record = row
-                return last_record
-        except FileNotFoundError:
-            return None
+        """Получает последнюю запись из лога через репозиторий."""
+        return self.log_repository.get_last_record()
 
     def _update_log(self, order_id, symbol, order_type, price, quantity, status):
-        """Добавляет новую запись в лог."""
-        with open(self.trade_log_path, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=self.header)
-            writer.writerow({
-                'timestamp': datetime.utcnow().isoformat(),
-                'order_id': order_id,
-                'symbol': symbol,
-                'order_type': order_type,
-                'price': price,
-                'quantity': quantity,
-                'status': status
-            })
+        """Добавляет новую запись в лог через репозиторий."""
+        record_data = {
+            'order_id': order_id,
+            'symbol': symbol,
+            'order_type': order_type,
+            'price': price,
+            'quantity': quantity,
+            'status': status
+        }
+        self.log_repository.add_record(record_data)
 
     def _get_ai_decision(self, market_data, current_position):
         """
@@ -53,28 +42,27 @@ class TradingCycle:
         Текущая Позиция: {current_position}
         Каково ваше следующее действие (BUY, SELL, HOLD)?
         """
-        print("--- Промпт для ИИ ---")
-        print(prompt)
+        self.logger.log_operation_start("get_ai_decision", context={"prompt": prompt})
         
         # Заглушка для решения ИИ
         decision = "BUY"
-        print(f"--- Решение ИИ: {decision} ---")
+        self.logger.log_operation_complete("get_ai_decision", context={"decision": decision})
         return decision
 
     def run_cycle(self):
         """Запускает один полный торговый цикл."""
-        print("--- Запуск нового торгового цикла ---")
+        self.logger.log_operation_start("run_cycle")
         
         current_position = self._get_current_position()
         
         # Шаг 1: Синхронизация статуса "зависших" ордеров
         if current_position and current_position['status'] == 'PENDING':
             order_id = current_position['order_id']
-            print(f"Обнаружен ордер в статусе PENDING: {order_id}. Проверяю статус...")
+            self.logger.log_operation_start("sync_pending_order", context={"order_id": order_id})
             
             try:
                 actual_status = self.oms.get_order_status(order_id)
-                print(f"Актуальный статус ордера {order_id}: {actual_status}")
+                self.logger.log_operation_complete("get_order_status", context={"order_id": order_id, "status": actual_status})
                 
                 if actual_status != current_position['status']:
                     self._update_log(
@@ -85,13 +73,17 @@ class TradingCycle:
                         quantity=current_position['quantity'],
                         status=actual_status
                     )
-                    print(f"Статус ордера {order_id} обновлен в логе на {actual_status}.")
+                    self.logger.log_operation_complete("update_log", context={"order_id": order_id, "new_status": actual_status})
                     current_position = self._get_current_position()
                     # Завершаем цикл, так как основное действие - синхронизация - выполнено
                     return
-                
+                else:
+                    # Если статус не изменился, просто завершаем цикл
+                    self.logger.log_operation_complete("sync_pending_order", context={"order_id": order_id, "status": "unchanged"})
+                    return
+               
             except Exception as e:
-                print(f"Ошибка при получении статуса ордера {order_id}: {e}")
+                self.logger.log_operation_error("get_order_status", error=str(e), context={"order_id": order_id})
                 return
 
         # Шаг 2: Получение рыночных данных (пока заглушка)
@@ -107,7 +99,7 @@ class TradingCycle:
             quantity = 0.01
             price = market_data.h1_candles['close'].iloc[-1] if not market_data.h1_candles.empty else 52000
             
-            print(f"ИИ принял решение BUY. Размещаю ордер: {symbol} {quantity} @ {price}")
+            self.logger.log_operation_start("place_buy_order", context={"symbol": symbol, "quantity": quantity, "price": price})
             
             try:
                 # Размещаем ордер через OMS
@@ -117,7 +109,7 @@ class TradingCycle:
                     quantity=quantity,
                     price=price
                 )
-                print(f"Ордер размещен. ID: {new_order_id}")
+                self.logger.log_operation_complete("place_order", context={"order_id": new_order_id})
                 
                 # Сразу же логируем новый ордер как PENDING
                 self._update_log(
@@ -128,19 +120,21 @@ class TradingCycle:
                     quantity=quantity,
                     status='PENDING'
                 )
-                print(f"Новый ордер {new_order_id} залогирован со статусом PENDING.")
+                self.logger.log_operation_complete("log_pending_order", context={"order_id": new_order_id})
 
+            except MarketDataError as e:
+                self.logger.log_operation_error("place_buy_order", error=str(e), context={"error_type": "MarketDataError"})
             except Exception as e:
-                print(f"Ошибка при размещении ордера: {e}")
+                self.logger.log_operation_error("place_buy_order", error=str(e), context={"error_type": "Unexpected"})
                 # Обработка ошибок размещения
 
         elif ai_decision == "SELL":
             # Логика для продажи (пока заглушка)
-            print("ИИ принял решение SELL. Логика продажи будет реализована позже.")
+            self.logger.log_operation_start("sell_logic", context={"decision": "SELL"})
             pass
         
         elif ai_decision == "HOLD":
-            print("ИИ принял решение HOLD. Никаких действий не требуется.")
+            self.logger.log_operation_start("hold_logic", context={"decision": "HOLD"})
             pass
 
-        print("--- Торговый цикл завершен ---")
+        self.logger.log_operation_complete("run_cycle")

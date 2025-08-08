@@ -54,7 +54,9 @@ class AITradingTestRunner:
                     'tests/unit/market_data/test_market_data_edge_cases.py',
                     'tests/unit/test_timing_validation.py',
                     'tests/unit/logging/test_trace_id_integration_simple.py',
-                    'tests/unit/trading/test_trading_cycle_logic.py',
+                    'tests/unit/trading/test_log_repository.py',
+                    'tests/unit/trading/test_trading_cycle.py',
+                    'tests/unit/trading/test_repository.py',
                 ]
             },
             'integration': {
@@ -69,7 +71,6 @@ class AITradingTestRunner:
                     'tests/integration/refactoring/test_api_call_efficiency.py',
                     'tests/integration/system/test_backward_compatibility.py',
                     'tests/integration/system/test_comprehensive_integration.py',
-                    'tests/integration/trading/test_contracts.py',
                     'tests/integration/trading/test_trading_cycle_integration.py',
                 ]
             }
