@@ -239,3 +239,12 @@ Recent 5, Extremes, High Volume, Big Moves, Patterns, S/R Tests, Deduplication
 [2025-08-06 02:57:00] - Added Comprehensive MarketDataService Logging Demonstration patterns following successful Phase 6 completion
 
 *Optimized 2025-08-05: Reduced from 599 lines to essential patterns + archive reference*
+
+---
+### [2025-08-09 19:02:50] - Preferred Diagramming Format
+
+**Pattern:** All new architectural or explanatory diagrams should be created using the **PlantUML (`.puml`)** format.
+
+**Rationale:** This format has been successfully set up in the user's environment and provides a good balance of complexity and readability. It is the most reliable and preferred method for visualization.
+
+**Implementation:** When a request to "draw" or "visualize" a concept is made, default to creating a `.puml` file.
