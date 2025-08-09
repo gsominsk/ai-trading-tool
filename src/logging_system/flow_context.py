@@ -6,7 +6,7 @@ Tracks flow stages and maintains context throughout operation chains
 import threading
 from typing import Dict, Any, Optional, List
 from contextlib import contextmanager
-from .trace_generator import get_flow_id
+from .trace_generator import get_trace_id
 
 
 class FlowContext:
@@ -32,13 +32,13 @@ class FlowContext:
         return flow.get('stage') if flow else None
     
     @property
-    def flow_id(self) -> Optional[str]:
-        """Get current flow ID."""
+    def trace_id(self) -> Optional[str]:
+        """Get current trace ID."""
         flow = self.current_flow
-        return flow.get('flow_id') if flow else None
+        return flow.get('trace_id') if flow else None
     
-    def start_flow(self, symbol: str = "", operation: str = "", 
-                   initial_stage: str = "initiation") -> str:
+    def start_flow(self, symbol: str = "", operation: str = "",
+                   initial_stage: str = "initiation", parent_trace_id: Optional[str] = None) -> str:
         """
         Start a new operation flow.
         
@@ -46,14 +46,16 @@ class FlowContext:
             symbol: Trading symbol (e.g., "BTCUSDT")
             operation: Operation type (e.g., "enhanced_context")
             initial_stage: Starting stage name
+            parent_trace_id: The trace_id of the parent operation, if any.
             
         Returns:
-            Generated flow ID
+            Generated trace ID
         """
-        flow_id = get_flow_id(symbol, operation)
+        trace_id = get_trace_id(parent_trace_id=parent_trace_id)
         
         self._local.flow = {
-            "flow_id": flow_id,
+            "trace_id": trace_id,
+            "parent_trace_id": parent_trace_id,
             "stage": initial_stage,
             "previous_stage": None,
             "symbol": symbol,
@@ -62,7 +64,7 @@ class FlowContext:
             "context_data": {}
         }
         
-        return flow_id
+        return trace_id
     
     def advance_stage(self, next_stage: str, context_data: Optional[Dict[str, Any]] = None):
         """
@@ -118,7 +120,8 @@ class FlowContext:
             return {}
         
         return {
-            "flow_id": self.current_flow["flow_id"],
+            "trace_id": self.current_flow["trace_id"],
+            "parent_trace_id": self.current_flow.get("parent_trace_id"),
             "stage": self.current_flow["stage"],
             "previous_stage": self.current_flow.get("previous_stage"),
             "stages_completed": self.current_flow.get("stages_completed", []),

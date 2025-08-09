@@ -11,7 +11,7 @@ import os
 from typing import Dict, Any, Optional
 from .json_formatter import get_logger, StructuredLogger
 from .flow_context import flow_operation, get_flow_summary
-from .trace_generator import get_trace_id, get_flow_id
+from .trace_generator import get_trace_id
 
 
 class LoggerConfig:
@@ -230,8 +230,8 @@ class MarketDataLogger:
         
         # Auto-generate trace_id using get_flow_id if not provided and symbol is available
         if trace_id is None and symbol:
-            from .trace_generator import get_flow_id
-            trace_id = get_flow_id(symbol, operation)
+            from .trace_generator import get_trace_id
+            trace_id = get_trace_id()
         
         # Add parent_trace_id to context if provided for hierarchical tracing
         if parent_trace_id:
@@ -258,8 +258,8 @@ class MarketDataLogger:
         
         # Auto-generate trace_id using get_flow_id if not provided and symbol is available in context
         if trace_id is None and ctx.get("symbol"):
-            from .trace_generator import get_flow_id
-            trace_id = get_flow_id(ctx["symbol"], operation)
+            from .trace_generator import get_trace_id
+            trace_id = get_trace_id()
         
         # Add parent_trace_id to context if provided for hierarchical tracing
         if parent_trace_id:

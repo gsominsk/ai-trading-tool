@@ -41,7 +41,6 @@ from .flow_context import (
 
 from .trace_generator import (
     get_trace_id,
-    get_flow_id,
     reset_trace_counter
 )
 
@@ -68,7 +67,6 @@ __all__ = [
     
     # ID generation
     "get_trace_id",
-    "get_flow_id",
     "reset_trace_counter",
     
     # Low-level interfaces

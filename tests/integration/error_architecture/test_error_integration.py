@@ -417,13 +417,13 @@ class TestErrorContextIntegration:
     
     def test_trace_id_generation_and_propagation(self):
         """Test trace ID generation and propagation across operations."""
-        from src.logging_system.trace_generator import get_flow_id
+        from src.logging_system.trace_generator import get_trace_id
         service = MarketDataService()
         
         # Generate trace ID using new system
-        trace_id = get_flow_id("test")
-        assert trace_id.startswith("flow_test_")
-        assert len(trace_id) > 14  # flow_test_ + timestamp + counter
+        trace_id = get_trace_id()
+        assert trace_id.startswith("trd_")
+        assert len(trace_id) > 20  # trd_ + session + timestamp + sequence
         # Note: _current_trace_id is not used in new architecture
     
     @patch('requests.get')

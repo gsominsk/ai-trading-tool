@@ -433,15 +433,15 @@ class MarketDataService:
         """
         Starts a new operation, generates a trace_id, logs the start, and returns the new trace_id.
         """
-        from src.logging_system.trace_generator import get_flow_id
-        # 1. Generate a new, unique trace_id for this specific operation
-        symbol = kwargs.get('symbol', '')
-        new_trace_id = get_flow_id(symbol=symbol, operation=operation)
+        from src.logging_system.trace_generator import get_trace_id
+        # 1. Generate a new, unique trace_id for this specific operation.
+        # The parent_trace_id is passed to the generator for semantic consistency.
+        new_trace_id = get_trace_id(parent_trace_id=parent_trace_id)
 
         # 2. Log the start of the operation with parent-child relationship
         # The symbol is explicitly passed, so remove it from kwargs to avoid TypeError
         log_kwargs = kwargs.copy()
-        log_kwargs.pop('symbol', None)
+        symbol = log_kwargs.pop('symbol', '')
 
         self._log_operation_start(
             operation=operation,

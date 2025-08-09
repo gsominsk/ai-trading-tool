@@ -342,6 +342,38 @@ class TestMarketDataServiceCore:
         no_test_result = self.service._analyze_sr_tests(no_test_candles, support_level, resistance_level)
         assert no_test_result == "No recent S/R tests"
 
+    # =================
+    # TRACING
+    # =================
+
+    @patch('src.logging_system.trace_generator.get_trace_id')
+    @patch('src.market_data.market_data_service.MarketDataService._get_klines')
+    def test_trace_id_propagation(self, mock_get_klines, mock_get_trace_id):
+        """Test that a main trace_id is generated and propagated to child operations."""
+        # 1. Setup Mocks
+        mock_get_trace_id.return_value = "main_trace_123"
+        
+        # Create dummy dataframes to avoid validation errors
+        dummy_df = pd.DataFrame({
+            'timestamp': pd.to_datetime(pd.date_range(start='2024-01-01', periods=180, freq='D')),
+            'open': [1.0] * 180, 'high': [1.0] * 180, 'low': [1.0] * 180, 'close': [1.0] * 180, 'volume': [1.0] * 180
+        })
+        mock_get_klines.return_value = dummy_df
+
+        # 2. Execute
+        market_data = self.service.get_market_data("BTCUSDT")
+
+        # 3. Assert
+        # Assert that get_trace_id was called to start the main operation
+        mock_get_trace_id.assert_called()
+        
+        # Assert that the main trace_id is stored in the final MarketDataSet
+        assert market_data.trace_id == "main_trace_123"
+
+        # Assert that _get_klines was called with the correct parent_trace_id
+        for call in mock_get_klines.call_args_list:
+            assert call.kwargs.get('parent_trace_id') == "main_trace_123"
+
 
 @pytest.mark.unit
 @pytest.mark.performance

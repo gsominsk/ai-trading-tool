@@ -11,6 +11,7 @@ Complete project history (928 lines before this optimization) is archived in [`m
 - All unit and integration tests (288 total) are passing, confirming the stability of the new architecture.
 
 ## Recent Changes (Last 10 Entries)
+[2025-08-09 00:01:00] - **Architectural Refactoring: Hierarchical Tracing**: Refactored the logging system to support hierarchical tracing. This involved simplifying `TraceGenerator` to produce a single `trace_id` and updating `MarketDataService` to propagate this `trace_id` as a `parent_trace_id` to all sub-operations. This change provides a clear parent-child relationship in logs, significantly improving debuggability and system observability. All related tests were updated or created, and the entire test suite is now passing.
 
 [2025-08-08 22:52:00] - **MILESTONE: Phase 4 (TradingCycle Refactoring) Completed**
 

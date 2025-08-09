@@ -22,7 +22,6 @@ from src.logging_system import (
     MarketDataLogger,
     flow_operation,
     get_trace_id,
-    get_flow_id,
     reset_trace_counter
 )
 from src.logging_system.flow_context import advance_to_stage
@@ -49,18 +48,6 @@ class TestTraceGeneration:
         assert trace_id1.endswith("0001")
         assert trace_id2.endswith("0002")
     
-    def test_flow_id_generation(self):
-        """Test flow ID format for different symbols."""
-        flow_id1 = get_flow_id("BTCUSDT")
-        flow_id2 = get_flow_id("", "enhanced_context")
-        
-        # Check format
-        assert flow_id1.startswith("flow_btc_")
-        assert flow_id2.startswith("flow_enhanced_context_")
-        
-        # Check timestamp inclusion
-        assert len(flow_id1.split("_")) == 3  # flow_btc_timestamp
-        assert len(flow_id2.split("_")) == 4  # flow_enhanced_context_timestamp
     
     def test_trace_id_thread_safety(self):
         """Test trace ID generation is thread-safe."""
@@ -108,8 +95,8 @@ class TestFlowContextManagement:
     
     def test_flow_operation_context_manager(self):
         """Test flow operation context manager."""
-        with flow_operation("BTCUSDT", "get_market_data") as flow_id:
-            assert flow_id.startswith("flow_btc_")
+        with flow_operation("BTCUSDT", "get_market_data") as trace_id:
+            assert trace_id.startswith("trd_")
             
             # Test stage advancement
             advance_to_stage("symbol_validation")
@@ -132,12 +119,12 @@ class TestFlowContextManagement:
                 advance_to_stage("inner_stage")
                 # Inner flow should be different
                 assert inner_flow != outer_flow
-                assert inner_flow.startswith("flow_eth_")
+                assert inner_flow.startswith("trd_")
     
     def test_empty_flow_operation(self):
         """Test flow operation with empty parameters."""
-        with flow_operation("", "") as flow_id:
-            assert flow_id.startswith("flow_")
+        with flow_operation("", "") as trace_id:
+            assert trace_id.startswith("trd_")
             advance_to_stage("test_stage")
 
 

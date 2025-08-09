@@ -411,7 +411,7 @@ class TestJSONSchemaValidation:
                 },
                 "trace_id": {
                     "type": "string",
-                    "pattern": r"^(trd_\d{3}_\d{14}\d{4}|flow_[a-z]{3}_\d{14}\d{3})$"
+                    "pattern": r"^trd_\d{3}_\d{14}\d{5}$"
                 },
                 "context": {
                     "type": "object"
@@ -423,7 +423,7 @@ class TestJSONSchemaValidation:
                 "flow": {
                     "type": "object",
                     "properties": {
-                        "flow_id": {"type": "string"},
+                        "trace_id": {"type": "string"},
                         "stage": {"type": "string"},
                         "previous_stage": {"type": ["string", "null"]},
                         "stages_completed": {
@@ -561,7 +561,7 @@ class TestJSONSchemaValidation:
         """Test flow context schema validation."""
         logger = get_ai_logger("flow_schema_test")
         
-        with flow_operation("ETHUSDT", "flow_schema_test") as flow_id:
+        with flow_operation("ETHUSDT", "flow_schema_test") as trace_id:
             from src.logging_system.flow_context import advance_to_stage
             advance_to_stage("validation")
             advance_to_stage("processing", api_calls=2)
@@ -589,9 +589,9 @@ class TestJSONSchemaValidation:
             pytest.fail(f"Flow context log does not conform to schema: {e.message}")
         
         # Verify flow context structure
-        assert "flow_id" in json_log["flow"]
+        assert "trace_id" in json_log["flow"]
         assert "stage" in json_log["flow"]
-        assert json_log["flow"]["flow_id"].startswith("flow_eth_")
+        assert json_log["flow"]["trace_id"].startswith("trd_")
     
     def test_trace_id_format_validation(self, capfd):
         """Test trace ID format validation."""
@@ -616,7 +616,7 @@ class TestJSONSchemaValidation:
         
         # Validate trace ID format
         import re
-        trace_pattern = r"^trd_\d{3}_\d{14}\d{4}$"
+        trace_pattern = r"^trd_\d{3}_\d{14}\d{5}$"
         for trace_id in trace_ids:
             assert trace_id is not None, "Trace ID should not be None"
             assert re.match(trace_pattern, trace_id), f"Invalid trace ID format: {trace_id}"

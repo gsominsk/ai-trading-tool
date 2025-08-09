@@ -369,7 +369,7 @@ class TestTradingLoggingIntegration:
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
         # Simulate complete market data workflow
-        with flow_operation("BTCUSDT", "get_market_data") as flow_id:
+        with flow_operation("BTCUSDT", "get_market_data") as trace_id:
             # Start operation
             service._log_operation_start("get_market_data", symbol="BTCUSDT")
             
@@ -462,7 +462,7 @@ class TestCompleteLoggingWorkflows:
         market_logger = MarketDataLogger("integration_test")
         service = MarketDataService(enable_logging=True, log_level="DEBUG")
         
-        with flow_operation("BTCUSDT", "complete_integration_test") as flow_id:
+        with flow_operation("BTCUSDT", "complete_integration_test") as trace_id:
             # Test all major logging components
             
             # 1. Basic logging
@@ -527,9 +527,9 @@ class TestCompleteLoggingWorkflows:
         assert any("RSI calculation completed" in msg for msg in log_messages)
         
         # Verify flow ID consistency
-        flow_ids = [log.get("flow", {}).get("flow_id") for log in json_logs if log.get("flow")]
-        unique_flow_ids = set(filter(None, flow_ids))
-        assert len(unique_flow_ids) >= 1, "Should have consistent flow IDs"
+        trace_ids_from_flow = [log.get("flow", {}).get("trace_id") for log in json_logs if log.get("flow")]
+        unique_flow_ids = set(filter(None, trace_ids_from_flow))
+        assert len(unique_flow_ids) >= 1, "Should have consistent trace IDs in flow"
         
         # Verify trace IDs are present and properly formatted (both old and new formats)
         trace_ids = [log.get("trace_id") for log in json_logs]
