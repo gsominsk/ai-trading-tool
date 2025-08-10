@@ -14,7 +14,7 @@ import requests
 from unittest.mock import patch, Mock, MagicMock
 from decimal import Decimal
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
 from src.market_data.exceptions import (
@@ -364,7 +364,7 @@ class TestProcessingErrorIntegration:
         with pytest.raises(ValueError) as exc_info:
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=df,
                 h4_candles=df,
                 h1_candles=df,
@@ -393,7 +393,7 @@ class TestProcessingErrorIntegration:
         with pytest.raises(DataFrameValidationError) as exc_info:
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=empty_df,  # Empty DataFrame
                 h4_candles=valid_df,
                 h1_candles=valid_df,

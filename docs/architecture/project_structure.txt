@@ -1,0 +1,138 @@
+# AI Trading System - Comprehensive Architecture
+# Status: [FINAL, DETAILED]
+# Description: This document provides a single, unified view of the system architecture.
+# It includes the hierarchical structure, a detailed breakdown of each component's
+# responsibilities, and a block diagram illustrating their interactions.
+
+---
+## 1. Hierarchical File Structure
+---
+[AI TRADING SYSTEM ROOT]
+|
++-- 📂 src/
+|   |
+|   +-- 📂 core/ - Core business logic and orchestration.
+|   |   |
+|   |   +-- 📂 trading_cycle/ - Central orchestrator.
+|   |   +-- 📂 execution/ - Manages order lifecycle (OMS).
+|   |   +-- 📂 risk_management/ - (Planned) Enforces risk rules.
+|   |
+|   +-- 📂 services/ - Supporting services.
+|   |   |
+|   |   +-- 📂 market_data/ - Fetches and prepares market data.
+|   |   +-- 📂 persistence/ - Handles data storage (Repositories).
+|   |   +-- 📂 logging_system/ - Manages structured logging.
+|   |   +-- 📂 ai_decision/ - Manages interaction with LLM providers.
+|   |
+|   +-- 📂 interfaces/ - Abstract interfaces for external services.
+|   |   |
+|   |   +-- 📜 exchange_interface.py - Contract for exchange communication.
+|   |   +-- 📜 llm_interface.py - Contract for AI model interaction.
+|   |
+|   +-- 📜 scheduler.py - Main entry point and trigger.
+|
++-- 📂 tests/
++-- 📂 data/
++-- 📂 config/
++-- 📂 docs/
++-- 📂 memory-bank/
+
+---
+## 2. Component Responsibilities
+---
+- **Scheduler**: The entry point of the system. Triggers the `TradingCycle` at regular intervals (e.g., every 15 minutes) for each specified trading symbol.
+
+- **TradingCycle**: The central orchestrator of the entire process for a single asset. It sequentially calls other services to get data, receive an AI decision, manage risk, and execute trades. It holds no business logic of its own, only coordinates the flow.
+
+- **MarketDataService**: Responsible for fetching all necessary market data (klines, indicators) from the exchange. It returns a clean, validated `MarketDataSet` object.
+
+- **AIDecisionService**: Prepares the context (market data, current position status) and creates a detailed prompt for the AI. It then calls the `LLMInterface` to get a decision.
+
+- **LLMInterface**: An abstract contract that defines how to interact with an AI model. This allows for different LLM providers (Claude, Gemini, etc.) to be used interchangeably.
+
+- **OMS (Order Management System)**: The internal "brain" for managing order **state and logic**. It answers questions like "Do we have an active order for BTC?" or "What is the status of order #123?". It **does not** communicate with the exchange directly. It decides *what* needs to be done (e.g., "place a buy order").
+
+- **OMSRepository**: Handles the persistence of the OMS's state. Its only job is to `save` and `load` the current state of all orders to/from `oms_state.csv`.
+
+- **ExchangeInterface**: A crucial abstraction layer. This is a "contract" that defines *how* to interact with any exchange (e.g., methods like `place_order`, `cancel_order`). The OMS depends on this contract, not on any specific exchange's implementation.
+
+- **Concrete Exchange Wrapper (e.g., `BinanceWrapper`)**: A class that *implements* the `ExchangeInterface`. This is where the actual API calls to a specific exchange (like Binance) happen. It translates the generic commands from the OMS (via the interface) into concrete HTTP requests.
+
+- **Logging System**: The official, immutable historical record of all system events. It uses hierarchical tracing to provide a complete audit trail of every trading cycle, making a separate trade log repository redundant.
+
+---
+## 3. System Block Diagram
+---
+# This diagram illustrates the final data flow and component interaction,
+# highlighting the separation between state logic (OMS) and execution (Interface).
+
++--------------------------+
+|   (Entry Point)          |
+|   Scheduler.py           |
++--------------------------+
+            |
+            | 1. Trigger Trading Cycle (for "BTC/USDT")
+            ▼
++--------------------------------------------------------------------------------+
+|                             (Orchestrator) core.TradingCycle                   |
++--------------------------------------------------------------------------------+
+    |
+    | 2. Get Current Position & Market Data
+    |
+    +----------------------> (Data) services.MarketData
+    |
+    +----------------------> (State) core.execution.OMS
+    |
+    | 3. Get AI Decision (Provide ALL context)
+    ▼
++---------------------------------+
+|   (Prompt Engine)               |
+|   services.ai_decision          |
++---------------------------------+
+    | 4. Call LLM via Abstraction
+    ▼
++---------------------------------+
+|   (Contract) interfaces.LLM     |
++---------------------------------+
+    | 5. Concrete Implementation
+    ▼
++---------------------------------+
+|   (e.g., Claude, Gemini)        |
++---------------------------------+
+    |
+    | 6. Return Signal (e.g., "BUY") to TradingCycle
+    ▼
++--------------------------------------------------------------------------------+
+|                             (Orchestrator) core.TradingCycle                   |
+|                                (Resumes Control)                               |
++--------------------------------------------------------------------------------+
+    |
+    | 7. Pre-trade Risk Check & Execution Decision
+    ▼
++--------------------------------------------------------------------+
+|                      (State Logic) core.execution.OMS              |
+|--------------------------------------------------------------------|
+| - Decides WHAT to do (e.g., "place order")                         |
+| - Calls the ExchangeInterface, NOT the direct API.                 |
+| - Injected with: `ExchangeInterface`, `OMSRepository`              |
++--------------------------------------------------------------------+
+    |                        |
+    | 8. Persist STATE             | 9. Execute ACTION via Contract
+    ▼                        ▼
++--------------------------+  +-----------------------------+
+| (Persistence)            |  | (Contract)                  |
+| services.OMSRepository   |  | interfaces.ExchangeInterface|
+|--------------------------|  +-----------------------------+
+| - Overwrites             |              | 10. Concrete API Call
+|   `oms_state.csv`        |              ▼
++--------------------------+  +-----------------------------+
+                            |  | (Worker) e.g. BinanceWrapper|
+                            |  |-----------------------------|
+                            |  | - Implements ExchangeInterface|
+                            |  | - Makes the real API call   |
+                            |  +-----------------------------+
+                            |              | 11. To Exchange
+                            |              ▼
+                            +->+-----------------------------+
+                               |    External Exchange API    |
+                               +-----------------------------+

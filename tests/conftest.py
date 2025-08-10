@@ -10,7 +10,7 @@ import json
 import tempfile
 import os
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any
 from unittest.mock import Mock, MagicMock
 from pathlib import Path
@@ -239,7 +239,7 @@ def sample_error_context():
         "trace_id": "error_trace_789",
         "operation": "test_operation",
         "symbol": "BTCUSDT",
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(timezone.utc),
         "system_info": {
             "python_version": "3.9.0",
             "platform": "test_platform"

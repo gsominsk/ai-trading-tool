@@ -5,6 +5,20 @@ Complete decision history with full details (approx. 522 lines before this optim
 
 ## Recent Decisions (Last 10 Entries)
 
+### [2025-08-09 23:22:00] - **Architectural Decision: Final Documentation and Diagram Enhancement**
+**Problem**: The architectural diagram, while functionally correct, lacked explicit textual descriptions of each component's role, leading to potential ambiguity (e.g., the exact responsibility of the OMS vs. the Exchange Interface).
+**Solution**: The main architectural document, `docs/architecture/project_structure.txt`, was significantly enhanced.
+1.  **Detailed Component Descriptions**: A new section, "Component Responsibilities," was added to explicitly define the role of each major part of the system, from the `Scheduler` to the `Concrete Exchange Wrapper`.
+2.  **Enhanced Block Diagram**: The system diagram was updated to be more explicit. It now visually distinguishes between component types (e.g., "Orchestrator", "State Logic", "Contract", "Worker") and clearly shows the full, decoupled data flow from the `OMS` to the `ExchangeInterface` and finally to the `Concrete Exchange Wrapper`, which makes the actual API call.
+**Result**: The project now has a comprehensive, unambiguous, and self-contained architectural document that serves as a clear blueprint for development and onboarding, fully clarifying the separation of concerns within the system.
+
+### [2025-08-09 23:15:00] - **Architectural Decision: Persistence Simplification & Finalization**
+**Problem**: The existing architectural diagram and persistence strategy were overly complex and contained contradictions. The `TradeLogRepository` duplicated the function of the main logging system, and the `OMSRepository`'s data format (JSON) was not aligned with the final requirements.
+**Solution**: A definitive simplification of the persistence layer was implemented, based on direct user feedback.
+1.  **`TradeLogRepository` Abolished**: The concept of a separate repository for historical trade logs has been completely removed. The primary, hierarchical logging system is now the sole source of truth for the historical audit trail of all trading cycle events. This eliminates redundancy and simplifies the architecture, aligning with the decision made on [2025-08-06 18:41:00].
+2.  **`OMSRepository` Format Changed to CSV**: The `OMSRepository`, which is responsible for managing the **current state** of orders, will now use a CSV file (`oms_state.csv`) as its persistence mechanism. This decision supersedes the previous decision ([2025-08-06 23:16:00]) to use JSON. The repository will overwrite the CSV file to reflect the latest state.
+**Result**: The architecture is now cleaner, more logical, and free of contradictions. The roles of each component are clearly defined: `OMSRepository` handles the current state, and the global `Logging System` handles the historical record. The master architectural document, `docs/architecture/project_structure.txt`, has been updated to reflect this final design.
+
 [2025-08-06 23:16:41] - Принято решение реализовать персистентность OMS через паттерн "Репозиторий". Создается отдельный класс `OrderRepository` для инкапсуляции логики сохранения/загрузки состояния ордеров. Это разделяет ответственности и повышает гибкость системы по сравнению с хранением логики персистентности внутри `OMS`.
 
 ### [2025-08-06 23:16:00] - **Architectural Decision: OMS Persistence via Repository Pattern**
@@ -107,3 +121,15 @@ Complete decision history with full details (approx. 522 lines before this optim
 
 ---
 *Optimized on 2025-08-06: Reduced from 522 lines to an optimized version with a historical index. Full content is preserved in the archive.*
+
+[2025-08-09 22:14:57] - [ARCHITECTURAL BLUEPRINT ESTABLISHED] - Decided to move from a simple component list to a full hierarchical architecture plan. A new file, `docs/architecture/project_structure.txt`, has been created to serve as the blueprint for all future development. It defines a clear, modular, and scalable structure, separating concerns into distinct layers: Core Services, Data Handling, Trading Logic, and Analysis. This plan introduces several key new modules to be developed: Configuration Service, Notification Service, Strategy Engine, Risk Management, Backtesting Engine, and Performance Analyzer.
+
+[2025-08-09 22:17:39] - [ARCHITECTURAL REVISION] - Based on user feedback and a thorough review of the Memory Bank, the previously proposed architecture in `project_structure.txt` was revised. The initial plan was found to be overly complex and inconsistent with the key decision to simplify the trading engine for the MVP (Decision Log: 2025-08-06 18:41:00). The architecture has been corrected to a leaner, more focused structure that accurately reflects the project's established goals. Auxiliary modules like Backtesting and Performance Analysis have been explicitly separated from the core operational loop.
+
+[2025-08-10 00:01:00] - **Decision**: The custom logging framework's `MarketDataLogger` should be used semantically. Instead of adding generic `.info()` methods or accessing the inner logger (`.logger.info()`), the correct approach for informational messages that represent a specific event is to use an existing high-level method like `log_operation_start`.
+**Rationale**: This adheres to the framework's design of logging meaningful, structured events rather than simple text messages. It makes logs more valuable for AI analysis and avoids modifying the core logging system for one-off cases. This decision was reached after multiple incorrect attempts to fix a logging error in `trading_cycle.py`.
+
+[2025-08-10 00:14:00] - **Decision**: The `OmsRepository` will be migrated from a CSV-based persistence mechanism to SQLite.
+**Rationale**: Analysis of the CSV implementation revealed significant risks regarding data integrity, type safety, and fragility when handling schema changes. SQLite provides ACID guarantees, strong data typing, and efficient row-level updates (`INSERT OR REPLACE`), making it a vastly more robust and scalable solution for managing OMS state. This decision was made after a critical review of the CSV repository's readiness for production.
+
+[2025-08-10 00:26:30] - **Status**: The migration of `OmsRepository` to SQLite (Phase 7) has been successfully completed. The new implementation passed all unit and integration tests.

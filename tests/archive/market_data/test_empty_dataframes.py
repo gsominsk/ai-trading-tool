@@ -1,6 +1,6 @@
 import pandas as pd
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from src.market_data.market_data_service import MarketDataSet
 
 def test_empty_dataframes():
@@ -14,7 +14,7 @@ def test_empty_dataframes():
         # Попытка создать MarketDataSet с пустыми данными
         market_data = MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=empty_df,
             h4_candles=empty_df,
             h1_candles=empty_df,
@@ -44,7 +44,7 @@ def test_empty_dataframes():
     try:
         market_data = MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=empty_df,
             h4_candles=empty_df,
             h1_candles=empty_df,

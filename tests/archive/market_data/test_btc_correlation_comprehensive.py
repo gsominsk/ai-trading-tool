@@ -7,7 +7,7 @@ import pytest
 import pandas as pd
 from unittest.mock import Mock, patch, call
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 from src.market_data.market_data_service import MarketDataService
@@ -24,7 +24,7 @@ class TestBTCCorrelationComprehensive:
                              correlation_factor: float = 0.8, volatility: float = 0.02) -> List[List[str]]:
         """Generate test klines with controlled correlation to BTC-like pattern."""
         klines = []
-        current_time = int((datetime.utcnow() - timedelta(hours=count)).timestamp() * 1000)
+        current_time = int((datetime.now(timezone.utc) - timedelta(hours=count)).timestamp() * 1000)
         
         # Generate BTC-like base pattern
         btc_changes = []
@@ -262,7 +262,7 @@ class TestBTCCorrelationComprehensive:
         btc_klines = []
         for i in range(30):
             btc_klines.append([
-                int((datetime.utcnow() - timedelta(hours=30-i)).timestamp() * 1000),
+                int((datetime.now(timezone.utc) - timedelta(hours=30-i)).timestamp() * 1000),
                 "50000.00000000", "50000.00000000", "50000.00000000", "50000.00000000",
                 "1000.00000000", 0, "0", 0, "0", "0", "0"
             ])

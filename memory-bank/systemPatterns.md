@@ -241,10 +241,10 @@ Recent 5, Extremes, High Volume, Big Moves, Patterns, S/R Tests, Deduplication
 *Optimized 2025-08-05: Reduced from 599 lines to essential patterns + archive reference*
 
 ---
-### [2025-08-09 19:02:50] - Preferred Diagramming Format
+### [2025-08-09 19:21:54] - Preferred Diagramming Format (UPDATED)
 
-**Pattern:** All new architectural or explanatory diagrams should be created using the **PlantUML (`.puml`)** format.
+**Pattern:** All new architectural or explanatory diagrams should be created using **ASCII art** inside a Markdown (`.md`) file.
 
-**Rationale:** This format has been successfully set up in the user's environment and provides a good balance of complexity and readability. It is the most reliable and preferred method for visualization.
+**Rationale:** Previous attempts to use PlantUML (`.puml`) have consistently failed due to syntax errors and tool incompatibility. ASCII art is a simple, reliable, and tool-independent format that guarantees readability and avoids technical issues.
 
-**Implementation:** When a request to "draw" or "visualize" a concept is made, default to creating a `.puml` file.
+**Implementation:** When a request to "draw" or "visualize" a concept is made, create a new `.md` file and draw the diagram using ASCII characters.

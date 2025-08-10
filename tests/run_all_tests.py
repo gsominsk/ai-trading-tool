@@ -46,13 +46,13 @@ class AITradingTestRunner:
                     'tests/unit/logging/test_http_filter.py',
                     'tests/unit/logging/test_operation_context.py',
                     'tests/unit/logging/test_raw_data_logging.py',
+                    'tests/unit/logging/test_trace_generator.py',
                     'tests/unit/market_data/test_market_data_core.py',
                     'tests/unit/market_data/test_market_data_api.py',
                     'tests/unit/market_data/test_market_data_edge_cases.py',
                     'tests/unit/test_timing_validation.py',
-                    'tests/unit/trading/test_log_repository.py',
                     'tests/unit/trading/test_trading_cycle.py',
-                    'tests/unit/trading/test_repository.py',
+                    'tests/unit/trading/test_oms_repository_sqlite.py',
                 ]
             },
             'integration': {
@@ -134,7 +134,7 @@ class AITradingTestRunner:
                 'error': 'File not found'
             }
         
-        cmd = ["python3", "-m", "pytest", str(test_file)]
+        cmd = [sys.executable, "-m", "pytest", str(test_file)]
         if verbose:
             cmd.append("-v")
         else:
@@ -212,7 +212,7 @@ class AITradingTestRunner:
             # Use all existing test files
             test_files = [f for f in self.discover_tests() if os.path.exists(f)]
         
-        cmd = ["python3", "-m", "pytest"] + test_files + [
+        cmd = [sys.executable, "-m", "pytest"] + test_files + [
             "--cov=src",
             "--cov-report=term-missing",
             "--cov-report=html:htmlcov",

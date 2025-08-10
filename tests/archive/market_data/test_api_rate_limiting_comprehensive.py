@@ -7,7 +7,7 @@ import pytest
 import pandas as pd
 from unittest.mock import Mock, patch, call
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import threading
 from typing import List, Dict, Any
@@ -28,7 +28,7 @@ class TestAPIRateLimitingComprehensive:
         test_data = []
         for i in range(30):  # Minimum required for validation
             candle_data = {
-                'timestamp': datetime.utcnow() - timedelta(hours=i+2),
+                'timestamp': datetime.now(timezone.utc) - timedelta(hours=i+2),
                 'open': 50000.0,
                 'high': 50001.0,
                 'low': 49999.0,
@@ -41,7 +41,7 @@ class TestAPIRateLimitingComprehensive:
         
         return MarketDataSet(
             symbol=symbol,
-            timestamp=datetime.utcnow() - timedelta(minutes=30),
+            timestamp=datetime.now(timezone.utc) - timedelta(minutes=30),
             daily_candles=test_df.copy(),
             h4_candles=test_df.copy(),
             h1_candles=test_df.copy(),

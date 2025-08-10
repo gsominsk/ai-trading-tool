@@ -13,7 +13,7 @@ Consolidated from archived tests covering:
 import pytest
 import pandas as pd
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
 
@@ -312,7 +312,7 @@ class TestMarketDataServiceIntegration:
             assert isinstance(result.timestamp, datetime)
             
             # Timestamp should be recent (within last hour)
-            time_diff = datetime.utcnow() - result.timestamp
+            time_diff = datetime.now(timezone.utc) - result.timestamp
             assert time_diff.total_seconds() < 3600  # Less than 1 hour
     
     # =================

@@ -4,7 +4,7 @@ Tests real-world scenarios and edge cases to verify validation works correctly.
 """
 
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from src.market_data.market_data_service import MarketDataSet
 
@@ -23,7 +23,7 @@ def create_valid_dataframe(num_rows=50):
         volume = 1000.0 + (i * 10)
         
         data.append({
-            'timestamp': datetime.utcnow() - timedelta(hours=num_rows-i),
+            'timestamp': datetime.now(timezone.utc) - timedelta(hours=num_rows-i),
             'open': open_price,
             'high': high_price,
             'low': low_price,
@@ -41,7 +41,7 @@ def test_valid_creation():
     try:
         market_data = MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(50),
             h4_candles=create_valid_dataframe(30),
             h1_candles=create_valid_dataframe(20),
@@ -70,7 +70,7 @@ def test_timestamp_validation():
     
     # Test too old timestamp
     try:
-        old_timestamp = datetime.utcnow() - timedelta(days=35)
+        old_timestamp = datetime.now(timezone.utc) - timedelta(days=35)
         MarketDataSet(
             symbol="BTCUSDT",
             timestamp=old_timestamp,
@@ -94,7 +94,7 @@ def test_timestamp_validation():
     
     # Test future timestamp
     try:
-        future_timestamp = datetime.utcnow() + timedelta(hours=2)
+        future_timestamp = datetime.now(timezone.utc) + timedelta(hours=2)
         MarketDataSet(
             symbol="BTCUSDT",
             timestamp=future_timestamp,
@@ -128,7 +128,7 @@ def test_dataframe_validation():
         empty_df = pd.DataFrame()
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=empty_df,
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -152,7 +152,7 @@ def test_dataframe_validation():
         small_df = create_valid_dataframe(5)  # Less than minimum 30 for daily
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=small_df,
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -182,7 +182,7 @@ def test_decimal_validation():
     try:
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(),
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -205,7 +205,7 @@ def test_decimal_validation():
     try:
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(),
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -235,7 +235,7 @@ def test_cross_field_consistency():
     try:
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(),
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -260,7 +260,7 @@ def test_cross_field_consistency():
     try:
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(),
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -290,7 +290,7 @@ def test_edge_cases():
     try:
         MarketDataSet(
             symbol="ETHUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(),
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),
@@ -314,7 +314,7 @@ def test_edge_cases():
     try:
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=create_valid_dataframe(),
             h4_candles=create_valid_dataframe(),
             h1_candles=create_valid_dataframe(),

@@ -6,7 +6,7 @@ Tests the critical _analyze_volume_profile() method that has NO current test cov
 import pytest
 import pandas as pd
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 from src.market_data.market_data_service import MarketDataService
@@ -24,7 +24,7 @@ class TestVolumeProfileComprehensive:
         if hours_back is None:
             hours_back = len(volumes)
         
-        base_time = datetime.utcnow() - timedelta(hours=hours_back)
+        base_time = datetime.now(timezone.utc) - timedelta(hours=hours_back)
         
         data = []
         for i, volume in enumerate(volumes):

@@ -136,7 +136,7 @@ class TestErrorContext:
         assert len(context.trace_id) == 12  # "err_" + 8 hex chars
         
         # Check timestamp format (ISO format with Z)
-        assert context.timestamp.endswith("Z")
+        assert "+00:00" in context.timestamp or context.timestamp.endswith("Z")
         
         # Check system info structure
         system_info = context.system_info

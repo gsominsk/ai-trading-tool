@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, call
 from src.trading.trading_cycle import TradingCycle
-from src.trading.log_repository import TradeLogRepository
 from src.trading.oms import OrderManagementSystem
 from src.market_data.market_data_service import MarketDataService
 
@@ -14,45 +13,36 @@ def mock_oms():
 def mock_market_data_service():
     """Fixture for a mocked MarketDataService."""
     mock = MagicMock(spec=MarketDataService)
-    # Mock a basic MarketDataSet for the service to return
     mock_market_data = MagicMock()
     mock_market_data.h1_candles = MagicMock()
     mock_market_data.h1_candles.empty = False
-    # Correctly mock the return value for the chained call `...['close'].iloc[-1]`
     mock_market_data.h1_candles.__getitem__.return_value.iloc.__getitem__.return_value = 52000.0
     mock.get_market_data.return_value = mock_market_data
     return mock
 
 @pytest.fixture
-def mock_log_repository():
-    """Fixture for a mocked TradeLogRepository."""
-    return MagicMock(spec=TradeLogRepository)
-
-@pytest.fixture
-def trading_cycle(mock_oms, mock_market_data_service, mock_log_repository):
+def trading_cycle(mock_oms, mock_market_data_service):
     """Fixture to create a TradingCycle instance with mocked dependencies."""
     return TradingCycle(
         oms=mock_oms,
-        market_data_service=mock_market_data_service,
-        log_repository=mock_log_repository
+        market_data_service=mock_market_data_service
     )
 
-def test_run_cycle_no_pending_order_buy_decision(trading_cycle, mock_oms, mock_log_repository):
+def test_run_cycle_no_active_order_buy_decision(trading_cycle, mock_oms):
     """
-    Тест 1: Проверяет стандартный цикл покупки при отсутствии PENDING ордеров.
+    Тест 1: Проверяет стандартный цикл покупки при отсутствии активных ордеров.
     """
-    # Подготовка: нет PENDING ордеров
-    mock_log_repository.get_last_record.return_value = None
-    mock_oms.place_order.return_value = 'new-order-123'
+    # Подготовка: OMS не возвращает активных ордеров для символа
+    mock_oms.get_order_by_symbol.return_value = None
 
     # Действие
     trading_cycle.run_cycle()
 
     # Проверка
-    # 1. Проверить, что был запрошен последний лог
-    mock_log_repository.get_last_record.assert_called_once()
+    # 1. Проверить, что был запрошен ордер по символу
+    mock_oms.get_order_by_symbol.assert_called_once_with("BTCUSDT")
     
-    # 2. Проверить, что был размещен ордер
+    # 2. Проверить, что был размещен новый ордер
     mock_oms.place_order.assert_called_once_with(
         symbol="BTCUSDT",
         order_type='BUY',
@@ -60,71 +50,39 @@ def test_run_cycle_no_pending_order_buy_decision(trading_cycle, mock_oms, mock_l
         price=52000.0
     )
 
-    # 3. Проверить, что новый ордер был залогирован как PENDING
-    mock_log_repository.add_record.assert_called_once_with({
-        'order_id': 'new-order-123',
-        'symbol': 'BTCUSDT',
-        'order_type': 'BUY',
-        'price': 52000.0,
-        'quantity': 0.01,
-        'status': 'PENDING'
-    })
-
-def test_run_cycle_with_pending_order_syncs_to_filled(trading_cycle, mock_oms, mock_log_repository):
+def test_run_cycle_with_pending_order_syncs_it(trading_cycle, mock_oms):
     """
-    Тест 2: Проверяет синхронизацию, если в логе есть PENDING ордер, который стал FILLED.
+    Тест 2: Проверяет, что цикл синхронизирует PENDING ордер и завершается.
     """
-    # Подготовка: в логе есть PENDING ордер
-    pending_order = {
-        'order_id': 'pending-order-456',
-        'symbol': 'ETHUSDT',
-        'order_type': 'BUY',
-        'price': '3000.0',
-        'quantity': '0.5',
-        'status': 'PENDING'
-    }
-    mock_log_repository.get_last_record.return_value = pending_order
-    # OMS сообщает, что ордер теперь FILLED
-    mock_oms.get_order_status.return_value = 'FILLED'
+    # Подготовка: OMS возвращает PENDING ордер
+    pending_order = {'order_id': 'pending-order-456', 'status': 'PENDING'}
+    mock_oms.get_order_by_symbol.return_value = pending_order
 
     # Действие
     trading_cycle.run_cycle()
 
     # Проверка
-    # 1. Проверить, что был запрошен статус ордера
+    # 1. Проверить, что был запрошен статус ордера для синхронизации
     mock_oms.get_order_status.assert_called_once_with('pending-order-456')
 
-    # 2. Проверить, что лог был обновлен новым статусом
-    mock_log_repository.add_record.assert_called_once_with({
-        'order_id': 'pending-order-456',
-        'symbol': 'ETHUSDT',
-        'order_type': 'BUY',
-        'price': '3000.0',
-        'quantity': '0.5',
-        'status': 'FILLED'
-    })
-
-    # 3. Проверить, что новый ордер НЕ размещался, так как цикл завершился после синхронизации
+    # 2. Проверить, что новый ордер НЕ размещался, так как цикл был занят синхронизацией
     mock_oms.place_order.assert_not_called()
 
-def test_run_cycle_with_pending_order_remains_pending(trading_cycle, mock_oms, mock_log_repository):
+def test_run_cycle_with_filled_order_does_nothing(trading_cycle, mock_oms):
     """
-    Тест 3: Проверяет, что ничего не происходит, если PENDING ордер все еще PENDING.
+    Тест 3: Проверяет, что цикл ничего не делает, если уже есть исполненный ордер.
+    (В будущем здесь может быть логика продажи).
     """
-    # Подготовка: PENDING ордер все еще PENDING
-    pending_order = {'order_id': 'pending-order-789', 'status': 'PENDING'}
-    mock_log_repository.get_last_record.return_value = pending_order
-    mock_oms.get_order_status.return_value = 'PENDING'
+    # Подготовка: OMS возвращает FILLED ордер
+    filled_order = {'order_id': 'filled-order-789', 'status': 'FILLED'}
+    mock_oms.get_order_by_symbol.return_value = filled_order
 
     # Действие
     trading_cycle.run_cycle()
 
     # Проверка
-    # 1. Проверить, что был запрошен статус ордера
-    mock_oms.get_order_status.assert_called_once_with('pending-order-789')
+    # 1. Проверить, что статус PENDING ордера НЕ запрашивался
+    mock_oms.get_order_status.assert_not_called()
 
-    # 2. Проверить, что лог НЕ обновлялся
-    mock_log_repository.add_record.assert_not_called()
-
-    # 3. Проверить, что новый ордер НЕ размещался
+    # 2. Проверить, что новый ордер НЕ размещался
     mock_oms.place_order.assert_not_called()

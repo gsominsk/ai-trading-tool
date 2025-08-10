@@ -12,7 +12,7 @@ Includes technical indicators and market context for comprehensive analysis.
 import requests
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, NamedTuple
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
@@ -89,7 +89,7 @@ class MarketDataSet:
             raise ValueError("Timestamp must be a datetime object")
         
         # Check if timestamp is not too far in the past or future
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         max_past = timedelta(days=30)  # Allow up to 30 days old data
         max_future = timedelta(hours=1)  # Allow up to 1 hour in future (timezone tolerance)
         
@@ -575,7 +575,7 @@ class MarketDataService:
             
             market_data_set = MarketDataSet(
                 symbol=symbol,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=daily_data,
                 h4_candles=h4_data,
                 h1_candles=h1_data,
@@ -707,7 +707,7 @@ class MarketDataService:
         except (ValidationError, NetworkError, ProcessingError) as e:
             return f"""
 MARKET DATA ANALYSIS FOR {symbol}
-Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 ❌ {type(e).__name__.upper()}: {str(e)[:200]}
 Trace ID: {trace_id}
@@ -723,7 +723,7 @@ Please check network, symbol, or data availability.
         except Exception as e:
             return f"""
 CRITICAL ERROR: MARKET DATA ANALYSIS FOR {symbol}
-Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 ❌ Unable to fetch market data for {symbol}
 Error: {str(e)[:200]}
@@ -1364,7 +1364,7 @@ Please check system logs and contact support.
                 # Create basic market data with graceful defaults for enhanced features
                 market_data = MarketDataSet(
                     symbol=symbol,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     daily_candles=daily_data,
                     h4_candles=h4_data,
                     h1_candles=h1_data,
@@ -1485,7 +1485,7 @@ Please check system logs and contact support.
             "failed_component": failed_component,
             "fallback_used": fallback_used,
             "trace_id": trace_id or self._current_trace_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             **kwargs
         })
         
@@ -1534,7 +1534,7 @@ Please check system logs and contact support.
                     "analysis_data": analysis_data,
                     "decision": decision,
                     "confidence": confidence,
-                    "analysis_timestamp": datetime.utcnow().isoformat()
+                    "analysis_timestamp": datetime.now(timezone.utc).isoformat()
                 },
                 data_stats={
                     "symbol": symbol,

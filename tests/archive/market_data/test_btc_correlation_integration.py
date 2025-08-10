@@ -5,7 +5,7 @@ Verifies that hardcoded mock values have been removed and replaced with actual c
 
 import pandas as pd
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from src.market_data.market_data_service import MarketDataService
 
@@ -15,7 +15,7 @@ def create_test_dataframe(prices, symbol_name="TEST"):
     data = []
     for i, price in enumerate(prices):
         data.append({
-            'timestamp': datetime.utcnow() - timedelta(hours=len(prices)-i),
+            'timestamp': datetime.now(timezone.utc) - timedelta(hours=len(prices)-i),
             'open': price,
             'high': price + 1,
             'low': price - 1,

@@ -7,7 +7,7 @@ import pytest
 import pandas as pd
 from unittest.mock import Mock, patch, call
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 import time
 
@@ -24,7 +24,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
     def _create_large_market_dataset(self, num_candles: int = 1000) -> MarketDataSet:
         """Create a large MarketDataSet for performance testing."""
         # Ensure we have enough data for validation
-        base_time = datetime.utcnow() - timedelta(hours=2)
+        base_time = datetime.now(timezone.utc) - timedelta(hours=2)
         
         # Calculate minimum required rows
         min_daily = max(30, num_candles // 24 + 1)
@@ -80,7 +80,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         
         return MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow() - timedelta(hours=2),
+            timestamp=datetime.now(timezone.utc) - timedelta(hours=2),
             daily_candles=daily_df,
             h4_candles=h4_df,
             h1_candles=h1_df,
@@ -99,7 +99,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         minimal_data = []
         for i in range(30):  # Minimum required for validation
             candle_data = {
-                'timestamp': datetime.utcnow() - timedelta(hours=i+2),
+                'timestamp': datetime.now(timezone.utc) - timedelta(hours=i+2),
                 'open': 50000.0,
                 'high': 50001.0,
                 'low': 49999.0,
@@ -112,7 +112,7 @@ class TestEnhancedContextEdgeCasesComprehensive:
         
         return MarketDataSet(
             symbol="TESTUSDT",
-            timestamp=datetime.utcnow() - timedelta(minutes=30),
+            timestamp=datetime.now(timezone.utc) - timedelta(minutes=30),
             daily_candles=minimal_df.copy(),
             h4_candles=minimal_df.copy(),
             h1_candles=minimal_df.copy(),

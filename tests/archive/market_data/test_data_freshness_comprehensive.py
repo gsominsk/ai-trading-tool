@@ -7,7 +7,7 @@ import pytest
 import pandas as pd
 from unittest.mock import Mock, patch
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
@@ -52,7 +52,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_fresh_data_acceptance(self):
         """Test that fresh data (recent timestamps) is accepted."""
-        fresh_timestamp = datetime.utcnow() - timedelta(minutes=10)
+        fresh_timestamp = datetime.now(timezone.utc) - timedelta(minutes=10)
         fresh_dataset = self._create_market_dataset_with_timestamp(fresh_timestamp)
         
         with patch.object(self.service, 'get_market_data', return_value=fresh_dataset):
@@ -69,7 +69,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_stale_data_detection(self):
         """Test detection of stale data (old timestamps)."""
-        stale_timestamp = datetime.utcnow() - timedelta(hours=25)  # Beyond 24h limit
+        stale_timestamp = datetime.now(timezone.utc) - timedelta(hours=25)  # Beyond 24h limit
         stale_dataset = self._create_market_dataset_with_timestamp(stale_timestamp)
         
         # Should handle stale data gracefully (validation in MarketDataSet.__post_init__)
@@ -87,7 +87,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_data_age_validation(self):
         """Test validation of data age across different scenarios."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         test_cases = [
             ("fresh", now - timedelta(minutes=5), True),
@@ -118,7 +118,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_future_timestamp_rejection(self):
         """Test rejection of data with future timestamps."""
-        future_timestamp = datetime.utcnow() + timedelta(hours=2)
+        future_timestamp = datetime.now(timezone.utc) + timedelta(hours=2)
         
         try:
             future_dataset = self._create_market_dataset_with_timestamp(future_timestamp)
@@ -133,7 +133,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_timestamp_consistency_across_timeframes(self):
         """Test that timestamps are consistent across different timeframes."""
-        base_timestamp = datetime.utcnow() - timedelta(minutes=15)
+        base_timestamp = datetime.now(timezone.utc) - timedelta(minutes=15)
         dataset = self._create_market_dataset_with_timestamp(base_timestamp)
         
         with patch.object(self.service, 'get_market_data', return_value=dataset):
@@ -147,7 +147,7 @@ class TestDataFreshnessComprehensive:
             h1_timestamps = pd.to_datetime(result.h1_candles['timestamp'])
             
             # All timestamps should be in the past
-            now = pd.Timestamp(datetime.utcnow())
+            now = pd.Timestamp(datetime.now(timezone.utc))
             assert all(ts <= now for ts in daily_timestamps), "Daily timestamps should be in the past"
             assert all(ts <= now for ts in h4_timestamps), "H4 timestamps should be in the past"
             assert all(ts <= now for ts in h1_timestamps), "H1 timestamps should be in the past"
@@ -155,7 +155,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_data_freshness_in_enhanced_context(self):
         """Test that data freshness is considered in enhanced context generation."""
-        fresh_timestamp = datetime.utcnow() - timedelta(minutes=5)
+        fresh_timestamp = datetime.now(timezone.utc) - timedelta(minutes=5)
         fresh_dataset = self._create_market_dataset_with_timestamp(fresh_timestamp)
         
         with patch.object(self.service, 'get_market_data', return_value=fresh_dataset):
@@ -169,7 +169,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_data_freshness_performance_impact(self):
         """Test that freshness checks don't significantly impact performance."""
-        fresh_dataset = self._create_market_dataset_with_timestamp(datetime.utcnow() - timedelta(minutes=5))
+        fresh_dataset = self._create_market_dataset_with_timestamp(datetime.now(timezone.utc) - timedelta(minutes=5))
         
         with patch.object(self.service, 'get_market_data', return_value=fresh_dataset):
             start_time = time.time()
@@ -189,7 +189,7 @@ class TestDataFreshnessComprehensive:
     @pytest.mark.unit
     def test_mixed_timestamp_scenarios(self):
         """Test scenarios with mixed fresh and stale data."""
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         mixed_dataset = self._create_market_dataset_with_timestamp(base_time - timedelta(minutes=10))
         
         # Modify some candle timestamps
@@ -208,7 +208,7 @@ class TestDataFreshnessComprehensive:
     def test_data_freshness_configuration_validation(self):
         """Test that data freshness validation is properly configured."""
         # Test that the service validates data freshness appropriately
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Test various age thresholds based on actual validation rules
         age_tests = [

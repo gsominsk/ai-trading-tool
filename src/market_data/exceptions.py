@@ -16,7 +16,7 @@ Design Principles:
 import sys
 import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
 
@@ -40,7 +40,7 @@ class ErrorContext:
         """
         self.trace_id = trace_id or f"err_{uuid.uuid4().hex[:8]}"
         self.operation = operation
-        self.timestamp = datetime.utcnow().isoformat() + "Z"
+        self.timestamp = datetime.now(timezone.utc).isoformat()
         self.system_info = self._collect_system_info()
         self.stack_trace = self._get_stack_trace()
     

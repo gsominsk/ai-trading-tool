@@ -6,7 +6,7 @@ decimal fields, optional fields, and cross-field consistency.
 
 import pytest
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from src.market_data.market_data_service import MarketDataSet
 
@@ -28,7 +28,7 @@ class TestMarketDataSetValidation:
             volume = 1000.0 + (i * 10)
             
             data.append({
-                'timestamp': datetime.utcnow() - timedelta(hours=num_rows-i),
+                'timestamp': datetime.now(timezone.utc) - timedelta(hours=num_rows-i),
                 'open': open_price,
                 'high': high_price,
                 'low': low_price,
@@ -46,7 +46,7 @@ class TestMarketDataSetValidation:
         
         return MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=daily_df,
             h4_candles=h4_df,
             h1_candles=h1_df,
@@ -88,7 +88,7 @@ class TestMarketDataSetValidation:
     
     def test_timestamp_validation_too_old(self):
         """Test timestamp validation with too old timestamp."""
-        old_timestamp = datetime.utcnow() - timedelta(days=35)
+        old_timestamp = datetime.now(timezone.utc) - timedelta(days=35)
         
         with pytest.raises(ValueError, match="Timestamp too old"):
             MarketDataSet(
@@ -106,7 +106,7 @@ class TestMarketDataSetValidation:
     
     def test_timestamp_validation_too_future(self):
         """Test timestamp validation with future timestamp."""
-        future_timestamp = datetime.utcnow() + timedelta(hours=2)
+        future_timestamp = datetime.now(timezone.utc) + timedelta(hours=2)
         
         with pytest.raises(ValueError, match="Timestamp too far in future"):
             MarketDataSet(
@@ -129,7 +129,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="daily_candles must be a pandas DataFrame"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=[],  # List instead of DataFrame
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -147,7 +147,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="daily_candles cannot be empty"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=empty_df,
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -165,7 +165,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="daily_candles must have at least 30 rows"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=small_df,
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -182,7 +182,7 @@ class TestMarketDataSetValidation:
         data = []
         for i in range(40):  # Enough rows to pass minimum check
             data.append({
-                'timestamp': datetime.utcnow() - timedelta(hours=40-i),
+                'timestamp': datetime.now(timezone.utc) - timedelta(hours=40-i),
                 'open': 100.0 + i,
                 'high': 101.0 + i
                 # Missing 'low', 'close', 'volume'
@@ -192,7 +192,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="daily_candles missing required columns"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=df_missing_cols,
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -210,7 +210,7 @@ class TestMarketDataSetValidation:
         for i in range(40):  # Enough rows to pass minimum check
             if i == 0:  # First row has invalid OHLC
                 data.append({
-                    'timestamp': datetime.utcnow() - timedelta(hours=40-i),
+                    'timestamp': datetime.now(timezone.utc) - timedelta(hours=40-i),
                     'open': 100.0,
                     'high': 99.0,   # High less than open (invalid)
                     'low': 98.0,
@@ -219,7 +219,7 @@ class TestMarketDataSetValidation:
                 })
             else:  # Other rows are valid
                 data.append({
-                    'timestamp': datetime.utcnow() - timedelta(hours=40-i),
+                    'timestamp': datetime.now(timezone.utc) - timedelta(hours=40-i),
                     'open': 100.0 + i,
                     'high': 102.0 + i,
                     'low': 99.0 + i,
@@ -231,7 +231,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="has invalid OHLC data: high < max"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=invalid_df,
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -249,7 +249,7 @@ class TestMarketDataSetValidation:
         for i in range(40):  # Enough rows to pass minimum check
             volume = -1000.0 if i == 0 else 1000.0 + i  # First row has negative volume
             data.append({
-                'timestamp': datetime.utcnow() - timedelta(hours=40-i),
+                'timestamp': datetime.now(timezone.utc) - timedelta(hours=40-i),
                 'open': 100.0 + i,
                 'high': 102.0 + i,
                 'low': 99.0 + i,
@@ -261,7 +261,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="has negative volume values"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=df_negative_vol,
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -279,7 +279,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="ma_20 must be Decimal"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -295,7 +295,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="ma_20 must be positive"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -311,7 +311,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="ma_20 too large"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -329,7 +329,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="btc_correlation must be Decimal"):
             MarketDataSet(
                 symbol="ETHUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -346,7 +346,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="btc_correlation must be between -1 and 1"):
             MarketDataSet(
                 symbol="ETHUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -363,7 +363,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="fear_greed_index must be int"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -380,7 +380,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="fear_greed_index must be between 0 and 100"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -399,7 +399,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="Support level .* must be lower than resistance level"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -417,7 +417,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="MA trend is uptrend but MA20.*not significantly above MA50"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -433,7 +433,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="MA trend is downtrend but MA20.*not significantly below MA50"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=self._create_valid_dataframe(),
@@ -451,7 +451,7 @@ class TestMarketDataSetValidation:
         for i in range(15):  # Enough rows to pass minimum check
             if i == 14:  # Last row (recent price) very different from MA
                 data.append({
-                    'timestamp': datetime.utcnow() - timedelta(hours=15-i),
+                    'timestamp': datetime.now(timezone.utc) - timedelta(hours=15-i),
                     'open': 200.0,    # Price around 200
                     'high': 201.0,
                     'low': 199.0,
@@ -460,7 +460,7 @@ class TestMarketDataSetValidation:
                 })
             else:  # Other rows are normal
                 data.append({
-                    'timestamp': datetime.utcnow() - timedelta(hours=15-i),
+                    'timestamp': datetime.now(timezone.utc) - timedelta(hours=15-i),
                     'open': 100.0 + i,
                     'high': 102.0 + i,
                     'low': 99.0 + i,
@@ -472,7 +472,7 @@ class TestMarketDataSetValidation:
         with pytest.raises(ValueError, match="Recent price.*too far from MA20"):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=self._create_valid_dataframe(),
                 h4_candles=self._create_valid_dataframe(),
                 h1_candles=h1_df,

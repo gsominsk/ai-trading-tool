@@ -1,6 +1,6 @@
 import pandas as pd
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 import pytest
 from src.market_data.market_data_service import MarketDataSet
 from src.market_data.exceptions import DataFrameValidationError
@@ -16,7 +16,7 @@ def test_dataframe_protection():
     with pytest.raises(DataFrameValidationError) as exc_info:
         MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=empty_df,
             h4_candles=empty_df,
             h1_candles=empty_df,
@@ -47,7 +47,7 @@ def test_dataframe_protection():
     with pytest.raises(DataFrameValidationError) as exc_info2:
         MarketDataSet(
             symbol="ETHUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=df_short,
             h4_candles=df_short,
             h1_candles=df_short,
@@ -76,7 +76,7 @@ def test_dataframe_protection():
     
     market_data_valid = MarketDataSet(
         symbol="ETHUSDT",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         daily_candles=df_valid,
         h4_candles=df_valid[:15],  # 15 4H candles (минимум 10)
         h1_candles=df_valid[:20],  # 20 1H candles (минимум 10)
@@ -113,7 +113,7 @@ def test_dataframe_protection():
     with pytest.raises(DataFrameValidationError) as exc_info3:
         MarketDataSet(
             symbol="ADAUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=df_nan,
             h4_candles=df_nan[:15],   # 15 4H candles
             h1_candles=df_nan[:20],   # 20 1H candles

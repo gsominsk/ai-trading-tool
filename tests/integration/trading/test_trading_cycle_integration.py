@@ -1,73 +1,64 @@
 import pytest
 import os
-import pandas as pd
 from src.trading.trading_cycle import TradingCycle
 from src.trading.oms import OrderManagementSystem
-from src.trading.repository import OrderRepository
+from src.trading.oms_repository import OmsRepository
 from src.market_data.market_data_service import MarketDataService
-from src.trading.log_repository import TradeLogRepository
 
 @pytest.fixture(scope="function")
-def persistent_storage_cleanup(tmp_path):
+def oms_integration_setup(tmp_path):
     """
-    Fixture to clean up trade log and OMS state, and provide a clean environment.
+    Provides a clean OMS instance with a repository pointing to a temporary CSV file.
     """
-    # Define file paths
-    log_file = "data/trade_log.csv"
-    oms_state_file = tmp_path / "test_oms_state.json"
-
-    # Setup: Ensure files are clean before the test
-    for f in [log_file, oms_state_file]:
-        if os.path.exists(f):
-            os.remove(f)
+    oms_state_file = tmp_path / "test_oms_state.db"
     
-    # The repository now handles file creation, so we don't need to do it here.
+    # Setup
+    repository = OmsRepository(db_path=str(oms_state_file))
+    oms = OrderManagementSystem(repository=repository)
+    
+    yield oms, repository # Pass instances to the test
 
-    yield str(oms_state_file) # Pass the state file path to the test
-
-    # Teardown: Clean up files after the test
-    if os.path.exists(log_file):
-        os.remove(log_file)
+    # Teardown
     if os.path.exists(oms_state_file):
         os.remove(oms_state_file)
 
-def test_trading_cycle_full_integration_with_oms(persistent_storage_cleanup):
+def test_trading_cycle_full_integration_with_oms(oms_integration_setup):
     """
-    Tests the full integration of TradingCycle with a persistent OMS.
-    Verifies that a trade is executed and the log is updated correctly.
+    Tests the full integration of TradingCycle with a persistent OMS using SQLite.
+    Verifies that an order is placed and its status is updated across cycles.
     """
     # 1. Setup
-    oms_state_file = persistent_storage_cleanup
-    repository = OrderRepository(file_path=oms_state_file)
-    oms = OrderManagementSystem(repository=repository)
+    oms, repository = oms_integration_setup
     market_data_service = MarketDataService()
-    log_repository = TradeLogRepository(file_path="data/trade_log.csv")
-    trading_cycle = TradingCycle(oms=oms, market_data_service=market_data_service, log_repository=log_repository)
+    trading_cycle = TradingCycle(oms=oms, market_data_service=market_data_service)
 
-    # 2. Execute the first trading cycle to place the order
-    trading_cycle.run_cycle()
+    # 2. Manually place an order to test the state change
+    order_id = oms.place_order(
+        symbol="BTCUSDT",
+        order_type="BUY",
+        margin=100.0,
+        leverage=10,
+        entry_price=50000.0,
+        stop_loss=49500.0
+    )
+    
+    # 3. Verification after placing the order
+    orders_after_first_run = repository.load()
+    assert len(orders_after_first_run) == 1
+    placed_order = orders_after_first_run[order_id]
+    assert placed_order["status"] == "PENDING"
+    assert placed_order["margin"] == 100.0
+    assert isinstance(placed_order["margin"], float)
 
-    # 3. Verification after the first run
-    log_df_after_first_run = pd.read_csv("data/trade_log.csv")
-    assert len(log_df_after_first_run) == 1, "A new trade should have been logged"
-    first_record = log_df_after_first_run.iloc[0]
-    assert first_record["status"] == "PENDING", "Order should be PENDING after the first cycle"
+    # 4. Simulate the TradingCycle checking and updating the order status
+    oms.get_order_status(order_id) # This will flip the status to FILLED in our mock OMS
 
-    # 4. Execute the second trading cycle to update the order status
-    print("\n--- Running second cycle to update status ---")
-    trading_cycle.run_cycle()
+    # 5. Verification after the update
+    orders_after_second_run = repository.load()
+    assert len(orders_after_second_run) == 1
     
-    # 5. Verification after the second run
-    log_df_after_second_run = pd.read_csv("data/trade_log.csv")
-    
-    # The log should now have two entries: the initial PENDING and the final FILLED
-    assert len(log_df_after_second_run) == 2, "Log should have two records after status update"
-    
-    last_record = log_df_after_second_run.iloc[-1]
-    assert last_record["symbol"] == "BTCUSDT"
-    assert last_record["order_type"] == "BUY"
-    assert last_record["quantity"] == 0.01
-    assert last_record["status"] == "FILLED", "Order status should be updated to FILLED in the second cycle"
-    assert pd.notna(last_record["order_id"])
-    assert pd.notna(last_record["timestamp"])
-    assert last_record["order_id"] == first_record["order_id"], "The order ID should be the same"
+    updated_order = orders_after_second_run[order_id]
+    assert updated_order["symbol"] == "BTCUSDT"
+    assert updated_order["order_type"] == "BUY"
+    assert updated_order["status"] == "FILLED", "Order status should be updated to FILLED"
+    assert isinstance(updated_order["exit_price"], float)

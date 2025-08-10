@@ -20,7 +20,7 @@ import requests
 from unittest.mock import patch, Mock
 from decimal import Decimal
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
 from src.market_data.exceptions import (
@@ -79,7 +79,7 @@ class TestValueErrorInheritanceCompatibility:
         with pytest.raises(DataFrameValidationError):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=empty_df,  # Invalid empty DataFrame
                 h4_candles=valid_df,
                 h1_candles=valid_df,
@@ -94,7 +94,7 @@ class TestValueErrorInheritanceCompatibility:
         with pytest.raises(ValueError):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=empty_df,
                 h4_candles=valid_df,
                 h1_candles=valid_df,
@@ -120,7 +120,7 @@ class TestValueErrorInheritanceCompatibility:
         with pytest.raises(ValueError):
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=valid_df,
                 h4_candles=valid_df,
                 h1_candles=valid_df,
@@ -135,7 +135,7 @@ class TestValueErrorInheritanceCompatibility:
         try:
             MarketDataSet(
                 symbol="BTCUSDT",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 daily_candles=valid_df,
                 h4_candles=valid_df,
                 h1_candles=valid_df,
@@ -225,7 +225,7 @@ class TestLegacyExceptionHandlingPatterns:
                 # Create base params
                 base_params = {
                     "symbol": "BTCUSDT",
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                     "daily_candles": valid_df,
                     "h4_candles": valid_df,
                     "h1_candles": valid_df,
@@ -314,7 +314,7 @@ class TestMarketDataServiceBackwardCompatibility:
         
         market_data = MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=valid_df,
             h4_candles=valid_df,
             h1_candles=valid_df,
@@ -368,7 +368,7 @@ class TestNoBreakingChangesPublicAPI:
         
         market_data = MarketDataSet(
             symbol="BTCUSDT",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             daily_candles=valid_df,
             h4_candles=valid_df,
             h1_candles=valid_df,

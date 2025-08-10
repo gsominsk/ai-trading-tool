@@ -7,7 +7,7 @@ import json
 import logging
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from .trace_generator import get_trace_id
 from .flow_context import get_flow_summary
@@ -46,7 +46,7 @@ class AIOptimizedJSONFormatter(logging.Formatter):
         
         # Base log structure
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "service": self.service_name,
             "operation": getattr(record, 'operation', 'unknown'),
@@ -105,7 +105,7 @@ class AIOptimizedJSONFormatter(logging.Formatter):
             return json.dumps(log_entry, ensure_ascii=False, separators=(',', ':'))
         except (TypeError, ValueError) as e:
             # Fallback: если JSON serialization не удалась, возвращаем простой текст
-            return f'{{"timestamp":"{datetime.utcnow().isoformat()}Z","level":"{record.levelname}","service":"{self.service_name}","message":"FALLBACK_LOG: {record.getMessage()}","serialization_error":"{str(e)}"}}'
+            return f'{{"timestamp":"{datetime.now(timezone.utc).isoformat()}","level":"{record.levelname}","service":"{self.service_name}","message":"FALLBACK_LOG: {record.getMessage()}","serialization_error":"{str(e)}"}}'
 
 
 class StructuredLogger:

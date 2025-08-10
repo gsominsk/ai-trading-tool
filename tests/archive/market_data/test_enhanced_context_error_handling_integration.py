@@ -5,7 +5,7 @@ Verifies graceful degradation when individual analysis components fail.
 
 import pandas as pd
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
 
@@ -13,7 +13,7 @@ from src.market_data.market_data_service import MarketDataService, MarketDataSet
 def create_valid_market_data() -> MarketDataSet:
     """Create valid MarketDataSet for testing."""
     # Create valid DataFrames
-    timestamps = [datetime.utcnow() - timedelta(hours=i) for i in range(50, 0, -1)]
+    timestamps = [datetime.now(timezone.utc) - timedelta(hours=i) for i in range(50, 0, -1)]
     
     daily_data = pd.DataFrame({
         'timestamp': timestamps,
@@ -29,7 +29,7 @@ def create_valid_market_data() -> MarketDataSet:
     
     return MarketDataSet(
         symbol="ETHUSDT",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         daily_candles=daily_data,
         h4_candles=h4_data,
         h1_candles=h1_data,
@@ -106,7 +106,7 @@ def test_individual_component_failures():
         mock_get_data.return_value = market_data
         
         # Mock key candles to return valid data
-        key_candles = [[datetime.utcnow().timestamp(), 100, 105, 95, 102, 1000] for _ in range(5)]
+        key_candles = [[datetime.now(timezone.utc).timestamp(), 100, 105, 95, 102, 1000] for _ in range(5)]
         
         with patch.object(service, '_select_key_candles') as mock_select:
             mock_select.return_value = key_candles
@@ -141,7 +141,7 @@ def test_graceful_degradation_mixed_success():
     with patch.object(service, 'get_market_data') as mock_get_data:
         mock_get_data.return_value = market_data
         
-        key_candles = [[datetime.utcnow().timestamp(), 100, 105, 95, 102, 1000] for _ in range(5)]
+        key_candles = [[datetime.now(timezone.utc).timestamp(), 100, 105, 95, 102, 1000] for _ in range(5)]
         
         with patch.object(service, '_select_key_candles') as mock_select:
             mock_select.return_value = key_candles
@@ -226,7 +226,7 @@ def test_missing_support_resistance_levels():
     with patch.object(service, 'get_market_data') as mock_get_data:
         mock_get_data.return_value = market_data
         
-        key_candles = [[datetime.utcnow().timestamp(), 100, 105, 95, 102, 1000] for _ in range(5)]
+        key_candles = [[datetime.now(timezone.utc).timestamp(), 100, 105, 95, 102, 1000] for _ in range(5)]
         
         with patch.object(service, '_select_key_candles') as mock_select:
             mock_select.return_value = key_candles

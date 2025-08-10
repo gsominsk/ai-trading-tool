@@ -39,3 +39,5 @@ black>=23.7.0
 flake8>=6.0.0
 mypy>=1.5.0
 pre-commit>=3.3.3
+jsonschema>=4.19.0
+psutil>=5.9.5
