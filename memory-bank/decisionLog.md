@@ -172,3 +172,6 @@ Complete decision history with full details (approx. 522 lines before this optim
 
 
 [2025-08-10 22:10:00] - **Architectural Decision: Stricter Workflow for Refactoring**. Added a mandatory testing policy to `workflowChecks.md`. Any change to existing code (refactoring, bug fix) must be immediately followed by a full test suite run within the same phase to ensure no regressions are introduced. This enforces a higher standard of quality and prevents breaking changes from being committed.
+
+
+[2025-08-10 22:20:00] - **Architectural Decision: Make `service_name` a Mandatory Parameter in Logging System**. To fix incorrect service attribution in logs, the `service_name` parameter was made mandatory across the entire logging chain (`AIOptimizedJSONFormatter`, `StructuredLogger`, `get_logger`, `MarketDataLogger`). This forces each component to explicitly declare its identity when creating a logger, eliminating the risk of incorrect, hardcoded default values. A subsequent test run confirmed this change by producing widespread `TypeError` failures, precisely identifying all call sites that require updates.

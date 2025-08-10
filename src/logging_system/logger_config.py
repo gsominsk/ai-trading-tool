@@ -33,7 +33,8 @@ class LoggerConfig:
                          log_file: Optional[str] = None,
                          console_output: bool = True,
                          max_bytes: int = 10*1024*1024,  # 10MB
-                         backup_count: int = 5):
+                         backup_count: int = 5,
+                         service_name: Optional[str] = None):
         """
         Configure global logging for AI optimization with file rotation.
         
@@ -83,8 +84,19 @@ class LoggerConfig:
                 
                 # Apply JSON formatter to file handler for structured logs
                 from .json_formatter import AIOptimizedJSONFormatter
-                json_formatter = AIOptimizedJSONFormatter("MarketDataService")
-                file_handler.setFormatter(json_formatter)
+                # Use a specific service_name for the file handler if provided,
+                # otherwise use a generic formatter.
+                if service_name:
+                    from .json_formatter import AIOptimizedJSONFormatter
+                    json_formatter = AIOptimizedJSONFormatter(service_name)
+                    file_handler.setFormatter(json_formatter)
+                else:
+                    # Fallback to a standard formatter if no service name is given
+                    # as we cannot assume a default service.
+                    standard_formatter = logging.Formatter(
+                        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                    )
+                    file_handler.setFormatter(standard_formatter)
                 
                 root_logger.addHandler(file_handler)
             except Exception as e:
@@ -95,7 +107,7 @@ class LoggerConfig:
         
         self._configured = True
     
-    def get_logger(self, name: str, service_name: str = "MarketDataService") -> StructuredLogger:
+    def get_logger(self, name: str, service_name: str) -> StructuredLogger:
         """
         Get or create a structured logger for AI-optimized logging.
         
@@ -193,7 +205,7 @@ def _configure_http_logging_filters():
         logger.setLevel(logging.ERROR)  # Only critical HTTP errors
 
 
-def get_ai_logger(name: str, service_name: str = "MarketDataService") -> StructuredLogger:
+def get_ai_logger(name: str, service_name: str) -> StructuredLogger:
     """
     Get AI-optimized structured logger.
     
@@ -215,8 +227,8 @@ class MarketDataLogger:
     and context preservation for AI analysis.
     """
     
-    def __init__(self, module_name: str):
-        self.logger = get_ai_logger(module_name)
+    def __init__(self, module_name: str, service_name: str):
+        self.logger = get_ai_logger(module_name, service_name=service_name)
         self.module_name = module_name
     
     def log_operation_start(self, operation: str, symbol: str = "",

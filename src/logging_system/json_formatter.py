@@ -28,7 +28,7 @@ class AIOptimizedJSONFormatter(logging.Formatter):
     - Flow and trace ID integration
     """
     
-    def __init__(self, service_name: str = "MarketDataService"):
+    def __init__(self, service_name: str):
         super().__init__()
         self.service_name = service_name
     
@@ -116,7 +116,7 @@ class StructuredLogger:
     automatic trace ID generation and context preservation.
     """
     
-    def __init__(self, name: str, service_name: str = "MarketDataService"):
+    def __init__(self, name: str, service_name: str):
         self.logger = logging.getLogger(name)
         self.service_name = service_name
         
@@ -244,7 +244,7 @@ class StructuredLogger:
         self._log(logging.CRITICAL, message, operation, context, tags, flow, trace_id)
 
 
-def get_logger(name: str, service_name: str = "MarketDataService") -> StructuredLogger:
+def get_logger(name: str, service_name: str) -> StructuredLogger:
     """
     Get a structured logger instance for AI-optimized logging.
     
