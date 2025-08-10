@@ -182,3 +182,9 @@ Complete decision history with full details (approx. 522 lines before this optim
     - **Implication:** All logger instantiations throughout the codebase must now provide a `service_name`. Unit tests for logging required significant refactoring.
 
 [2025-08-10 21:20:15] - [Test Refactoring] - Refactored `tests/integration/logging/test_end_to_end_tracing.py` to use the real `AIOptimizedJSONFormatter` and validate the `service` field in the JSON logs. This ensures the test correctly verifies the dynamic service name injection, which was the primary goal of the logging refactoring. The previous implementation used a custom formatter that completely ignored the `service` field, rendering the test ineffective for its intended purpose.
+
+### [2025-08-10 21:51:37] - **Decision: Increase Kline Data Fetch Limit for MA50 Calculation**
+**Problem**: Log analysis revealed that the `MarketDataService` was consistently using a fallback mechanism to calculate the 50-period Moving Average (MA50). The service was fetching only 48 hours of 1-hour kline data, which was insufficient for a 50-period calculation, leading to a less accurate technical indicator.
+**Solution**: The `limit` parameter in the `_get_klines` call within `market_data_service.py` was increased from 48 to 100 for the 1-hour interval.
+**Rationale**: This simple change ensures that the service always has more than enough data (100 points) to perform a standard 50-period MA calculation. It eliminates the reliance on the graceful degradation logic, thereby improving the quality and reliability of the technical analysis data used for AI decision-making. The change was determined to have no impact on existing tests.
+**Result**: The system now produces a more accurate MA50 indicator. The fix was validated through a full test suite run and a real-world scenario execution, confirming the fallback is no longer triggered.

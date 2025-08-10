@@ -4,7 +4,7 @@ MarketDataService - Multi-timeframe cryptocurrency market data aggregation.
 Provides structured market data for LLM trading decisions with three data levels:
 - Level 1: 6 months daily candles (global trend analysis)
 - Level 2: 2 weeks 4H candles (medium-term patterns)
-- Level 3: 48 hours 1H candles (short-term signals)
+- Level 3: 100 hours 1H candles (short-term signals)
 
 Includes technical indicators and market context for comprehensive analysis.
 """
@@ -52,7 +52,7 @@ class MarketDataSet:
     # Multi-level price data
     daily_candles: pd.DataFrame      # 6 months daily (Level 1)
     h4_candles: pd.DataFrame         # 2 weeks 4H (Level 2)
-    h1_candles: pd.DataFrame         # 48 hours 1H (Level 3)
+    h1_candles: pd.DataFrame         # 100 hours 1H (Level 3)
     
     # Technical indicators (using Decimal for financial precision)
     rsi_14: Decimal
@@ -503,7 +503,7 @@ class MarketDataService:
             # Fetch multi-timeframe data, passing the main trace_id
             daily_data = self._get_klines(symbol, "1d", 180, trace_id=trace_id)
             h4_data = self._get_klines(symbol, "4h", 84, trace_id=trace_id)
-            h1_data = self._get_klines(symbol, "1h", 48, trace_id=trace_id)
+            h1_data = self._get_klines(symbol, "1h", 100, trace_id=trace_id)
             
             # Defensive check for empty DataFrames before calculations
             if daily_data.empty or h4_data.empty or h1_data.empty:
@@ -1328,7 +1328,7 @@ Please check system logs and contact support.
                 # Get core data first (timeframes - critical)
                 daily_data = self._get_klines(symbol, "1d", 180)  # 6 months
                 h4_data = self._get_klines(symbol, "4h", 84)      # 2 weeks
-                h1_data = self._get_klines(symbol, "1h", 48)      # 48 hours
+                h1_data = self._get_klines(symbol, "1h", 100)     # 100 hours
                 
                 # Calculate support/resistance levels (no state pollution)
                 support_level = Decimal(str(daily_data['low'].tail(30).min()))
@@ -1533,7 +1533,7 @@ Please check system logs and contact support.
         confidence_factors = []
         
         # Data quality factor (30% weight)
-        data_quality = min(len(market_data.h1_candles) / 48.0, 1.0)  # Full confidence at 48+ candles
+        data_quality = min(len(market_data.h1_candles) / 100.0, 1.0) # Full confidence at 100+ candles
         confidence_factors.append(data_quality * 0.3)
         
         # Technical indicators confidence (40% weight)
