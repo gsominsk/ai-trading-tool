@@ -133,3 +133,7 @@ Complete decision history with full details (approx. 522 lines before this optim
 **Rationale**: Analysis of the CSV implementation revealed significant risks regarding data integrity, type safety, and fragility when handling schema changes. SQLite provides ACID guarantees, strong data typing, and efficient row-level updates (`INSERT OR REPLACE`), making it a vastly more robust and scalable solution for managing OMS state. This decision was made after a critical review of the CSV repository's readiness for production.
 
 [2025-08-10 00:26:30] - **Status**: The migration of `OmsRepository` to SQLite (Phase 7) has been successfully completed. The new implementation passed all unit and integration tests.
+
+[2025-08-10 00:33:12] - **Decision:** Corrected the trading cycle logic in `trading_cycle.py`.
+**Rationale:** The cycle was incorrectly terminating after an order's status was synced (e.g., from PENDING to FILLED). This prevented the AI from receiving the updated state (a closed position) to make a new decision.
+**Implication:** The trading loop will now correctly continue after a position is closed, allowing for continuous operation and decision-making based on the latest portfolio state.
