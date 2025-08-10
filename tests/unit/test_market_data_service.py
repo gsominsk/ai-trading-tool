@@ -20,7 +20,7 @@ class TestMarketDataService:
     
     def setup_method(self):
         """Set up test fixtures before each test method."""
-        self.service = MarketDataService()
+        self.service = MarketDataService(enable_logging=False)
     
     @pytest.mark.unit
     @pytest.mark.financial
@@ -529,7 +529,7 @@ class TestMarketDataServiceIntegration:
         assert 45000 <= open_price <= 55000, f"Price should be around base value: {open_price}"
         
         # Verify this structure works with MarketDataService
-        service = MarketDataService()
+        service = MarketDataService(enable_logging=False)
         
         # Mock all timeframe calls
         def mock_side_effect(*args, **kwargs):

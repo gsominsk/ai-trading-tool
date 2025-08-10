@@ -73,7 +73,7 @@ class TestHTTPFilter:
         
         # Create direct log entry to verify file logging works
         from src.logging_system.json_formatter import get_logger
-        logger = get_logger("file_test")
+        logger = get_logger("file_test", service_name="test_service")
         logger.info(
             message="Test file logging",
             operation="file_test_operation",
@@ -110,7 +110,7 @@ class TestHTTPFilter:
         log_file = configure_test_logging
         
         # Create structured AI operation log
-        logger = get_logger("test_ai_operations")
+        logger = get_logger("test_ai_operations", service_name="test_service")
         logger.info(
             message="Test AI operation",
             operation="test_operation",

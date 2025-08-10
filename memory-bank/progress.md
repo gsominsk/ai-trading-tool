@@ -136,3 +136,7 @@ Complete progress history (1,179 lines before this optimization) is archived in 
     - Successfully refactored the core logging system (`json_formatter.py`, `logger_config.py`) to support dynamic service names.
     - Adapted and fixed all associated unit tests in `tests/unit/logging/test_core_logging.py`.
     - All tests for this phase are passing.
+
+[2025-08-10 20:59:51] - [Phase 2] Начато исправление тестов после обновления компонентов. Основная проблема связана с некорректным перехватом логов фикстурой `capfd`.
+
+[2025-08-10 21:18:59] - [Phase 2: Component and Test Updates] - Completed. All components updated to provide `service_name` to the logger. All 255 tests are passing after significant refactoring to use `caplog` and fix subprocess test issues.

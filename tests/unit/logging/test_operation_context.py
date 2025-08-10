@@ -50,7 +50,7 @@ class TestOperationContext:
     def test_structured_operation_logging(self, configure_test_logging):
         """Test that operations with proper context are logged correctly."""
         log_file = configure_test_logging
-        logger = get_logger("operation_context_test")
+        logger = get_logger("operation_context_test", service_name="test_service")
         
         # Test structured AI operation logging - this should work without errors
         # Note: logs go to stderr in test environment, not to file
@@ -72,7 +72,7 @@ class TestOperationContext:
     def test_operation_context_fields(self, configure_test_logging):
         """Test that all expected context fields are properly logged."""
         log_file = configure_test_logging
-        logger = get_logger("context_fields_test")
+        logger = get_logger("context_fields_test", service_name="test_service")
         
         # Log with comprehensive context (only use supported parameters)
         logger.info(
@@ -92,7 +92,7 @@ class TestOperationContext:
     def test_trace_id_inheritance(self, configure_test_logging):
         """Test trace_id inheritance in hierarchical operations."""
         log_file = configure_test_logging
-        logger = get_logger("trace_inheritance_test")
+        logger = get_logger("trace_inheritance_test", service_name="test_service")
         
         master_trace_id = "master_trace_456"
         
@@ -123,7 +123,7 @@ class TestOperationContext:
         raw_logger.info("Direct log without operation context")
         
         # Our structured logger for comparison
-        structured_logger = get_logger("structured_test")
+        structured_logger = get_logger("structured_test", service_name="test_service")
         structured_logger.info(
             message="Structured log with operation",
             operation="known_operation",
@@ -136,7 +136,7 @@ class TestOperationContext:
     def test_json_log_format_validation(self, configure_test_logging):
         """Test that logs are properly formatted as JSON when possible."""
         log_file = configure_test_logging
-        logger = get_logger("json_format_test")
+        logger = get_logger("json_format_test", service_name="test_service")
         
         logger.info(
             message="JSON format test",

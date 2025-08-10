@@ -13,7 +13,7 @@ class TradingCycle:
     def __init__(self, oms: OrderManagementSystem, market_data_service: MarketDataService):
         self.oms = oms
         self.market_data_service = market_data_service
-        self.logger = MarketDataLogger("trading_cycle")
+        self.logger = MarketDataLogger("trading_cycle", service_name="trading_cycle")
 
     def _get_ai_decision(self, market_data, current_position, trace_id: str):
         """

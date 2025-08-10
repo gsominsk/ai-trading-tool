@@ -399,7 +399,7 @@ class MarketDataService:
                         backup_count=10,
                         filter_http_noise=True
                     )
-                self.logger = MarketDataLogger("market_data_service")
+                self.logger = MarketDataLogger("market_data_service", service_name="market_data_service")
             except Exception as e:
                 # If logging initialization fails, raise the exception
                 # This allows tests to validate error handling behavior
