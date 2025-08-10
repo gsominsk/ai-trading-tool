@@ -27,6 +27,7 @@ class LoggerConfig:
         self._loggers: Dict[str, StructuredLogger] = {}
         self._loggers_lock = threading.Lock()
         self._log_level = logging.DEBUG
+        self._managed_handlers: list[logging.Handler] = []
     
     def configure_logging(self,
                          log_level: str = "DEBUG",
@@ -34,7 +35,7 @@ class LoggerConfig:
                          console_output: bool = True,
                          max_bytes: int = 10*1024*1024,  # 10MB
                          backup_count: int = 5,
-                         service_name: Optional[str] = None):
+                         service_name: Optional[str] = "default_service"):
         """
         Configure global logging for AI optimization with file rotation.
         
@@ -44,6 +45,7 @@ class LoggerConfig:
             console_output: Whether to output to console
             max_bytes: Maximum file size before rotation (default: 10MB)
             backup_count: Number of backup files to keep (default: 5)
+            service_name: Default service name for logs (used if not provided by logger)
         """
         if self._configured:
             return
@@ -57,13 +59,21 @@ class LoggerConfig:
         root_logger.setLevel(numeric_level)
         
         # Clear existing handlers
-        root_logger.handlers.clear()
+        # Remove only previously managed handlers to avoid conflicts with pytest
+        for handler in self._managed_handlers:
+            root_logger.removeHandler(handler)
+        self._managed_handlers.clear()
         
         # Add console handler if requested (JSON logs go to stderr for AI searchability)
         if console_output:
             console_handler = logging.StreamHandler(sys.stderr)
             console_handler.setLevel(numeric_level)
+            # Ensure console handler uses the correct JSON formatter
+            from .json_formatter import AIOptimizedJSONFormatter
+            json_formatter = AIOptimizedJSONFormatter()
+            console_handler.setFormatter(json_formatter)
             root_logger.addHandler(console_handler)
+            self._managed_handlers.append(console_handler)
         
         # Add rotating file handler if requested
         if log_file:
@@ -84,21 +94,12 @@ class LoggerConfig:
                 
                 # Apply JSON formatter to file handler for structured logs
                 from .json_formatter import AIOptimizedJSONFormatter
-                # Use a specific service_name for the file handler if provided,
-                # otherwise use a generic formatter.
-                if service_name:
-                    from .json_formatter import AIOptimizedJSONFormatter
-                    json_formatter = AIOptimizedJSONFormatter(service_name)
-                    file_handler.setFormatter(json_formatter)
-                else:
-                    # Fallback to a standard formatter if no service name is given
-                    # as we cannot assume a default service.
-                    standard_formatter = logging.Formatter(
-                        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-                    )
-                    file_handler.setFormatter(standard_formatter)
+                # Formatter is now service-agnostic
+                json_formatter = AIOptimizedJSONFormatter()
+                file_handler.setFormatter(json_formatter)
                 
                 root_logger.addHandler(file_handler)
+                self._managed_handlers.append(file_handler)
             except Exception as e:
                 # Логи сломались - останавливаем сервис
                 print(f"CRITICAL: Failed to configure file logging - shutting down service: {e}", file=sys.stderr)
@@ -139,9 +140,13 @@ class LoggerConfig:
             self._configured = False
             self._loggers.clear()
             
-            # Clear all handlers from root logger
+            # Clear only managed handlers to avoid conflicts with pytest
             root_logger = logging.getLogger()
-            root_logger.handlers.clear()
+            for handler in self._managed_handlers:
+                if handler in root_logger.handlers:
+                    root_logger.removeHandler(handler)
+            self._managed_handlers.clear()
+            
             root_logger.setLevel(logging.WARNING)  # Reset to default
 
 
@@ -205,18 +210,20 @@ def _configure_http_logging_filters():
         logger.setLevel(logging.ERROR)  # Only critical HTTP errors
 
 
-def get_ai_logger(name: str, service_name: str) -> StructuredLogger:
+def get_ai_logger(name: str, service_name: Optional[str] = None) -> StructuredLogger:
     """
     Get AI-optimized structured logger.
     
     Args:
         name: Logger name (typically __name__)
-        service_name: Service name for identification
+        service_name: Service name for identification. If None, a default is used.
         
     Returns:
         StructuredLogger configured for AI analysis
     """
-    return _logger_config.get_logger(name, service_name)
+    # Use a default service name if not provided
+    effective_service_name = service_name or "default_service"
+    return _logger_config.get_logger(name, effective_service_name)
 
 
 class MarketDataLogger:
@@ -227,7 +234,7 @@ class MarketDataLogger:
     and context preservation for AI analysis.
     """
     
-    def __init__(self, module_name: str, service_name: str):
+    def __init__(self, module_name: str, service_name: Optional[str] = None):
         self.logger = get_ai_logger(module_name, service_name=service_name)
         self.module_name = module_name
     

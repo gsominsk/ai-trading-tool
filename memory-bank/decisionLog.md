@@ -175,3 +175,8 @@ Complete decision history with full details (approx. 522 lines before this optim
 
 
 [2025-08-10 22:20:00] - **Architectural Decision: Make `service_name` a Mandatory Parameter in Logging System**. To fix incorrect service attribution in logs, the `service_name` parameter was made mandatory across the entire logging chain (`AIOptimizedJSONFormatter`, `StructuredLogger`, `get_logger`, `MarketDataLogger`). This forces each component to explicitly declare its identity when creating a logger, eliminating the risk of incorrect, hardcoded default values. A subsequent test run confirmed this change by producing widespread `TypeError` failures, precisely identifying all call sites that require updates.
+
+[2025-08-10 20:45:00] - Refactored core logging system to support dynamic `service_name`.
+    - **Decision:** Modified `AIOptimizedJSONFormatter` to extract `service_name` from the `LogRecord` instead of being initialized with a hardcoded value. `StructuredLogger` now acts as an adapter to inject the `service_name` into each log record's `extra` dictionary. The logging configuration (`LoggerConfig`) was also updated to manage its handlers without interfering with `pytest`'s capture mechanism.
+    - **Rationale:** The previous implementation hardcoded `"service":"MarketDataService"` in the formatter, causing all logs to be incorrectly attributed. The new architecture decouples the formatter from specific services, allowing each component to correctly identify itself. The fix for the test interference ensures a stable and isolated testing environment.
+    - **Implication:** All logger instantiations throughout the codebase must now provide a `service_name`. Unit tests for logging required significant refactoring.

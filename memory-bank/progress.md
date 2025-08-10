@@ -128,3 +128,11 @@ Complete progress history (1,179 lines before this optimization) is archived in 
 
 
 [2025-08-10 22:20:00] - **Logging Refactoring, Phase 1.3**: Completed core logging refactoring by making `service_name` a mandatory parameter. Ran the full test suite, which failed as expected with `TypeError`, successfully identifying all components that require updates.
+
+
+[2025-08-10 23:02:00] - **Logging Refactoring, Phase 2.4**: Completed updates to all core service components (`TradingCycle`, `OMS`, `OmsRepository`, `MarketDataService`) to provide the new mandatory `service_name` parameter during logger initialization. The main application logic is now aligned with the new logging contract.
+
+[2025-08-10 20:45:14] - **Phase 1: Core Logging Refactoring COMPLETE**
+    - Successfully refactored the core logging system (`json_formatter.py`, `logger_config.py`) to support dynamic service names.
+    - Adapted and fixed all associated unit tests in `tests/unit/logging/test_core_logging.py`.
+    - All tests for this phase are passing.

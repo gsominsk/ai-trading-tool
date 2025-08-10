@@ -26,6 +26,14 @@ from src.logging_system import (
 )
 from src.logging_system.flow_context import advance_to_stage
 
+@pytest.fixture(autouse=True)
+def reset_logging():
+    """Reset logging configuration before each test to ensure isolation."""
+    from src.logging_system.logger_config import reset_logging_state
+    reset_logging_state()
+    yield
+    reset_logging_state()
+
 
 @pytest.mark.unit
 @pytest.mark.logging
@@ -135,7 +143,7 @@ class TestJSONFormatter:
     
     def test_structured_logger_creation(self):
         """Test structured logger creation."""
-        logger = get_ai_logger("test_module")
+        logger = get_ai_logger("test_module", service_name="test_service")
         assert logger is not None
         assert hasattr(logger, 'info')
         assert hasattr(logger, 'debug')
@@ -145,7 +153,7 @@ class TestJSONFormatter:
     def test_json_log_format_basic(self):
         """Test basic JSON log output format."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
-        logger = get_ai_logger("test_module")
+        logger = get_ai_logger("test_module", service_name="test_service")
         
         # Log a message - system should not crash
         logger.info(
@@ -162,7 +170,7 @@ class TestJSONFormatter:
     def test_ai_searchable_json_structure(self, capfd):
         """Test that JSON structure is AI-searchable."""
         configure_ai_logging(log_level="DEBUG", console_output=True)
-        logger = get_ai_logger("ai_search_test")
+        logger = get_ai_logger("ai_search_test", service_name="search_service")
         
         logger.info("AI searchable test",
                    operation="ai_search",
@@ -189,6 +197,8 @@ class TestJSONFormatter:
         for field in required_fields:
             assert field in log_data, f"Missing required field: {field}"
         
+        assert log_data["service"] == "search_service"
+        
         # Verify semantic tags for AI
         assert "api_call" in log_data["tags"]
         assert "market_data" in log_data["tags"]
@@ -203,13 +213,13 @@ class TestLoggerConfiguration:
         """Test logging configuration."""
         configure_ai_logging(log_level="INFO", console_output=True)
         
-        logger = get_ai_logger("test_config")
+        logger = get_ai_logger("test_config", service_name="config_service")
         assert logger is not None
     
     def test_logger_singleton_behavior(self):
         """Test that same logger name returns same instance."""
-        logger1 = get_ai_logger("singleton_test")
-        logger2 = get_ai_logger("singleton_test")
+        logger1 = get_ai_logger("singleton_test", service_name="service1")
+        logger2 = get_ai_logger("singleton_test", service_name="service1")
         
         # Should be same instance
         assert logger1 is logger2
@@ -217,7 +227,7 @@ class TestLoggerConfiguration:
     def test_different_log_levels(self):
         """Test different log levels work correctly."""
         configure_ai_logging(log_level="ERROR", console_output=False)
-        logger = get_ai_logger("level_test")
+        logger = get_ai_logger("level_test", service_name="level_service")
         
         # Should not crash with different levels
         logger.debug("Debug message")
@@ -229,8 +239,8 @@ class TestLoggerConfiguration:
         """Test that different logger names have separate configurations."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
         
-        logger_a = get_ai_logger("logger_a")
-        logger_b = get_ai_logger("logger_b")
+        logger_a = get_ai_logger("logger_a", service_name="service_a")
+        logger_b = get_ai_logger("logger_b", service_name="service_b")
         
         # Should be different instances
         assert logger_a is not logger_b
@@ -247,7 +257,7 @@ class TestMarketDataLogger:
     def setup_method(self):
         """Setup for each test."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
-        self.logger = MarketDataLogger("test_market_data")
+        self.logger = MarketDataLogger("test_market_data", service_name="market_data_test_service")
     
     def test_operation_start_logging(self, caplog):
         """Test operation start logging."""
@@ -337,7 +347,7 @@ class TestCriticalFixes:
     def test_stderr_output_configuration(self, capfd):
         """Test that logs are directed to stderr for AI searchability."""
         configure_ai_logging(log_level="DEBUG", console_output=True)
-        logger = get_ai_logger("stderr_test")
+        logger = get_ai_logger("stderr_test", service_name="stderr_service")
         
         # Log a message
         logger.info("Test stderr output", 
@@ -354,7 +364,7 @@ class TestCriticalFixes:
     def test_trace_level_implementation(self):
         """Test that trace() method doesn't crash."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
-        logger = get_ai_logger("trace_test")
+        logger = get_ai_logger("trace_test", service_name="trace_service")
         
         # This should not crash
         try:
@@ -371,9 +381,9 @@ class TestCriticalFixes:
         configure_ai_logging(log_level="DEBUG", console_output=False)
         
         # Create same logger multiple times
-        logger1 = get_ai_logger("duplication_test")
-        logger2 = get_ai_logger("duplication_test")
-        logger3 = get_ai_logger("duplication_test")
+        logger1 = get_ai_logger("duplication_test", service_name="dup_service")
+        logger2 = get_ai_logger("duplication_test", service_name="dup_service")
+        logger3 = get_ai_logger("duplication_test", service_name="dup_service")
         
         # Should be same instance
         assert logger1 is logger2 is logger3
@@ -383,7 +393,7 @@ class TestCriticalFixes:
         
         # Create more instances
         for i in range(5):
-            get_ai_logger("duplication_test")
+            get_ai_logger("duplication_test", service_name="dup_service")
         
         # Handler count should not increase
         new_handler_count = len(logger1.logger.handlers)
@@ -399,7 +409,7 @@ class TestCriticalFixes:
         def create_logger(worker_id):
             try:
                 logger_name = f"worker_{worker_id}"
-                logger = get_ai_logger(logger_name)
+                logger = get_ai_logger(logger_name, service_name=f"worker_service_{worker_id}")
                 loggers[worker_id] = logger
                 
                 # Log some messages to ensure logger works
@@ -433,7 +443,7 @@ class TestEdgeCasesAndPerformance:
     def test_unicode_logging(self):
         """Test logging with unicode characters."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
-        logger = get_ai_logger("unicode_test")
+        logger = get_ai_logger("unicode_test", service_name="unicode_service")
         
         # Should not crash with unicode
         logger.info("Unicode test: ЙЦУ БТЦ УСДТ 🚀", context={"symbol": "BTCUSDT"})
@@ -441,7 +451,7 @@ class TestEdgeCasesAndPerformance:
     def test_large_context_logging(self):
         """Test logging with large context objects."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
-        logger = get_ai_logger("large_context_test")
+        logger = get_ai_logger("large_context_test", service_name="large_ctx_service")
         
         large_context = {"data": "x" * 10000}  # Large string
         
@@ -457,7 +467,7 @@ class TestEdgeCasesAndPerformance:
         
         def log_worker(worker_id):
             try:
-                logger = get_ai_logger(f"concurrent_worker_{worker_id}")
+                logger = get_ai_logger(f"concurrent_worker_{worker_id}", service_name=f"concurrent_service_{worker_id}")
                 for i in range(20):
                     trace_id = get_trace_id()
                     logger.info(f"Worker {worker_id} message {i}",
@@ -490,7 +500,7 @@ class TestEdgeCasesAndPerformance:
     def test_logging_performance(self):
         """Test logging performance under load."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
-        logger = get_ai_logger("performance_test")
+        logger = get_ai_logger("performance_test", service_name="perf_service")
         
         start_time = time.time()
         

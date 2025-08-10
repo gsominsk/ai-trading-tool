@@ -28,9 +28,8 @@ class AIOptimizedJSONFormatter(logging.Formatter):
     - Flow and trace ID integration
     """
     
-    def __init__(self, service_name: str):
+    def __init__(self):
         super().__init__()
-        self.service_name = service_name
     
     def format(self, record: logging.LogRecord) -> str:
         """
@@ -42,13 +41,14 @@ class AIOptimizedJSONFormatter(logging.Formatter):
         - tags: List of semantic tags
         - flow: Dict with flow information
         - trace_id: Trace identifier (auto-generated if missing)
+        - service_name: Name of the service/component
         """
         
         # Base log structure
         log_entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
-            "service": self.service_name,
+            "service": getattr(record, 'service_name', 'default_service'),
             "operation": getattr(record, 'operation', 'unknown'),
             "message": record.getMessage()
         }
@@ -105,7 +105,8 @@ class AIOptimizedJSONFormatter(logging.Formatter):
             return json.dumps(log_entry, ensure_ascii=False, separators=(',', ':'))
         except (TypeError, ValueError) as e:
             # Fallback: если JSON serialization не удалась, возвращаем простой текст
-            return f'{{"timestamp":"{datetime.now(timezone.utc).isoformat()}","level":"{record.levelname}","service":"{self.service_name}","message":"FALLBACK_LOG: {record.getMessage()}","serialization_error":"{str(e)}"}}'
+            service_name = getattr(record, 'service_name', 'default_service')
+            return f'{{"timestamp":"{datetime.now(timezone.utc).isoformat()}","level":"{record.levelname}","service":"{service_name}","message":"FALLBACK_LOG: {record.getMessage()}","serialization_error":"{str(e)}"}}'
 
 
 class StructuredLogger:
@@ -114,46 +115,12 @@ class StructuredLogger:
     
     Provides convenience methods for different log levels with
     automatic trace ID generation and context preservation.
+    This class acts as a custom LoggerAdapter.
     """
     
     def __init__(self, name: str, service_name: str):
         self.logger = logging.getLogger(name)
         self.service_name = service_name
-        
-        # Always configure logger with unique service name
-        self._configure_logger()
-    
-    def _configure_logger(self):
-        """Configure logger with AI-optimized JSON formatter."""
-        # Исправление handler accumulation - проверяем наличие handlers
-        if self.logger.handlers:
-            self.logger.handlers.clear()
-        
-        # Lazy import чтобы избежать circular imports
-        from .logger_config import _logger_config
-        
-        if _logger_config.is_configured():
-            # Create handler with service-specific formatter
-            handler = logging.StreamHandler(sys.stderr)
-            handler.setFormatter(AIOptimizedJSONFormatter(self.service_name))
-            self.logger.addHandler(handler)
-            
-            # Set level from global config
-            root_logger = logging.getLogger()
-            handler.setLevel(root_logger.level)
-            self.logger.setLevel(root_logger.level)
-            
-            # Always respect global propagation setting - consistent behavior
-            self.logger.propagate = True
-        else:
-            # Fallback: configure locally if no global config
-            handler = logging.StreamHandler(sys.stderr)
-            formatter = AIOptimizedJSONFormatter(self.service_name)
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.DEBUG)
-            # Consistent behavior: always allow propagation for test compatibility
-            self.logger.propagate = True
     
     def _log(self, level: int, message: str, operation: str = "",
              context: Optional[Dict[str, Any]] = None,
@@ -167,7 +134,8 @@ class StructuredLogger:
             'context': context or {},
             'tags': tags or [],
             'flow': flow or {},
-            'trace_id': trace_id
+            'trace_id': trace_id,
+            'service_name': self.service_name
         }
         
         try:
