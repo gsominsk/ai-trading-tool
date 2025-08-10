@@ -76,12 +76,12 @@ def main():
     
     # 1. Initialize the Repository (using in-memory SQLite for this demo)
     # In a real scenario, this would be a file path like 'data/oms.db'
-    repo_logger = MarketDataLogger("oms_repository")
+    repo_logger = MarketDataLogger("oms_repository", service_name="oms_repository")
     oms_repository = OmsRepository(db_path=":memory:", logger=repo_logger)
     print("   - OmsRepository (in-memory) initialized.")
 
     # 2. Initialize the Order Management System
-    oms_logger = MarketDataLogger("oms")
+    oms_logger = MarketDataLogger("oms", service_name="oms")
     oms = OrderManagementSystem(repository=oms_repository, logger=oms_logger)
     print("   - OrderManagementSystem initialized.")
 
