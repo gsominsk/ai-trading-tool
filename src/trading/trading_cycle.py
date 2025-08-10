@@ -56,9 +56,9 @@ class TradingCycle:
                 
                 # Если ордер исполнен или отменен, завершаем цикл
                 if current_position and current_position.get('status') != 'PENDING':
-                    self.logger.info("Order status synced. Ending cycle.", context={"order_id": order_id, "new_status": current_position.get('status')})
-                    self.logger.log_operation_complete("run_cycle")
-                    return
+                    self.logger.info("Order status synced. Continuing cycle.", context={"order_id": order_id, "new_status": current_position.get('status')})
+                    # Цикл должен продолжаться, чтобы ИИ мог принять решение на основе закрытой позиции.
+                    # Поэтому убираем return и log_operation_complete.
             except Exception as e:
                 self.logger.log_operation_error("sync_order_status", error=str(e), context={"order_id": order_id})
                 self.logger.log_operation_complete("run_cycle", status="failed")
