@@ -11,23 +11,40 @@ class OmsRepository:
     """
     def __init__(self, db_path: str, logger: Optional[MarketDataLogger] = None):
         """
-        Инициализирует репозиторий с путем к файлу базы данных.
+        Инициализирует репозиторий. Для :memory: создает постоянное соединение.
 
         Args:
-            db_path (str): Путь к файлу .db, где хранится состояние OMS.
+            db_path (str): Путь к файлу .db или ':memory:'.
             logger (Optional[MarketDataLogger]): Экземпляр логгера.
         """
         self._db_path = db_path
         self.logger = logger
-        # Убедимся, что директория для файла существует
-        os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
+        self._conn = None
+
+        if self._db_path == ":memory:":
+            self._conn = sqlite3.connect(":memory:", check_same_thread=False)
+        else:
+            # Убедимся, что директория для файла существует
+            os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
+        
         self._create_table()
+
+    def _get_connection(self):
+        """Возвращает существующее соединение или создает новое."""
+        if self._conn:
+            return self._conn
+        return sqlite3.connect(self._db_path)
+
+    def close(self):
+        """Закрывает постоянное соединение, если оно существует."""
+        if self._conn:
+            self._conn.close()
+            self._conn = None
 
     def _create_table(self):
         """Создает таблицу orders в БД, если она не существует."""
-        conn = None
+        conn = self._get_connection()
         try:
-            conn = sqlite3.connect(self._db_path)
             cursor = conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS orders (
@@ -46,15 +63,18 @@ class OmsRepository:
                 );
             """)
             conn.commit()
-        except sqlite3.Error:
-            # Silently fail on initialization if the DB is corrupt or unwritable.
-            # The error will be raised on the first actual operation (load/save).
-            pass
+        except sqlite3.Error as e:
+            raise RepositoryError(
+                message=f"Failed to create 'orders' table: {e}",
+                repository_type="sqlite",
+                db_operation="create_table",
+                original_exception=e
+            )
         finally:
-            if conn:
+            if not self._conn: # Закрываем только если соединение не постоянное
                 conn.close()
 
-    def load(self) -> Dict[str, Dict[str, Any]]:
+    def load(self, trace_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """
         Загружает все ордера из базы данных SQLite.
 
@@ -62,17 +82,25 @@ class OmsRepository:
             Словарь с состоянием ордеров, где ключ - order_id.
             Возвращает пустой словарь, если таблица пуста или произошла ошибка.
         """
+        if self.logger:
+            self.logger.log_operation_start("repo_load", trace_id=trace_id)
+        
         orders = {}
-        conn = None
+        conn = self._get_connection()
         try:
-            conn = sqlite3.connect(self._db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM orders")
             rows = cursor.fetchall()
             for row in rows:
                 orders[row['order_id']] = dict(row)
+            
+            if self.logger:
+                self.logger.log_operation_complete("repo_load", trace_id=trace_id, context={"orders_loaded": len(orders)})
+                
         except sqlite3.Error as e:
+            if self.logger:
+                self.logger.log_operation_error("repo_load", trace_id=trace_id, error=str(e))
             raise RepositoryError(
                 message=f"Failed to load orders from OMS database: {e}",
                 repository_type="sqlite",
@@ -80,11 +108,11 @@ class OmsRepository:
                 original_exception=e
             )
         finally:
-            if conn:
+            if not self._conn:
                 conn.close()
         return orders
 
-    def save(self, order: Dict[str, Any]):
+    def save(self, order: Dict[str, Any], trace_id: Optional[str] = None):
         """
         Сохраняет или обновляет один ордер в базе данных.
         Использует 'INSERT OR REPLACE' для атомарности.
@@ -92,24 +120,30 @@ class OmsRepository:
         Args:
             order: Словарь, представляющий один ордер.
         """
-        conn = None
+        if self.logger:
+            self.logger.log_operation_start("repo_save", trace_id=trace_id, context={"order_id": order.get("order_id")})
+            
+        conn = self._get_connection()
         try:
-            conn = sqlite3.connect(self._db_path)
             cursor = conn.cursor()
             
-            # Определяем колонки и плейсхолдеры на основе ключей словаря
             columns = ', '.join(order.keys())
             placeholders = ', '.join('?' * len(order))
             sql = f"INSERT OR REPLACE INTO orders ({columns}) VALUES ({placeholders})"
             
-            # Убедимся, что значения передаются в правильном порядке
             values = [order.get(key) for key in order.keys()]
             
             cursor.execute(sql, values)
             conn.commit()
+
+            if self.logger:
+                self.logger.log_operation_complete("repo_save", trace_id=trace_id, context={"order_id": order.get("order_id")})
+
         except sqlite3.Error as e:
             if conn:
                 conn.rollback()
+            if self.logger:
+                self.logger.log_operation_error("repo_save", trace_id=trace_id, error=str(e), context={"order_id": order.get("order_id")})
             raise RepositoryError(
                 message=f"Failed to save order to OMS database: {e}",
                 repository_type="sqlite",
@@ -117,25 +151,33 @@ class OmsRepository:
                 original_exception=e
             )
         finally:
-            if conn:
+            if not self._conn:
                 conn.close()
 
-    def delete(self, order_id: str):
+    def delete(self, order_id: str, trace_id: Optional[str] = None):
         """
         Удаляет ордер из базы данных по его ID.
 
         Args:
             order_id: ID ордера для удаления.
         """
-        conn = None
+        if self.logger:
+            self.logger.log_operation_start("repo_delete", trace_id=trace_id, context={"order_id": order_id})
+
+        conn = self._get_connection()
         try:
-            conn = sqlite3.connect(self._db_path)
             cursor = conn.cursor()
             cursor.execute("DELETE FROM orders WHERE order_id = ?", (order_id,))
             conn.commit()
+
+            if self.logger:
+                self.logger.log_operation_complete("repo_delete", trace_id=trace_id, context={"order_id": order_id})
+
         except sqlite3.Error as e:
             if conn:
                 conn.rollback()
+            if self.logger:
+                self.logger.log_operation_error("repo_delete", trace_id=trace_id, error=str(e), context={"order_id": order_id})
             raise RepositoryError(
                 message=f"Failed to delete order from OMS database: {e}",
                 repository_type="sqlite",
@@ -143,5 +185,5 @@ class OmsRepository:
                 original_exception=e
             )
         finally:
-            if conn:
+            if not self._conn:
                 conn.close()

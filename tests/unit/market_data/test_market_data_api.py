@@ -34,7 +34,7 @@ class TestMarketDataServiceAPI:
             mock_get.side_effect = requests.exceptions.Timeout("Connection timeout")
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Request to Binance API timed out" in str(exc_info.value)
     
@@ -44,7 +44,7 @@ class TestMarketDataServiceAPI:
             mock_get.side_effect = requests.exceptions.ConnectionError("Network unreachable")
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Failed to connect to Binance API" in str(exc_info.value)
     
@@ -57,7 +57,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Symbol BTCUSDT not found or invalid interval 1d" in str(exc_info.value)
     
@@ -70,7 +70,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Binance API server error: 500" in str(exc_info.value)
     
@@ -83,7 +83,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Binance API rate limit exceeded" in str(exc_info.value)
     
@@ -101,7 +101,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Unexpected error during klines data processing" in str(exc_info.value)
     
@@ -115,7 +115,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             assert "Empty or invalid response from Binance API" in str(exc_info.value)
     
@@ -151,7 +151,7 @@ class TestMarketDataServiceAPI:
             mock_get.side_effect = mock_responses
             
             # Should succeed with None BTC correlation
-            result = self.service.get_market_data("ETHUSDT")
+            result = self.service.get_market_data("ETHUSDT", trace_id="test_trace")
             assert result.btc_correlation is None
             assert result.symbol == "ETHUSDT"
     
@@ -170,7 +170,7 @@ class TestMarketDataServiceAPI:
                 mock_get.return_value = mock_response
                 
                 with pytest.raises(Exception) as exc_info:
-                    self.service.get_market_data("BTCUSDT")
+                    self.service.get_market_data("BTCUSDT", trace_id="test_trace")
                 
                 assert "Binance API rate limit exceeded" in str(exc_info.value)
     
@@ -193,7 +193,7 @@ class TestMarketDataServiceAPI:
                 mock_get.return_value = mock_response
                 
                 with pytest.raises(Exception) as exc_info:
-                    self.service.get_market_data("BTCUSDT")
+                    self.service.get_market_data("BTCUSDT", trace_id="test_trace")
                 
                 # Should contain appropriate error handling
                 assert str(exc_info.value)  # Should have meaningful error message
@@ -219,7 +219,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("INVUSDT")
+                self.service.get_market_data("INVUSDT", trace_id="test_trace")
             
             assert "invalid OHLC data" in str(exc_info.value)
     
@@ -239,7 +239,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("NEGUSDT")
+                self.service.get_market_data("NEGUSDT", trace_id="test_trace")
             
             # Should fail validation
             assert "support_level must be positive" in str(exc_info.value)
@@ -260,7 +260,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("NANUSDT")
+                self.service.get_market_data("NANUSDT", trace_id="test_trace")
             
             assert "Invalid numeric data in column open" in str(exc_info.value)
     
@@ -281,7 +281,7 @@ class TestMarketDataServiceAPI:
             mock_get.return_value = mock_response
             
             # Should handle large datasets gracefully
-            result = self.service.get_market_data("LARGUSDT")
+            result = self.service.get_market_data("LARGUSDT", trace_id="test_trace")
             assert result.symbol == "LARGUSDT"
             assert len(result.daily_candles) == 1000
             assert isinstance(result.ma_20, Decimal)
@@ -307,7 +307,7 @@ class TestMarketDataServiceAPI:
             results = []
             
             for service in services:
-                result = service.get_market_data("BTCUSDT")
+                result = service.get_market_data("BTCUSDT", trace_id="test_trace")
                 results.append(result)
             
             # All should succeed

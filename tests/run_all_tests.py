@@ -62,6 +62,7 @@ class AITradingTestRunner:
                     'tests/integration/logging/test_logging_integration.py',
                     'tests/integration/logging/test_logging_production.py',
                     'tests/integration/logging/test_hierarchical_tracing.py',
+                    'tests/integration/logging/test_end_to_end_tracing.py',
                     'tests/integration/market_data/test_market_data_integration.py',
                     'tests/integration/refactoring/test_api_call_efficiency.py',
                     'tests/integration/system/test_backward_compatibility.py',

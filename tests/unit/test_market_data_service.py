@@ -132,7 +132,7 @@ class TestMarketDataService:
         mock_get.side_effect = mock_side_effect
         
         # Test the real service
-        result = self.service.get_market_data("BTCUSDT")
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Verify it returns MarketDataSet
         assert isinstance(result, MarketDataSet)
@@ -186,7 +186,7 @@ class TestMarketDataService:
         mock_get.side_effect = mock_side_effect
         
         # Test the service
-        result = self.service.get_market_data("BTCUSDT")
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Verify Decimal types are used
         assert isinstance(result.rsi_14, Decimal)
@@ -329,7 +329,7 @@ class TestMarketDataService:
         """Test error handling in real service."""
         # Test invalid symbol validation
         with pytest.raises(ValueError, match="Symbol must be a non-empty string"):
-            self.service.get_market_data("")
+            self.service.get_market_data("", trace_id="test_trace")
         
         with pytest.raises(ValueError, match="Invalid symbol format"):
             self.service.get_market_data("BTC")
@@ -552,7 +552,7 @@ class TestMarketDataServiceIntegration:
         
         # This should work without errors now
         try:
-            result = service.get_market_data("BTCUSDT")
+            result = service.get_market_data("BTCUSDT", trace_id="test_trace")
             assert isinstance(result.rsi_14, Decimal), "RSI should be calculated as Decimal"
             assert isinstance(result.ma_20, Decimal), "MA20 should be calculated as Decimal"
         except Exception as e:

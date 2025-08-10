@@ -134,7 +134,7 @@ class TestHTTPFilterIntegration:
         
         try:
             # Run a complete market data operation
-            market_data = service.get_market_data("BTCUSDT")
+            market_data = service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Verify we got some data (if network is available)
             if market_data:

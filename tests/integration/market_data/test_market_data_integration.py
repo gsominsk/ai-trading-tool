@@ -66,7 +66,7 @@ class TestMarketDataServiceIntegration:
             
             mock_get.side_effect = mock_responses
             
-            result = self.service.get_market_data("ETHUSDT")
+            result = self.service.get_market_data("ETHUSDT", trace_id="test_trace")
             
             # Verify successful integration
             assert result.symbol == "ETHUSDT"
@@ -98,7 +98,7 @@ class TestMarketDataServiceIntegration:
             
             mock_get.side_effect = mock_responses
             
-            result = self.service.get_market_data("ETHUSDT")
+            result = self.service.get_market_data("ETHUSDT", trace_id="test_trace")
             
             # Should succeed with None BTC correlation
             assert result.symbol == "ETHUSDT"
@@ -123,7 +123,7 @@ class TestMarketDataServiceIntegration:
             mock_response.json.return_value = btc_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("BTCUSDT")
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Verify enhanced context fields
             assert result.symbol == "BTCUSDT"
@@ -160,7 +160,7 @@ class TestMarketDataServiceIntegration:
             mock_response.json.return_value = constant_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("STABUSDT")
+            result = self.service.get_market_data("STABUSDT", trace_id="test_trace")
             
             # Should handle edge cases gracefully
             assert result.symbol == "STABUSDT"
@@ -192,7 +192,7 @@ class TestMarketDataServiceIntegration:
             mock_response.json.return_value = valid_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("BTCUSDT")
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # All validation should pass
             assert result.symbol == "BTCUSDT"
@@ -219,7 +219,7 @@ class TestMarketDataServiceIntegration:
             mock_get.return_value = mock_response
             
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("INVUSDT")
+                self.service.get_market_data("INVUSDT", trace_id="test_trace")
             
             assert "invalid OHLC data" in str(exc_info.value)
     
@@ -239,7 +239,7 @@ class TestMarketDataServiceIntegration:
             mock_response.json.return_value = base_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("BTCUSDT")
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Verify cross-timeframe consistency
             assert result.symbol == "BTCUSDT"
@@ -273,11 +273,11 @@ class TestMarketDataServiceIntegration:
             mock_get.return_value = mock_response
             
             # First call should trigger API
-            result1 = self.service.get_market_data("BTCUSDT")
+            result1 = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             first_call_count = mock_get.call_count
             
             # Second call should use cache (if implemented)
-            result2 = self.service.get_market_data("BTCUSDT")
+            result2 = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Both results should be identical
             assert result1.symbol == result2.symbol
@@ -305,7 +305,7 @@ class TestMarketDataServiceIntegration:
             mock_response.json.return_value = fresh_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("BTCUSDT")
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Should succeed with fresh data
             assert result.symbol == "BTCUSDT"
@@ -346,7 +346,7 @@ class TestMarketDataServiceIntegration:
             
             mock_get.side_effect = mock_responses
             
-            result = self.service.get_market_data("BTCUSDT")
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Verify complete integration
             assert result.symbol == "BTCUSDT"

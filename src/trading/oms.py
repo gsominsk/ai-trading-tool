@@ -14,10 +14,10 @@ class OrderManagementSystem:
         self.repository = repository
         self.logger = logger
         try:
-            self._orders = self.repository.load()
+            self._orders = self.repository.load(trace_id="oms_init")
         except RepositoryError as e:
             if self.logger:
-                self.logger.log_operation_error("oms_init_load", "Failed to load initial orders from repository", error_details=e.get_context())
+                self.logger.log_operation_error("oms_init_load", error="Failed to load initial orders from repository", context=e.get_context(), trace_id="oms_init")
             self._orders = {}
 
     def place_order(self, symbol: str, order_type: str, margin: float, leverage: int, entry_price: float, stop_loss: Optional[float] = None, take_profit: Optional[float] = None, trace_id: Optional[str] = None):
@@ -26,7 +26,7 @@ class OrderManagementSystem:
         """
         order_id = str(uuid.uuid4())
         if self.logger:
-            self.logger.log_operation_start("place_order", trace_id=trace_id, order_details={"symbol": symbol, "type": order_type, "margin": margin})
+            self.logger.log_operation_start("place_order", trace_id=trace_id, context={"symbol": symbol, "type": order_type, "margin": margin})
         now = datetime.now(timezone.utc).isoformat()
         
         new_order = {
@@ -46,10 +46,10 @@ class OrderManagementSystem:
         
         self._orders[order_id] = new_order
         try:
-            self.repository.save(new_order)
+            self.repository.save(new_order, trace_id=trace_id)
         except RepositoryError as e:
             if self.logger:
-                self.logger.log_operation_error("place_order_save", "Failed to save new order", trace_id=trace_id, error_details=e.get_context())
+                self.logger.log_operation_error("place_order_save", error="Failed to save new order", context=e.get_context(), trace_id=trace_id)
             # In a real system, we might want to handle this more gracefully
             # For now, we'll re-raise to make the failure visible.
             raise
@@ -64,10 +64,10 @@ class OrderManagementSystem:
             order["status"] = "CANCELLED"
             order["updated_at"] = datetime.now(timezone.utc).isoformat()
             try:
-                self.repository.save(order)
+                self.repository.save(order, trace_id=trace_id)
             except RepositoryError as e:
                 if self.logger:
-                    self.logger.log_operation_error("cancel_order_save", "Failed to save cancelled order", trace_id=trace_id, error_details=e.get_context())
+                    self.logger.log_operation_error("cancel_order_save", error="Failed to save cancelled order", context=e.get_context(), trace_id=trace_id)
                 raise
             return True
         return False
@@ -87,19 +87,27 @@ class OrderManagementSystem:
                 order["exit_price"] = order["entry_price"] * 1.02 # Simulate 2% profit
                 order["updated_at"] = datetime.now(timezone.utc).isoformat()
                 try:
-                    self.repository.save(order)
+                    self.repository.save(order, trace_id=trace_id)
                 except RepositoryError as e:
                     if self.logger:
-                        self.logger.log_operation_error("get_order_status_save", "Failed to save updated order status", trace_id=trace_id, error_details=e.get_context())
+                        self.logger.log_operation_error("get_order_status_save", error="Failed to save updated order status", context=e.get_context(), trace_id=trace_id)
                     # Do not re-raise here, as getting status is non-critical
             return order["status"]
         return "UNKNOWN"
 
-    def get_order_by_symbol(self, symbol: str):
+    def get_order_by_symbol(self, symbol: str, trace_id: Optional[str] = None):
         """
         Находит первый активный (не CANCELLED или FILLED) ордер по символу.
         """
+        if self.logger:
+            self.logger.log_operation_start("get_order_by_symbol", trace_id=trace_id, context={"symbol": symbol})
+            
         for order in self._orders.values():
             if order['symbol'] == symbol and order['status'] not in ['CANCELLED', 'FILLED']:
+                if self.logger:
+                    self.logger.log_operation_complete("get_order_by_symbol", trace_id=trace_id, context={"status": "found", "order_id": order["order_id"]})
                 return order
+        
+        if self.logger:
+            self.logger.log_operation_complete("get_order_by_symbol", trace_id=trace_id, context={"status": "not_found"})
         return None

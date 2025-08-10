@@ -112,7 +112,7 @@ class TestMarketDataServiceCore:
             'volume': [1000] * 16
         })
         
-        rsi_rising = self.service._calculate_rsi(df_rising, 14)
+        rsi_rising = self.service._calculate_rsi("BTCUSDT", df_rising, 14)
         assert isinstance(rsi_rising, Decimal)
         assert rsi_rising == Decimal('100.0')  # Maximum RSI for only gains
         
@@ -129,7 +129,7 @@ class TestMarketDataServiceCore:
             'volume': [1000] * 16
         })
         
-        rsi_falling = self.service._calculate_rsi(df_falling, 14)
+        rsi_falling = self.service._calculate_rsi("BTCUSDT", df_falling, 14)
         assert isinstance(rsi_falling, Decimal)
         assert rsi_falling == Decimal('0.0')  # Minimum RSI for only losses
         
@@ -145,7 +145,7 @@ class TestMarketDataServiceCore:
             'volume': [1000] * 16
         })
         
-        rsi_constant = self.service._calculate_rsi(df_constant, 14)
+        rsi_constant = self.service._calculate_rsi("BTCUSDT", df_constant, 14)
         assert isinstance(rsi_constant, Decimal)
         assert rsi_constant == Decimal('50.0')  # Neutral RSI for no movement
     
@@ -163,7 +163,7 @@ class TestMarketDataServiceCore:
             'volume': [1000] * 16
         })
         
-        rsi_mixed = self.service._calculate_rsi(df_mixed, 14)
+        rsi_mixed = self.service._calculate_rsi("BTCUSDT", df_mixed, 14)
         assert isinstance(rsi_mixed, Decimal)
         assert Decimal('0') <= rsi_mixed <= Decimal('100')
     
@@ -263,7 +263,7 @@ class TestMarketDataServiceCore:
         empty_df = pd.DataFrame()
         
         # Should handle empty DataFrame gracefully
-        rsi_result = self.service._calculate_rsi(empty_df, 14)
+        rsi_result = self.service._calculate_rsi("BTCUSDT", empty_df, 14)
         assert isinstance(rsi_result, Decimal)
         assert rsi_result == Decimal('50.0')  # Default neutral value
     
@@ -279,7 +279,7 @@ class TestMarketDataServiceCore:
             'volume': [1000] * 5
         })
         
-        rsi_short = self.service._calculate_rsi(short_data, 14)
+        rsi_short = self.service._calculate_rsi("BTCUSDT", short_data, 14)
         assert isinstance(rsi_short, Decimal)
         assert rsi_short == Decimal('50.0')  # Default for insufficient data
     
@@ -361,18 +361,19 @@ class TestMarketDataServiceCore:
         mock_get_klines.return_value = dummy_df
 
         # 2. Execute
-        market_data = self.service.get_market_data("BTCUSDT")
+        market_data = self.service.get_market_data("BTCUSDT", trace_id="main_trace_123")
 
         # 3. Assert
         # Assert that get_trace_id was called to start the main operation
-        mock_get_trace_id.assert_called()
+        # The trace_id is now passed in, so we don't expect get_trace_id to be called
+        mock_get_trace_id.assert_not_called()
         
         # Assert that the main trace_id is stored in the final MarketDataSet
         assert market_data.trace_id == "main_trace_123"
 
         # Assert that _get_klines was called with the correct parent_trace_id
         for call in mock_get_klines.call_args_list:
-            assert call.kwargs.get('parent_trace_id') == "main_trace_123"
+            assert call.kwargs.get('trace_id') == "main_trace_123"
 
 
 @pytest.mark.unit
@@ -416,7 +417,7 @@ class TestMarketDataPerformance:
         service = MarketDataService()
         
         start_time = time.time()
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         end_time = time.time()
         
         processing_time = end_time - start_time
@@ -457,7 +458,7 @@ class TestMarketDataPerformance:
         service = MarketDataService()
         
         start_time = time.time()
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         rsi_calculation_time = time.time() - start_time
         
         # Performance requirement: RSI calculation < 3 seconds for 500 points
@@ -497,7 +498,7 @@ class TestMarketDataPerformance:
         
         # Perform multiple operations and monitor memory
         for i in range(10):
-            result = service.get_market_data("BTCUSDT")
+            result = service.get_market_data("BTCUSDT", trace_id="test_trace")
             basic_context = result.to_llm_context_basic()
             
             # Check memory every few operations

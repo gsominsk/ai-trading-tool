@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, ANY
 from src.trading.trading_cycle import TradingCycle
 from src.trading.oms import OrderManagementSystem
 from src.market_data.market_data_service import MarketDataService
@@ -23,10 +23,13 @@ def mock_market_data_service():
 @pytest.fixture
 def trading_cycle(mock_oms, mock_market_data_service):
     """Fixture to create a TradingCycle instance with mocked dependencies."""
-    return TradingCycle(
+    cycle = TradingCycle(
         oms=mock_oms,
         market_data_service=mock_market_data_service
     )
+    # Mock the logger after initialization to control logging in tests
+    cycle.logger = MagicMock()
+    return cycle
 
 def test_run_cycle_no_active_order_buy_decision(trading_cycle, mock_oms):
     """
@@ -40,14 +43,17 @@ def test_run_cycle_no_active_order_buy_decision(trading_cycle, mock_oms):
 
     # Проверка
     # 1. Проверить, что был запрошен ордер по символу
-    mock_oms.get_order_by_symbol.assert_called_once_with("BTCUSDT")
+    mock_oms.get_order_by_symbol.assert_called_once_with("BTCUSDT", trace_id=ANY)
     
     # 2. Проверить, что был размещен новый ордер
+    # 2. Проверить, что был размещен новый ордер, соответствуя реальной сигнатуре вызова
     mock_oms.place_order.assert_called_once_with(
         symbol="BTCUSDT",
         order_type='BUY',
-        quantity=0.01,
-        price=52000.0
+        margin=520.0,  # 0.01 * 52000.0
+        leverage=10,
+        entry_price=52000.0,
+        trace_id=ANY
     )
 
 def test_run_cycle_with_pending_order_syncs_it(trading_cycle, mock_oms):
@@ -62,8 +68,15 @@ def test_run_cycle_with_pending_order_syncs_it(trading_cycle, mock_oms):
     trading_cycle.run_cycle()
 
     # Проверка
-    # 1. Проверить, что был запрошен статус ордера для синхронизации
-    mock_oms.get_order_status.assert_called_once_with('pending-order-456')
+    # 1. Проверить, что get_order_by_symbol был вызван дважды: до и после синхронизации
+    assert mock_oms.get_order_by_symbol.call_count == 2
+    mock_oms.get_order_by_symbol.assert_has_calls([
+        call("BTCUSDT", trace_id=ANY),
+        call("BTCUSDT", trace_id=ANY)
+    ])
+
+    # 2. Проверить, что был запрошен статус ордера для синхронизации
+    mock_oms.get_order_status.assert_called_once_with('pending-order-456', trace_id=ANY)
 
     # 2. Проверить, что новый ордер НЕ размещался, так как цикл был занят синхронизацией
     mock_oms.place_order.assert_not_called()
@@ -81,7 +94,10 @@ def test_run_cycle_with_filled_order_does_nothing(trading_cycle, mock_oms):
     trading_cycle.run_cycle()
 
     # Проверка
-    # 1. Проверить, что статус PENDING ордера НЕ запрашивался
+    # 1. Проверить, что был запрошен ордер по символу
+    mock_oms.get_order_by_symbol.assert_called_once_with("BTCUSDT", trace_id=ANY)
+
+    # 2. Проверить, что статус PENDING ордера НЕ запрашивался
     mock_oms.get_order_status.assert_not_called()
 
     # 2. Проверить, что новый ордер НЕ размещался

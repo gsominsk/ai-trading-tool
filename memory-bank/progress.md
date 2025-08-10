@@ -99,3 +99,26 @@ Complete progress history (1,179 lines before this optimization) is archived in 
 [2025-08-10 16:09:40] - **Phase 8, Tasks 8.10-8.11**: Completed the first stage of logging integration. All `print` statements in `OmsRepository` were removed during prior refactoring, and the `MarketDataLogger` has been successfully injected into `OrderManagementSystem` to enable trace_id propagation.
 
 [2025-08-10 16:11:23] - **Phase 8, Tasks 8.13-8.14**: Implemented robust exception handling in `OrderManagementSystem` to catch `RepositoryError` and prevent crashes. Ran the full test suite (23 files), which passed successfully, confirming the stability of all changes made during Phase 8.
+
+[2025-08-10 16:31:32] - **Фаза 9: Начало работ по сквозной трассировке**.
+- **Задача 9.1**: `MarketDataService.get_market_data` успешно отрефакторен для приема `parent_trace_id`.
+- **Задача 9.2**: `TradingCycle.run_cycle` теперь генерирует мастер `trace_id` для каждой операции.
+- **Задача 9.3**: Интеграция между `TradingCycle` и `MarketDataService` завершена, `trace_id` передается корректно.
+
+[2025-08-10 16:34:54] - Phase 9: End-to-End Tracing. Completed tasks 9.5 through 9.9.
+  - **9.5 & 9.6**: `OmsRepository` methods (`load`, `save`, `delete`) updated to accept `trace_id` and implement detailed logging.
+  - **9.7 & 9.8**: `OrderManagementSystem` methods refactored to accept and propagate `trace_id` to the repository layer.
+  - **9.9**: `TradingCycle` updated to pass the master `trace_id` to all `OMS` method calls.
+  - **Status**: The full data and logic chain from `TradingCycle` -> `OMS` -> `OmsRepository` is now instrumented for end-to-end tracing.
+
+[2025-08-10 17:13:42] - Task 9.12 (Run all tests) failed due to `sqlite3.OperationalError: no such table: orders` in `test_end_to_end_tracing.py`. The root cause was identified as the ephemeral nature of `:memory:` database connections. Began refactoring `OmsRepository` to use a persistent connection for in-memory databases during tests.
+
+
+[2025-08-10 20:50:37] - **Phase 9.1, Phase 1 COMPLETE**: Successfully refactored `MarketDataService` to simplify tracing logic. Removed the internal `trace_id` generation (`_start_operation`) and updated all methods to accept a single, externally-provided `trace_id`. This simplifies the code and sets the foundation for fixing the end-to-end tracing test.
+
+
+[2025-08-10 20:52:03] - **Phase 9.1, Phase 2 COMPLETE**: Refactored `TradingCycle` to align with the new simplified tracing logic. The call to `market_data_service.get_market_data` now correctly passes the `master_trace_id` to the `trace_id` parameter, ensuring a single trace ID is used for the entire operation.
+
+[2025-08-10 17:53:50] - [Phase 3: Integration Test Refactoring] Completed refactoring of `tests/integration/logging/test_end_to_end_tracing.py`. The test now uses a simplified assertion model to verify the propagation of a single `master_trace_id`, aligning with the new tracing logic.
+
+[2025-08-10 18:46:22] - Phase 9.1 (Tracing Simplification) is complete. All tests are passing after refactoring the `MarketDataService` to use a single `trace_id` and enforcing its presence. The system is now more robust and easier to debug.

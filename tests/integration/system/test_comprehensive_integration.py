@@ -35,7 +35,7 @@ class TestSystemIntegrationComprehensive:
         service = MarketDataService()
         
         # Test with real symbol processing
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # RSI should be calculated safely with Decimal arithmetic
         assert isinstance(result.rsi_14, Decimal)
@@ -56,8 +56,8 @@ class TestSystemIntegrationComprehensive:
         service = MarketDataService()
         
         # Get data for two different symbols
-        btc_result = service.get_market_data("BTCUSDT")
-        eth_result = service.get_market_data("ETHUSDT")
+        btc_result = service.get_market_data("BTCUSDT", trace_id="test_trace")
+        eth_result = service.get_market_data("ETHUSDT", trace_id="test_trace_eth")
         
         # Verify different symbols are processed correctly
         assert btc_result.symbol == "BTCUSDT"
@@ -74,7 +74,7 @@ class TestSystemIntegrationComprehensive:
     def test_decimal_precision_system_wide(self):
         """Test Decimal precision across the entire system."""
         service = MarketDataService()
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Verify all critical fields use Decimal arithmetic
         decimal_fields = [
@@ -100,7 +100,7 @@ class TestSystemIntegrationComprehensive:
     def test_dataframe_protection_and_context_generation(self):
         """Test DataFrame protection and context generation integration."""
         service = MarketDataService()
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Test basic context generation
         basic_context = result.to_llm_context_basic()
@@ -123,7 +123,7 @@ class TestSystemIntegrationComprehensive:
         valid_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
         
         for symbol in valid_symbols:
-            result = service.get_market_data(symbol)
+            result = service.get_market_data(symbol, trace_id="test_trace")
             assert result.symbol == symbol
             assert isinstance(result.rsi_14, Decimal)
         
@@ -137,7 +137,7 @@ class TestSystemIntegrationComprehensive:
     def test_technical_indicators_real_conditions(self):
         """Test technical indicators under real market conditions."""
         service = MarketDataService()
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Verify indicator values are within expected ranges
         assert 0 <= result.rsi_14 <= 100, f"RSI should be 0-100, got {result.rsi_14}"
@@ -160,7 +160,7 @@ class TestSystemIntegrationComprehensive:
         service = MarketDataService()
         
         # Basic market data should have support/resistance
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         assert result.symbol == "BTCUSDT"
         
         # Test enhanced context with pattern analysis
@@ -192,7 +192,7 @@ class TestSystemIntegrationComprehensive:
         service = MarketDataService()
         
         # Test complete workflow
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Verify all components work together
         assert result.symbol == "BTCUSDT"
@@ -224,7 +224,7 @@ class TestSystemResilience:
         results = []
         
         for symbol in symbols:
-            result = service.get_market_data(symbol)
+            result = service.get_market_data(symbol, trace_id="test_trace")
             results.append(result)
             assert result.symbol == symbol
         
@@ -238,7 +238,7 @@ class TestSystemResilience:
         # Test with logging enabled and disabled
         for enable_logging in [True, False]:
             service = MarketDataService(enable_logging=enable_logging)
-            result = service.get_market_data("BTCUSDT")
+            result = service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Core functionality should work regardless of logging settings
             assert result.symbol == "BTCUSDT"

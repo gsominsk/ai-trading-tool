@@ -41,7 +41,7 @@ class TestSymbolValidationErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(SymbolValidationError) as exc_info:
-            service.get_market_data("INVALID")
+            service.get_market_data("INVALID", trace_id="test_trace")
         
         error = exc_info.value
         assert isinstance(error, SymbolValidationError)
@@ -70,7 +70,7 @@ class TestSymbolValidationErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(SymbolValidationError) as exc_info:
-            service.get_market_data("")
+            service.get_market_data("", trace_id="test_trace")
         
         error = exc_info.value
         assert error.symbol == ""
@@ -82,7 +82,7 @@ class TestSymbolValidationErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(SymbolValidationError) as exc_info:
-            service.get_market_data("USDTUSDT")
+            service.get_market_data("USDTUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert "Multiple USDT occurrences" in str(error)
@@ -93,7 +93,7 @@ class TestSymbolValidationErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(SymbolValidationError) as exc_info:
-            service.get_market_data("VERYLONGCOINUSDT")
+            service.get_market_data("VERYLONGCOINUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert "Symbol too long" in str(error)
@@ -111,7 +111,7 @@ class TestSymbolValidationErrorIntegration:
         
         for invalid_symbol in test_cases:
             with pytest.raises(SymbolValidationError) as exc_info:
-                service.get_market_data(invalid_symbol)
+                service.get_market_data(invalid_symbol, trace_id="test_trace")
             
             error = exc_info.value
             assert error.symbol == invalid_symbol
@@ -147,7 +147,7 @@ class TestNetworkErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIConnectionError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert isinstance(error, APIConnectionError)
@@ -173,7 +173,7 @@ class TestNetworkErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIConnectionError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert "Failed to connect" in str(error)
@@ -197,7 +197,7 @@ class TestNetworkErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(RateLimitError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert isinstance(error, RateLimitError)
@@ -225,7 +225,7 @@ class TestNetworkErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIConnectionError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert "server error: 503" in str(error)
@@ -248,7 +248,7 @@ class TestNetworkErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIResponseError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert isinstance(error, APIResponseError)
@@ -273,7 +273,7 @@ class TestNetworkErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIResponseError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert "Empty or invalid response" in str(error)
@@ -342,7 +342,7 @@ class TestProcessingErrorIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIResponseError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         assert isinstance(error, APIResponseError)
@@ -433,7 +433,7 @@ class TestErrorContextIntegration:
         service = MarketDataService()
         
         with pytest.raises(APIConnectionError) as exc_info:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         error = exc_info.value
         

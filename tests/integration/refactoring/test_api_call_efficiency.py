@@ -26,7 +26,7 @@ def test_get_enhanced_context_avoids_redundant_api_calls():
         mock_get_klines.return_value = mock_df
 
         # 1. First, get the market data. This is expected to make API calls.
-        market_data_set = service.get_market_data("BTCUSDT")
+        market_data_set = service.get_market_data("BTCUSDT", trace_id="test_trace")
         
         # Assert that API calls were made to get the initial data
         assert mock_get_klines.call_count > 0, "API calls should be made for get_market_data"

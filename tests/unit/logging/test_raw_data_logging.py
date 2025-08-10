@@ -264,7 +264,7 @@ class TestRawDataIntegration:
         
         # Execute complete market data retrieval
         try:
-            market_data = self.service.get_market_data("BTCUSDT")
+            market_data = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Verify market data structure
             assert market_data.symbol == "BTCUSDT"

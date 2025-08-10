@@ -114,7 +114,7 @@ class TestMarketDataServiceEdgeCases:
                 mock_get.return_value = mock_response
                 
                 try:
-                    result = self.service.get_market_data("BTCUSDT")
+                    result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
                     rsi = result.rsi_14
                     
                     # Verify RSI correctness
@@ -169,7 +169,7 @@ class TestMarketDataServiceEdgeCases:
                 mock_get.return_value = mock_response
                 
                 try:
-                    result = self.service.get_market_data("BTCUSDT")
+                    result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
                     macd_signal = result.macd_signal
                     
                     # Verify MACD signal correctness
@@ -210,7 +210,7 @@ class TestMarketDataServiceEdgeCases:
                 mock_get.return_value = mock_response
                 
                 try:
-                    result = self.service.get_market_data("BTCUSDT")
+                    result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
                     ma_trend = result.ma_trend
                     ma_20 = result.ma_20
                     ma_50 = result.ma_50
@@ -256,7 +256,7 @@ class TestMarketDataServiceEdgeCases:
             mock_get.return_value = mock_response
             
             try:
-                result = self.service.get_market_data("BTCUSDT")
+                result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
                 
                 # All indicators should work without errors
                 assert isinstance(result.rsi_14, Decimal)
@@ -290,7 +290,7 @@ class TestMarketDataServiceEdgeCases:
             
             # Should fail validation due to too large values
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT")
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             assert "ma_20 too large" in str(exc_info.value)
     
     def test_extremely_small_numbers(self):
@@ -311,7 +311,7 @@ class TestMarketDataServiceEdgeCases:
             
             # Should fail validation due to MA values being too small (rounded to 0)
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("SHIUSDT")
+                self.service.get_market_data("SHIUSDT", trace_id="test_trace")
             assert "ma_20 must be positive" in str(exc_info.value)
     
     def test_zero_volume_candles(self):
@@ -332,7 +332,7 @@ class TestMarketDataServiceEdgeCases:
             mock_response.json.return_value = zero_volume_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("DEADUSDT")
+            result = self.service.get_market_data("DEADUSDT", trace_id="test_trace")
             assert result.volume_profile in ["high", "low", "normal"]
             assert 0 <= result.rsi_14 <= 100
     
@@ -354,7 +354,7 @@ class TestMarketDataServiceEdgeCases:
             mock_response.json.return_value = constant_price_data
             mock_get.return_value = mock_response
             
-            result = self.service.get_market_data("STABUSDT")
+            result = self.service.get_market_data("STABUSDT", trace_id="test_trace")
             # RSI can be 100 with constant upward movement, even tiny
             assert 0 <= result.rsi_14 <= 100  # Valid RSI range
             assert result.ma_trend == "sideways"
@@ -386,7 +386,7 @@ class TestMarketDataServiceEdgeCases:
             
             # Should fail validation due to extreme price deviation from MA20
             with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("VOLUSDT")
+                self.service.get_market_data("VOLUSDT", trace_id="test_trace")
             assert "too far from MA20" in str(exc_info.value)
 
 

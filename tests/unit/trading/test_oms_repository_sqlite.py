@@ -117,19 +117,27 @@ def test_multiple_orders(db_path, sample_order):
 
 def test_save_raises_exception_on_db_error(db_path, sample_order, mocker):
     """
-    Test that save method raises an exception when a database error occurs.
-    This test will currently fail because the exception is not caught and re-raised.
+    Test that save method raises a RepositoryError when a database error occurs.
     """
+    # We need a real repository to test its error handling
     repo = OmsRepository(str(db_path))
+
+    # Mock the connection's cursor to raise an error on execute
+    mock_cursor = mocker.MagicMock()
+    mock_cursor.execute.side_effect = sqlite3.OperationalError("disk I/O error")
     
-    # Mock the connect method to raise an OperationalError
-    mocker.patch('sqlite3.connect', side_effect=sqlite3.OperationalError("disk I/O error"))
+    mock_conn = mocker.MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    
+    # Patch the _get_connection method to return our faulty connection object
+    mocker.patch.object(repo, '_get_connection', return_value=mock_conn)
     
     with pytest.raises(RepositoryError) as excinfo:
         repo.save(sample_order)
     
     assert "disk I/O error" in str(excinfo.value)
     assert excinfo.value.db_operation == "save"
+    assert isinstance(excinfo.value.original_exception, sqlite3.OperationalError)
 
 def test_save_raises_integrity_error_on_missing_not_null_field(db_path, sample_order):
     """
@@ -154,8 +162,6 @@ def test_load_returns_empty_dict_on_corrupt_db_file(db_path):
     with open(db_path, "w") as f:
         f.write("this is not a database file")
         
-    repo = OmsRepository(str(db_path))
-    with pytest.raises(RepositoryError) as excinfo:
-        repo.load()
-
-    assert "file is not a database" in str(excinfo.value)
+    # Проверяем, что при инициализации с поврежденным файлом выбрасывается исключение
+    with pytest.raises(RepositoryError, match="Failed to create 'orders' table"):
+        OmsRepository(str(db_path))

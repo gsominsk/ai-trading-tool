@@ -429,32 +429,7 @@ class MarketDataService:
         """Creates an ErrorContext for a given operation and trace_id."""
         return ErrorContext(trace_id=trace_id, operation=operation)
 
-    def _start_operation(self, operation: str, parent_trace_id: Optional[str] = None, **kwargs) -> str:
-        """
-        Starts a new operation, generates a trace_id, logs the start, and returns the new trace_id.
-        """
-        from src.logging_system.trace_generator import get_trace_id
-        # 1. Generate a new, unique trace_id for this specific operation.
-        # The parent_trace_id is passed to the generator for semantic consistency.
-        new_trace_id = get_trace_id(parent_trace_id=parent_trace_id)
-
-        # 2. Log the start of the operation with parent-child relationship
-        # The symbol is explicitly passed, so remove it from kwargs to avoid TypeError
-        log_kwargs = kwargs.copy()
-        symbol = log_kwargs.pop('symbol', '')
-
-        self._log_operation_start(
-            operation=operation,
-            parent_trace_id=parent_trace_id,
-            trace_id=new_trace_id,
-            symbol=symbol,
-            **log_kwargs
-        )
-
-        # 3. Return the new trace_id to be used by the caller and for error context
-        return new_trace_id
-    
-    def _log_operation_start(self, operation: str, symbol: str = "", level: str = "INFO", trace_id: Optional[str] = None, parent_trace_id: Optional[str] = None, **kwargs):
+    def _log_operation_start(self, operation: str, symbol: str = "", level: str = "INFO", trace_id: Optional[str] = None, **kwargs):
         """Direct logging: Log operation start with context and hierarchical tracing."""
         if self.logger:
             try:
@@ -462,14 +437,13 @@ class MarketDataService:
                     operation=operation,
                     symbol=symbol,
                     context=kwargs,
-                    trace_id=trace_id,
-                    parent_trace_id=parent_trace_id
+                    trace_id=trace_id
                 )
             except Exception:
                 # Graceful degradation: logging failures should not crash operations
                 pass
     
-    def _log_operation_success(self, operation: str, symbol: str = "", level: str = "INFO", trace_id: Optional[str] = None, parent_trace_id: Optional[str] = None, **kwargs):
+    def _log_operation_success(self, operation: str, symbol: str = "", level: str = "INFO", trace_id: Optional[str] = None, **kwargs):
         """Direct logging: Log successful operation completion with hierarchical tracing."""
         if self.logger:
             try:
@@ -481,8 +455,7 @@ class MarketDataService:
                         'status': 'success',
                         **kwargs
                     },
-                    trace_id=trace_id,
-                    parent_trace_id=parent_trace_id
+                    trace_id=trace_id
                 )
             except Exception:
                 # Graceful degradation: logging failures should not crash operations
@@ -507,34 +480,37 @@ class MarketDataService:
         """Create cache directory if it doesn't exist."""
         os.makedirs(self.cache_dir, exist_ok=True)
     
-    def get_market_data(self, symbol: str) -> MarketDataSet:
+    def get_market_data(self, symbol: str, trace_id: Optional[str] = None) -> MarketDataSet:
         """
         Get complete multi-timeframe market data for a symbol with structured error handling.
         
         Args:
             symbol: Trading pair symbol (e.g., 'BTCUSDT')
+            trace_id: The master trace_id for the entire operation.
             
         Returns:
             MarketDataSet with all timeframes and indicators
         """
-        # Start the main operation and get the parent trace_id
-        main_trace_id = self._start_operation("get_market_data", symbol=symbol)
+        self._log_operation_start("get_market_data", symbol=symbol, trace_id=trace_id)
         
         try:
             # Validate input parameters - may raise SymbolValidationError
             self._validate_symbol_input(symbol)
             
-            # Fetch multi-timeframe data, passing the main_trace_id as the parent
-            daily_data = self._get_klines(symbol, "1d", 180, parent_trace_id=main_trace_id)
-            h4_data = self._get_klines(symbol, "4h", 84, parent_trace_id=main_trace_id)
-            h1_data = self._get_klines(symbol, "1h", 48, parent_trace_id=main_trace_id)
+            if not trace_id:
+                raise ValidationError("A trace_id is required for all market data operations.")
+            
+            # Fetch multi-timeframe data, passing the main trace_id
+            daily_data = self._get_klines(symbol, "1d", 180, trace_id=trace_id)
+            h4_data = self._get_klines(symbol, "4h", 84, trace_id=trace_id)
+            h1_data = self._get_klines(symbol, "1h", 48, trace_id=trace_id)
             
             # Defensive check for empty DataFrames before calculations
             if daily_data.empty or h4_data.empty or h1_data.empty:
                 raise DataInsufficientError(
                     message="One or more required DataFrames are empty, cannot proceed with calculations.",
                     operation="get_market_data",
-                    context=self._get_error_context("get_market_data", main_trace_id),
+                    context=self._get_error_context("get_market_data", trace_id),
                     required_periods=1,  # We need at least one row
                     available_periods=min(len(daily_data), len(h4_data), len(h1_data)),
                     data_type="multi_timeframe_candles"
@@ -549,7 +525,7 @@ class MarketDataService:
                 raise CalculationError(
                     message="Cannot calculate support/resistance due to insufficient valid data in daily candles.",
                     operation="get_market_data",
-                    context=self._get_error_context("get_market_data", main_trace_id),
+                    context=self._get_error_context("get_market_data", trace_id),
                     calculation_type="support_resistance",
                     error_details="min() or max() on daily data returned NaN."
                 )
@@ -563,15 +539,15 @@ class MarketDataService:
                 support_level = resistance_level - price_buffer
             
             # Calculate technical indicators with graceful degradation
-            rsi = self._calculate_rsi_with_fallback(h1_data, 14, parent_trace_id=main_trace_id)
-            macd_signal = self._calculate_macd_signal_with_fallback(h1_data, parent_trace_id=main_trace_id)
-            ma_20 = self._calculate_ma_with_fallback(h1_data, 20, parent_trace_id=main_trace_id)
-            ma_50 = self._calculate_ma_with_fallback(h1_data, 50, parent_trace_id=main_trace_id)
-            ma_trend = self._determine_ma_trend_with_fallback(ma_20, ma_50, parent_trace_id=main_trace_id)
+            rsi = self._calculate_rsi_with_fallback(symbol, h1_data, 14, trace_id=trace_id)
+            macd_signal = self._calculate_macd_signal_with_fallback(symbol, h1_data, trace_id=trace_id)
+            ma_20 = self._calculate_ma_with_fallback(symbol, h1_data, 20, trace_id=trace_id)
+            ma_50 = self._calculate_ma_with_fallback(symbol, h1_data, 50, trace_id=trace_id)
+            ma_trend = self._determine_ma_trend_with_fallback(ma_20, ma_50, trace_id=trace_id)
             
             # Get market context with graceful degradation
-            btc_correlation = self._calculate_btc_correlation_with_fallback(symbol, h1_data, parent_trace_id=main_trace_id) if symbol != "BTCUSDT" else None
-            volume_profile = self._analyze_volume_profile_with_fallback(symbol, h1_data, parent_trace_id=main_trace_id)
+            btc_correlation = self._calculate_btc_correlation_with_fallback(symbol, h1_data, trace_id=trace_id) if symbol != "BTCUSDT" else None
+            volume_profile = self._analyze_volume_profile_with_fallback(symbol, h1_data, trace_id=trace_id)
             
             market_data_set = MarketDataSet(
                 symbol=symbol,
@@ -588,25 +564,26 @@ class MarketDataService:
                 volume_profile=volume_profile,
                 support_level=support_level,
                 resistance_level=resistance_level,
-                trace_id=main_trace_id  # Store the main trace_id
+                trace_id=trace_id
             )
+            market_data_set.trace_id = trace_id
             
-            self._log_operation_success("get_market_data", symbol=symbol, level="INFO", data_points=len(h1_data), trace_id=main_trace_id)
+            self._log_operation_success("get_market_data", symbol=symbol, level="INFO", data_points=len(h1_data), trace_id=trace_id)
             
             if self.logger:
-                self._log_market_analysis_complete(symbol, market_data_set, trace_id=main_trace_id)
+                self._log_market_analysis_complete(symbol, market_data_set, trace_id=trace_id)
             
             return market_data_set
             
         except (ValidationError, NetworkError, ProcessingError) as e:
-            self._log_operation_error("get_market_data", e, symbol=symbol, level="ERROR", error_type=type(e).__name__, trace_id=main_trace_id)
+            self._log_operation_error("get_market_data", e, symbol=symbol, level="ERROR", error_type=type(e).__name__, trace_id=trace_id)
             raise
         except Exception as e:
-            self._log_operation_error("get_market_data", e, symbol=symbol, level="CRITICAL", error_type="unexpected", trace_id=main_trace_id)
+            self._log_operation_error("get_market_data", e, symbol=symbol, level="CRITICAL", error_type="unexpected", trace_id=trace_id)
             raise ProcessingError(
                 message=f"Unexpected error during market data aggregation: {str(e)}",
                 operation="get_market_data",
-                context=self._get_error_context("get_market_data", main_trace_id),
+                context=self._get_error_context("get_market_data", trace_id),
                 processing_stage="data_aggregation",
                 error_details=str(e)
             )
@@ -645,11 +622,11 @@ class MarketDataService:
         """Get enhanced market context with candlestick analysis and structured error handling."""
         symbol = market_data.symbol
         # Start a new child operation, linking it to the parent trace_id from MarketDataSet
-        parent_trace_id = market_data.trace_id
-        trace_id = self._start_operation(
+        trace_id = market_data.trace_id
+        self._log_operation_start(
             "get_enhanced_context",
-            parent_trace_id=parent_trace_id,
-            symbol=symbol
+            symbol=symbol,
+            trace_id=trace_id
         )
 
         try:
@@ -738,17 +715,17 @@ Error Details:
 Please check system logs and contact support.
 """
     
-    def _get_klines(self, symbol: str, interval: str, limit: int, parent_trace_id: Optional[str] = None) -> pd.DataFrame:
+    def _get_klines(self, symbol: str, interval: str, limit: int, trace_id: Optional[str] = None) -> pd.DataFrame:
         """Fetch candlestick data from Binance API with structured error handling."""
         url = f"{self.base_url}/klines"
         params = {"symbol": symbol, "interval": interval, "limit": limit}
 
-        trace_id = self._start_operation(
+        self._log_operation_start(
             "get_klines",
-            parent_trace_id=parent_trace_id,
             symbol=symbol,
             interval=interval,
-            limit=limit
+            limit=limit,
+            trace_id=trace_id
         )
         error_context = self._get_error_context("get_klines", trace_id)
 
@@ -945,13 +922,14 @@ Please check system logs and contact support.
                                     error_type="unexpected", endpoint=url, trace_id=trace_id)
             raise processing_error
     
-    def _calculate_rsi(self, df: pd.DataFrame, period: int = 14, parent_trace_id: Optional[str] = None) -> Decimal:
+    def _calculate_rsi(self, symbol: str, df: pd.DataFrame, period: int = 14, trace_id: Optional[str] = None) -> Decimal:
         """Calculate RSI indicator with Decimal precision and division by zero protection."""
-        trace_id = self._start_operation(
+        self._log_operation_start(
             "rsi_calculation",
-            parent_trace_id=parent_trace_id,
+            symbol=symbol,
             period=period,
-            data_points=len(df)
+            data_points=len(df),
+            trace_id=trace_id
         )
         
         if len(df) < period + 1:
@@ -1015,12 +993,13 @@ Please check system logs and contact support.
         
         return result
     
-    def _calculate_macd_signal(self, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
+    def _calculate_macd_signal(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> str:
         """Calculate MACD signal (bullish/bearish/neutral)."""
-        trace_id = self._start_operation(
+        self._log_operation_start(
             "macd_calculation",
-            parent_trace_id=parent_trace_id,
-            data_points=len(df)
+            symbol=symbol,
+            data_points=len(df),
+            trace_id=trace_id
         )
         
         if len(df) < 26:
@@ -1072,13 +1051,14 @@ Please check system logs and contact support.
         
         return result
     
-    def _calculate_ma(self, df: pd.DataFrame, period: int, parent_trace_id: Optional[str] = None) -> Decimal:
+    def _calculate_ma(self, symbol: str, df: pd.DataFrame, period: int, trace_id: Optional[str] = None) -> Decimal:
         """Calculate moving average with Decimal precision."""
-        trace_id = self._start_operation(
+        self._log_operation_start(
             "ma_calculation",
-            parent_trace_id=parent_trace_id,
+            symbol=symbol,
             period=period,
-            data_points=len(df)
+            data_points=len(df),
+            trace_id=trace_id
         )
         
         if len(df) < period:
@@ -1144,7 +1124,7 @@ Please check system logs and contact support.
         
         return result
     
-    def _determine_ma_trend(self, ma_20: Decimal, ma_50: Decimal, parent_trace_id: Optional[str] = None) -> str:
+    def _determine_ma_trend(self, ma_20: Decimal, ma_50: Decimal, trace_id: Optional[str] = None) -> str:
         """Determine trend based on moving averages."""
         if ma_20 is None or ma_50 is None:
             return "sideways"
@@ -1159,23 +1139,23 @@ Please check system logs and contact support.
         else:
             return "sideways"
     
-    def _calculate_btc_correlation(self, symbol: str, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> Optional[Decimal]:
+    def _calculate_btc_correlation(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> Optional[Decimal]:
         """Calculate correlation with BTC using actual price data with structured error handling."""
         # Skip correlation calculation for BTC itself
         if symbol == "BTCUSDT":
             return None
 
-        trace_id = self._start_operation(
+        self._log_operation_start(
             "btc_correlation",
-            parent_trace_id=parent_trace_id,
             symbol=symbol,
-            data_points=len(df)
+            data_points=len(df),
+            trace_id=trace_id
         )
         error_context = self._get_error_context("btc_correlation", trace_id)
 
         try:
-            # Fetch BTC data for correlation calculation, passing the new trace_id as parent
-            btc_data = self._get_klines("BTCUSDT", "1h", len(df), parent_trace_id=trace_id)
+            # Fetch BTC data for correlation calculation, passing the trace_id
+            btc_data = self._get_klines("BTCUSDT", "1h", len(df), trace_id=trace_id)
 
             # Ensure we have enough data points for meaningful correlation
             if len(btc_data) < 10 or len(df) < 10:
@@ -1259,54 +1239,54 @@ Please check system logs and contact support.
                 error_details=str(e)
             )
     
-    def _calculate_btc_correlation_with_fallback(self, symbol: str, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> Optional[Decimal]:
+    def _calculate_btc_correlation_with_fallback(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> Optional[Decimal]:
         """Calculate BTC correlation with graceful degradation for all errors."""
         try:
-            return self._calculate_btc_correlation(symbol, df, parent_trace_id=parent_trace_id)
+            return self._calculate_btc_correlation(symbol, df, trace_id=trace_id)
         except (DataInsufficientError, ProcessingError, NetworkError) as e:
             # Graceful degradation: log the issue but continue without correlation
             self._log_operation_error("btc_correlation_fallback", e, symbol=symbol,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
+                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
             return None  # Graceful degradation: no correlation data
 
-    def _analyze_volume_profile_with_fallback(self, symbol: str, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
+    def _analyze_volume_profile_with_fallback(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> str:
         """Analyze volume profile with graceful degradation for calculation failures."""
         try:
-            return self._analyze_volume_profile(symbol, df, parent_trace_id=parent_trace_id)
+            return self._analyze_volume_profile(symbol, df, trace_id=trace_id)
         except Exception as e:
             # Graceful degradation: default to "normal" volume profile
             self._log_operation_error("volume_profile_fallback", e, symbol=symbol,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
+                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
             return "normal"  # Safe default value
 
-    def _calculate_rsi_with_fallback(self, df: pd.DataFrame, period: int = 14, parent_trace_id: Optional[str] = None) -> Decimal:
+    def _calculate_rsi_with_fallback(self, symbol: str, df: pd.DataFrame, period: int = 14, trace_id: Optional[str] = None) -> Decimal:
         """Calculate RSI with graceful degradation to neutral value."""
         try:
-            return self._calculate_rsi(df, period, parent_trace_id=parent_trace_id)
+            return self._calculate_rsi(symbol=symbol, df=df, period=period, trace_id=trace_id)
         except Exception as e:
             # Graceful degradation: return neutral RSI
             self._log_operation_error("rsi_fallback", e, period=period,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
+                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
             return Decimal('50.0')  # Neutral RSI value
 
-    def _calculate_macd_signal_with_fallback(self, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
+    def _calculate_macd_signal_with_fallback(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> str:
         """Calculate MACD signal with graceful degradation to neutral."""
         try:
-            return self._calculate_macd_signal(df, parent_trace_id=parent_trace_id)
+            return self._calculate_macd_signal(symbol, df, trace_id=trace_id)
         except Exception as e:
             # Graceful degradation: return neutral signal
             self._log_operation_error("macd_fallback", e,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
+                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
             return "neutral"  # Safe default signal
 
-    def _calculate_ma_with_fallback(self, df: pd.DataFrame, period: int, parent_trace_id: Optional[str] = None) -> Decimal:
+    def _calculate_ma_with_fallback(self, symbol: str, df: pd.DataFrame, period: int, trace_id: Optional[str] = None) -> Decimal:
         """Calculate moving average with graceful degradation to current price."""
         try:
-            return self._calculate_ma(df, period, parent_trace_id=parent_trace_id)
+            return self._calculate_ma(symbol, df, period, trace_id=trace_id)
         except Exception as e:
             # Graceful degradation: use current price as MA fallback
             self._log_operation_error("ma_fallback", e, period=period,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
+                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
             try:
                 # Try to use current price as fallback
                 current_price = Decimal(str(df['close'].iloc[-1]))
@@ -1315,14 +1295,14 @@ Please check system logs and contact support.
                 # Ultimate fallback: return a reasonable default price
                 return Decimal('50000.00')  # Conservative estimate for crypto
 
-    def _determine_ma_trend_with_fallback(self, ma_20: Decimal, ma_50: Decimal, parent_trace_id: Optional[str] = None) -> str:
+    def _determine_ma_trend_with_fallback(self, ma_20: Decimal, ma_50: Decimal, trace_id: Optional[str] = None) -> str:
         """Determine MA trend with graceful degradation to sideways."""
         try:
-            return self._determine_ma_trend(ma_20, ma_50, parent_trace_id=parent_trace_id)
+            return self._determine_ma_trend(ma_20, ma_50, trace_id=trace_id)
         except Exception as e:
             # Graceful degradation: return sideways trend
             self._log_operation_error("ma_trend_fallback", e,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=parent_trace_id)
+                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
             return "sideways"  # Safe default trend
     
     def _get_market_data_with_fallback(self, symbol: str) -> dict:
@@ -1341,7 +1321,7 @@ Please check system logs and contact support.
         try:
             # Use existing trace_id (inherited from master operation) and pass master as parent
             master_trace_id = self._current_trace_id
-            error_context = self._get_error_context("get_market_data_with_fallback", parent_trace_id=master_trace_id, symbol=symbol)
+            error_context = self._get_error_context("get_market_data_with_fallback", trace_id=master_trace_id)
             
             # Try to get basic market data with manual graceful degradation
             try:
@@ -1703,13 +1683,13 @@ Please check system logs and contact support.
                                         strategy="fail_fast_default", operation_type=operation_type)
                 raise
     
-    def _analyze_volume_profile(self, symbol: str, df: pd.DataFrame, parent_trace_id: Optional[str] = None) -> str:
+    def _analyze_volume_profile(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> str:
         """Analyze volume profile (high/normal/low)."""
-        trace_id = self._start_operation(
+        self._log_operation_start(
             "volume_analysis",
-            parent_trace_id=parent_trace_id,
             symbol=symbol,
-            data_points=len(df)
+            data_points=len(df),
+            trace_id=trace_id
         )
 
         if len(df) < 24:  # Need at least 24 hours for basic comparison
@@ -2080,7 +2060,7 @@ if __name__ == "__main__":
     
     try:
         # Test with BTC basic context
-        btc_data = service.get_market_data("BTCUSDT")
+        btc_data = service.get_market_data("BTCUSDT", trace_id="test_trace_id_123")
         print("=== BTC Market Data Test (Basic) ===")
         print(btc_data.to_llm_context())
         

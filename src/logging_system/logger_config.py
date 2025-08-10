@@ -274,10 +274,30 @@ class MarketDataLogger:
             trace_id=trace_id
         )
     
+    def log_operation_error(self, operation: str, error: str,
+                             context: Optional[Dict[str, Any]] = None,
+                             trace_id: Optional[str] = None,
+                             parent_trace_id: Optional[str] = None):
+        """Log a failed operation with hierarchical tracing."""
+        ctx = context or {}
+        ctx["error"] = error
+
+        if parent_trace_id:
+            ctx["parent_trace_id"] = parent_trace_id
+
+        self.logger.error(
+            f"{operation} failed",
+            operation=operation,
+            context=ctx,
+            tags=["flow_fail", operation.lower().replace("_", ""), "error"],
+            flow=get_flow_summary(),
+            trace_id=trace_id
+        )
+
     def log_api_call(self, symbol: str, interval: str, limit: int,
-                     response_time_ms: Optional[int] = None,
-                     status_code: Optional[int] = None,
-                     trace_id: Optional[str] = None):
+                      response_time_ms: Optional[int] = None,
+                      status_code: Optional[int] = None,
+                      trace_id: Optional[str] = None):
         """Log API call with performance metrics."""
         context = {
             "symbol": symbol,

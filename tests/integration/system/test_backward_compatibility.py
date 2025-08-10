@@ -48,7 +48,7 @@ class TestValueErrorInheritanceCompatibility:
         
         # Test catching as specific type
         with pytest.raises(SymbolValidationError):
-            service.get_market_data("INVALID")
+            service.get_market_data("INVALID", trace_id="test_trace")
         
         # Test catching as ValueError (backward compatibility)
         with pytest.raises(ValueError):
@@ -159,7 +159,7 @@ class TestLegacyExceptionHandlingPatterns:
         # Legacy pattern: catch all validation errors as ValueError
         validation_error_caught = False
         try:
-            service.get_market_data("INVALID_SYMBOL")
+            service.get_market_data("INVALID_SYMBOL", trace_id="test_trace")
         except ValueError as e:
             validation_error_caught = True
             assert "Invalid symbol format" in str(e)
@@ -192,7 +192,7 @@ class TestLegacyExceptionHandlingPatterns:
         # Legacy pattern: catch broad Exception for network issues
         network_error_caught = False
         try:
-            service.get_market_data("BTCUSDT")
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
         except Exception as e:
             network_error_caught = True
             # Should still be able to access basic error information
@@ -297,7 +297,7 @@ class TestMarketDataServiceBackwardCompatibility:
         service = MarketDataService()
         
         # Legacy usage: just symbol parameter
-        result = service.get_market_data("BTCUSDT")
+        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
         assert isinstance(result, MarketDataSet)
         assert result.symbol == "BTCUSDT"
     
@@ -412,7 +412,7 @@ class TestNoBreakingChangesPublicAPI:
         
         # Test symbol validation error message
         try:
-            service.get_market_data("INVALID")
+            service.get_market_data("INVALID", trace_id="test_trace")
         except ValueError as e:
             error_msg = str(e)
             # Should contain helpful information
@@ -431,7 +431,7 @@ class TestExistingTestCompatibility:
         
         # pytest.raises should work with ValueError
         with pytest.raises(ValueError, match="Invalid symbol format"):
-            service.get_market_data("INVALID")
+            service.get_market_data("INVALID", trace_id="test_trace")
         
         # pytest.raises should work with specific exception types
         with pytest.raises(SymbolValidationError, match="Invalid symbol format"):
@@ -471,7 +471,7 @@ class TestExistingTestCompatibility:
             
             # Should also be able to catch as specific type
             with pytest.raises(APIConnectionError):
-                service.get_market_data("BTCUSDT")
+                service.get_market_data("BTCUSDT", trace_id="test_trace")
 
 
 if __name__ == "__main__":

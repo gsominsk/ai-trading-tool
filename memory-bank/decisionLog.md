@@ -147,3 +147,25 @@ Complete decision history with full details (approx. 522 lines before this optim
 4.  **Graceful Handling**: `OrderManagementSystem` was updated to handle `RepositoryError` gracefully, preventing crashes and logging the persistence issue.
 5.  **Logging & Tracing**: The `MarketDataLogger` was injected into both `OMS` and `OmsRepository`, and `trace_id` propagation was implemented to ensure full end-to-end observability of order operations.
 **Result**: The OMS and its repository are now robust, production-ready components that align with the project's established architectural patterns for error handling and logging. The entire system remains stable, as confirmed by a full test suite run.
+
+[2025-08-10 16:30:50] - **Архитектурное решение: Централизация генерации `trace_id`**. Принято решение перенести точку генерации корневого `trace_id` из `MarketDataService` в `TradingCycle`. `TradingCycle` теперь отвечает за создание "мастер" `trace_id` для каждого цикла, который затем передается во все дочерние компоненты (`MarketDataService`, `OMS`). Это обеспечивает настоящую сквозную трассировку операций.
+
+[2025-08-10 16:34:35] - **Архитектурное решение: Сквозная передача `trace_id` в слой персистентности**. Реализована передача `trace_id` через `OrderManagementSystem` в `OmsRepository`.
+**Проблема**: Логирование в `OmsRepository` было изолированным и не имело связи с инициирующей операцией в `TradingCycle`.
+**Решение**: Все методы в `OMS`, вызывающие репозиторий, и все методы в `OmsRepository` (`load`, `save`, `delete`) были модифицированы для приема и использования `trace_id`.
+**Результат**: Завершено создание полной цепочки трассировки. Теперь каждое действие, от старта торгового цикла до записи в базу данных, связано единым `trace_id`, что обеспечивает полную наблюдаемость и упрощает отладку.
+
+[2025-08-10 17:13:33] - Refactoring `OmsRepository` to handle `:memory:` database connections correctly for testing purposes. The change introduces a persistent connection for in-memory databases to prevent tables from being destroyed between operations, while maintaining the existing connection-per-operation logic for file-based databases in production.
+
+
+[2025-08-10 20:50:22] - **Architectural Decision: Simplification of Tracing in `MarketDataService`**
+**Problem**: The existing hierarchical tracing in `MarketDataService`, where the service generated its own `trace_id`s for sub-operations, was overly complex. It contradicted the project's goal of simple end-to-end tracing and was a root cause of failures in the `test_end_to_end_tracing.py` integration test.
+**Solution**: The tracing mechanism was refactored to use a single, externally provided `trace_id`.
+1.  **Removed `_start_operation`**: The method responsible for generating new `trace_id`s was deleted.
+2.  **Simplified Signatures**: All methods, including `get_market_data` and internal calculation methods, were updated to accept a single `trace_id` instead of a `parent_trace_id`.
+3.  **Direct Propagation**: The `trace_id` is now passed down directly through the entire call stack within the service.
+**Result**: This change significantly simplifies the logging logic, makes log analysis more straightforward, and directly addresses the instability in the integration test by allowing for simpler, more robust assertions based on a single `trace_id`.
+
+[2025-08-10 17:53:57] - [Decision] Refactored the end-to-end tracing test (`test_end_to_end_tracing.py`) to align with the simplified single `trace_id` architecture. [Rationale] The previous test was designed to validate a complex parent-child trace ID hierarchy, which has been removed. The new test validates that the single `master_trace_id` is correctly propagated through all logged operations. [Implication] This simplifies test maintenance and more accurately reflects the current, cleaner tracing design.
+
+[2025-08-10 18:46:08] - Refactor tracing logic to enforce a single `trace_id` throughout the `MarketDataService`. All methods now require a `trace_id`, and the service raises a `ValidationError` if it's missing. This simplifies debugging and ensures consistent end-to-end tracing.

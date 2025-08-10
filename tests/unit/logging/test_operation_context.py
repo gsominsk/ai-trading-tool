@@ -198,7 +198,7 @@ class TestOperationContextIntegration:
         
         try:
             # Run market data operation
-            market_data = service.get_market_data("BTCUSDT")
+            market_data = service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Parse log file to check trace_id consistency
             with open(log_file, 'r') as f:
