@@ -137,3 +137,13 @@ Complete decision history with full details (approx. 522 lines before this optim
 [2025-08-10 00:33:12] - **Decision:** Corrected the trading cycle logic in `trading_cycle.py`.
 **Rationale:** The cycle was incorrectly terminating after an order's status was synced (e.g., from PENDING to FILLED). This prevented the AI from receiving the updated state (a closed position) to make a new decision.
 **Implication:** The trading loop will now correctly continue after a position is closed, allowing for continuous operation and decision-making based on the latest portfolio state.
+
+[2025-08-10 16:11:35] - **Architectural Decision: OMS/Repository Hardening (Phase 8)**
+**Problem**: The initial implementation of `OmsRepository` and `OrderManagementSystem` was not production-ready. It lacked proper error handling (did not convert specific DB errors into domain exceptions), had no logging, and was missing tests for critical failure scenarios (DB corruption, integrity errors).
+**Solution**: A systematic, test-driven approach was used to harden the components.
+1.  **TDD for Errors**: Specific tests were created to simulate `sqlite3.OperationalError`, `sqlite3.IntegrityError`, and database corruption *before* implementing the fixes.
+2.  **Custom Domain Exception**: A new `RepositoryError` was created to abstract away database-specific exceptions, providing a consistent error-handling contract.
+3.  **Refactoring**: `OmsRepository` was refactored to catch `sqlite3.Error` and wrap it in the new `RepositoryError`.
+4.  **Graceful Handling**: `OrderManagementSystem` was updated to handle `RepositoryError` gracefully, preventing crashes and logging the persistence issue.
+5.  **Logging & Tracing**: The `MarketDataLogger` was injected into both `OMS` and `OmsRepository`, and `trace_id` propagation was implemented to ensure full end-to-end observability of order operations.
+**Result**: The OMS and its repository are now robust, production-ready components that align with the project's established architectural patterns for error handling and logging. The entire system remains stable, as confirmed by a full test suite run.

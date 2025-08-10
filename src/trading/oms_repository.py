@@ -1,20 +1,24 @@
 import sqlite3
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from src.market_data.exceptions import RepositoryError
+from src.logging_system.logger_config import MarketDataLogger
 
 class OmsRepository:
     """
     Отвечает за сохранение и загрузку состояния ордеров (orders)
     в персистентное хранилище (база данных SQLite).
     """
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, logger: Optional[MarketDataLogger] = None):
         """
         Инициализирует репозиторий с путем к файлу базы данных.
 
         Args:
             db_path (str): Путь к файлу .db, где хранится состояние OMS.
+            logger (Optional[MarketDataLogger]): Экземпляр логгера.
         """
         self._db_path = db_path
+        self.logger = logger
         # Убедимся, что директория для файла существует
         os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
         self._create_table()
@@ -42,9 +46,10 @@ class OmsRepository:
                 );
             """)
             conn.commit()
-        except sqlite3.Error as e:
-            print(f"Database error in _create_table: {e}")
-            raise
+        except sqlite3.Error:
+            # Silently fail on initialization if the DB is corrupt or unwritable.
+            # The error will be raised on the first actual operation (load/save).
+            pass
         finally:
             if conn:
                 conn.close()
@@ -68,8 +73,12 @@ class OmsRepository:
             for row in rows:
                 orders[row['order_id']] = dict(row)
         except sqlite3.Error as e:
-            print(f"Database error in load: {e}")
-            return {}
+            raise RepositoryError(
+                message=f"Failed to load orders from OMS database: {e}",
+                repository_type="sqlite",
+                db_operation="load",
+                original_exception=e
+            )
         finally:
             if conn:
                 conn.close()
@@ -99,10 +108,14 @@ class OmsRepository:
             cursor.execute(sql, values)
             conn.commit()
         except sqlite3.Error as e:
-            print(f"Database error in save: {e}")
             if conn:
                 conn.rollback()
-            raise
+            raise RepositoryError(
+                message=f"Failed to save order to OMS database: {e}",
+                repository_type="sqlite",
+                db_operation="save",
+                original_exception=e
+            )
         finally:
             if conn:
                 conn.close()
@@ -121,10 +134,14 @@ class OmsRepository:
             cursor.execute("DELETE FROM orders WHERE order_id = ?", (order_id,))
             conn.commit()
         except sqlite3.Error as e:
-            print(f"Database error in delete: {e}")
             if conn:
                 conn.rollback()
-            raise
+            raise RepositoryError(
+                message=f"Failed to delete order from OMS database: {e}",
+                repository_type="sqlite",
+                db_operation="delete",
+                original_exception=e
+            )
         finally:
             if conn:
                 conn.close()

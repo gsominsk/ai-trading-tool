@@ -89,3 +89,13 @@ Complete progress history (1,179 lines before this optimization) is archived in 
 *Optimized on 2025-08-06: Reduced from 1,179 lines to an optimized version with a historical index. Full content is preserved in the archive.*
 
 [2025-08-10 00:33:33] - **Fix:** Corrected a critical logic flaw in `trading_cycle.py` that caused premature cycle termination. The fix ensures the trading loop continues after order status synchronization, enabling proper AI decision-making.
+
+[2025-08-10 16:04:47] - **Phase 8, Tasks 8.1-8.2**: Created unit tests for `sqlite3.OperationalError` and `sqlite3.IntegrityError` in `OmsRepository`. The tests currently pass, confirming that the repository correctly propagates raw database exceptions. This sets the stage for the next step, where these raw exceptions will be wrapped in a custom `RepositoryError`.
+
+[2025-08-10 16:05:35] - **Phase 8, Tasks 8.4-8.5**: Created a unit test for handling corrupted database files and defined the new `RepositoryError` exception class in `src/market_data/exceptions.py`. This completes the first block of TDD work.
+
+[2025-08-10 16:08:36] - **Phase 8, Tasks 8.7-8.8**: Refactored `OmsRepository` to wrap `sqlite3.Error` in the custom `RepositoryError` and injected the `MarketDataLogger` into its constructor. This prepares the repository for semantic logging.
+
+[2025-08-10 16:09:40] - **Phase 8, Tasks 8.10-8.11**: Completed the first stage of logging integration. All `print` statements in `OmsRepository` were removed during prior refactoring, and the `MarketDataLogger` has been successfully injected into `OrderManagementSystem` to enable trace_id propagation.
+
+[2025-08-10 16:11:23] - **Phase 8, Tasks 8.13-8.14**: Implemented robust exception handling in `OrderManagementSystem` to catch `RepositoryError` and prevent crashes. Ran the full test suite (23 files), which passed successfully, confirming the stability of all changes made during Phase 8.

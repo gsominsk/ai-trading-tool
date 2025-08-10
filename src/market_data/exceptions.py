@@ -449,3 +449,37 @@ class DataInsufficientError(ProcessingError):
         self.required_periods = required_periods
         self.available_periods = available_periods
         self.data_type = data_type
+
+class RepositoryError(ProcessingError):
+    """
+    Repository-related errors for persistence issues.
+    
+    Used for:
+    - Database connection failures
+    - SQL execution errors
+    - Data serialization/deserialization problems
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        repository_type: Optional[str] = None,
+        db_operation: Optional[str] = None,
+        original_exception: Optional[Exception] = None,
+        **kwargs
+    ):
+        # Set default operation if not provided
+        if 'operation' not in kwargs:
+            kwargs['operation'] = "repository_operation"
+
+        super().__init__(
+            message,
+            calculation_type=f"{repository_type}_repository",
+            repository_type=repository_type,
+            db_operation=db_operation,
+            original_exception=str(original_exception),
+            **kwargs
+        )
+        self.repository_type = repository_type
+        self.db_operation = db_operation
+        self.original_exception = original_exception

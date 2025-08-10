@@ -1,6 +1,7 @@
 import pytest
 import sqlite3
 from src.trading.oms_repository import OmsRepository
+from src.market_data.exceptions import RepositoryError
 from datetime import datetime
 
 @pytest.fixture
@@ -113,3 +114,48 @@ def test_multiple_orders(db_path, sample_order):
     assert "order1" in loaded_orders
     assert "order2" in loaded_orders
     assert loaded_orders["order2"]["symbol"] == "ETHUSDT"
+
+def test_save_raises_exception_on_db_error(db_path, sample_order, mocker):
+    """
+    Test that save method raises an exception when a database error occurs.
+    This test will currently fail because the exception is not caught and re-raised.
+    """
+    repo = OmsRepository(str(db_path))
+    
+    # Mock the connect method to raise an OperationalError
+    mocker.patch('sqlite3.connect', side_effect=sqlite3.OperationalError("disk I/O error"))
+    
+    with pytest.raises(RepositoryError) as excinfo:
+        repo.save(sample_order)
+    
+    assert "disk I/O error" in str(excinfo.value)
+    assert excinfo.value.db_operation == "save"
+
+def test_save_raises_integrity_error_on_missing_not_null_field(db_path, sample_order):
+    """
+    Test that saving an order with a missing NOT NULL field raises IntegrityError.
+    """
+    repo = OmsRepository(str(db_path))
+    
+    # Remove a field that has a NOT NULL constraint in the database
+    del sample_order["symbol"]
+    
+    with pytest.raises(RepositoryError) as excinfo:
+        repo.save(sample_order)
+        
+    assert "NOT NULL constraint failed" in str(excinfo.value)
+    assert excinfo.value.db_operation == "save"
+
+def test_load_returns_empty_dict_on_corrupt_db_file(db_path):
+    """
+    Test that load() returns an empty dictionary if the database file is corrupt.
+    """
+    # Create a corrupted database file
+    with open(db_path, "w") as f:
+        f.write("this is not a database file")
+        
+    repo = OmsRepository(str(db_path))
+    with pytest.raises(RepositoryError) as excinfo:
+        repo.load()
+
+    assert "file is not a database" in str(excinfo.value)
