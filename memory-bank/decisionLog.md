@@ -169,3 +169,6 @@ Complete decision history with full details (approx. 522 lines before this optim
 [2025-08-10 17:53:57] - [Decision] Refactored the end-to-end tracing test (`test_end_to_end_tracing.py`) to align with the simplified single `trace_id` architecture. [Rationale] The previous test was designed to validate a complex parent-child trace ID hierarchy, which has been removed. The new test validates that the single `master_trace_id` is correctly propagated through all logged operations. [Implication] This simplifies test maintenance and more accurately reflects the current, cleaner tracing design.
 
 [2025-08-10 18:46:08] - Refactor tracing logic to enforce a single `trace_id` throughout the `MarketDataService`. All methods now require a `trace_id`, and the service raises a `ValidationError` if it's missing. This simplifies debugging and ensures consistent end-to-end tracing.
+
+
+[2025-08-10 22:10:00] - **Architectural Decision: Stricter Workflow for Refactoring**. Added a mandatory testing policy to `workflowChecks.md`. Any change to existing code (refactoring, bug fix) must be immediately followed by a full test suite run within the same phase to ensure no regressions are introduced. This enforces a higher standard of quality and prevents breaking changes from being committed.

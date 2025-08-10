@@ -122,3 +122,6 @@ Complete progress history (1,179 lines before this optimization) is archived in 
 [2025-08-10 17:53:50] - [Phase 3: Integration Test Refactoring] Completed refactoring of `tests/integration/logging/test_end_to_end_tracing.py`. The test now uses a simplified assertion model to verify the propagation of a single `master_trace_id`, aligning with the new tracing logic.
 
 [2025-08-10 18:46:22] - Phase 9.1 (Tracing Simplification) is complete. All tests are passing after refactoring the `MarketDataService` to use a single `trace_id` and enforcing its presence. The system is now more robust and easier to debug.
+
+
+[2025-08-10 22:10:00] - **Workflow Improvement**: Updated `workflowChecks.md` with a strict policy requiring a full test suite run immediately after any code refactoring or modification. This ensures all changes are validated against regressions before proceeding.
