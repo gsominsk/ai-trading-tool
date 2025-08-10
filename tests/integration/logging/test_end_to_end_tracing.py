@@ -17,21 +17,21 @@ class TestEndToEndTracing(unittest.TestCase):
 
     def setUp(self):
         """Set up a complete trading cycle with mocked external dependencies."""
-        # 1. Setup logging to capture to a string buffer
+        # 1. Setup logging to use the actual AIOptimizedJSONFormatter
         self.log_stream = io.StringIO()
-        # Make sure to use a handler that writes to the stream
         handler = logging.StreamHandler(self.log_stream)
-        # Use a flexible formatter that doesn't fail on missing keys
-        formatter = logging.Formatter('{"trace_id": "%(trace_id)s", "operation": "%(operation)s", "message": "%(message)s"}', defaults={"trace_id": None, "operation": "unknown"})
+        
+        # Use the real formatter to ensure 'service' field is handled correctly
+        from src.logging_system.json_formatter import AIOptimizedJSONFormatter
+        formatter = AIOptimizedJSONFormatter()
         handler.setFormatter(formatter)
         
-        # We need a clean logger for each test
-        configure_ai_logging(log_level="INFO", console_output=False) # Disable console output to avoid clutter
-        self.logger_instance = MarketDataLogger("E2E_Test")
-        # Remove all handlers and add our custom one
-        # Get the root logger to which handlers are attached by configure_ai_logging
+        # Configure logging without console output and get the root logger
+        configure_ai_logging(log_level="INFO", console_output=False)
         root_logger = logging.getLogger()
-        for h in root_logger.handlers[:]: # Iterate over a copy
+        
+        # Clean up any existing handlers and add our stream handler
+        for h in root_logger.handlers[:]:
             root_logger.removeHandler(h)
         root_logger.addHandler(handler)
         root_logger.setLevel(logging.INFO)
@@ -40,21 +40,27 @@ class TestEndToEndTracing(unittest.TestCase):
         self.mock_ai_analyst = MagicMock()
         self.mock_exchange = MagicMock()
 
-        # 3. Setup real components with an in-memory SQLite DB
+        # 3. Setup real components with correct service names
         db_path = ":memory:"
-        self.repository = OmsRepository(db_path=db_path, logger=self.logger_instance)
-        self.oms = OrderManagementSystem(repository=self.repository, logger=self.logger_instance)
-        self.market_data_service = MarketDataService(enable_logging=False)
-        self.market_data_service.logger = self.logger_instance
+        # Each component gets a logger with its specific service name
+        self.repo_logger = MarketDataLogger("E2E_Test_Repo", service_name="oms_repository")
+        self.oms_logger = MarketDataLogger("E2E_Test_OMS", service_name="oms")
+        self.mds_logger = MarketDataLogger("E2E_Test_MDS", service_name="market_data_service")
+        self.tc_logger = MarketDataLogger("E2E_Test_TC", service_name="trading_cycle")
+
+        self.repository = OmsRepository(db_path=db_path, logger=self.repo_logger)
+        self.oms = OrderManagementSystem(repository=self.repository, logger=self.oms_logger)
+        self.market_data_service = MarketDataService(enable_logging=True) # Enable logging
+        self.market_data_service.logger = self.mds_logger
 
         # 4. Create the TradingCycle instance
         self.trading_cycle = TradingCycle(
             oms=self.oms,
             market_data_service=self.market_data_service
         )
-        # Manually inject mocks and logger
+        # Manually inject mocks and the specific logger
         self.trading_cycle.ai_analyst = self.mock_ai_analyst
-        self.trading_cycle.logger = self.logger_instance
+        self.trading_cycle.logger = self.tc_logger
 
     def test_trace_id_propagates_through_all_layers(self):
         """
@@ -109,21 +115,22 @@ class TestEndToEndTracing(unittest.TestCase):
         
         self.assertIsNotNone(master_trace_id, "Master trace_id from 'run_cycle' was not found in logs.")
 
-        # Verify that the master trace_id is present in logs from all key components
-        expected_operations = {"run_cycle", "get_market_data", "repo_save"}
-        found_operations = set()
+        # Verify that the master trace_id and correct service name are in logs from all key components
+        expected_services = {
+            "trading_cycle": False,
+            "market_data_service": False,
+            "oms": False,
+            "oms_repository": False
+        }
 
         for log in parsed_logs:
-            # We are checking that the master trace_id is in every relevant log.
-            # The old logic checked for parent_trace_id, which is now removed.
             if log.get("trace_id") == master_trace_id:
-                op_name = log.get("operation")
-                if op_name in expected_operations:
-                    found_operations.add(op_name)
-
-        self.assertEqual(expected_operations, found_operations,
-                         f"Not all expected operations were logged with the master trace_id. "
-                         f"Expected: {expected_operations}, Found: {found_operations}")
+                service = log.get("service")
+                if service in expected_services:
+                    expected_services[service] = True
+        
+        for service, found in expected_services.items():
+            self.assertTrue(found, f"Did not find log with master trace_id for service: {service}")
 
 if __name__ == "__main__":
     unittest.main()
