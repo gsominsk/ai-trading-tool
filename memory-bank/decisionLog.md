@@ -14,6 +14,11 @@ Complete decision history with full details (approx. 522 lines before this optim
 **Solution**: All instances of `datetime.utcnow()` were replaced with the modern, timezone-aware equivalent: `datetime.now(timezone.utc)`. The necessary `timezone` object was imported from the `datetime` module.
 **Rationale**: Using up-to-date, non-deprecated methods is crucial for long-term code health and maintainability. This change ensures the codebase is aligned with current Python best practices and will be compatible with future versions.
 **Result**: The test suite now runs cleanly without any `DeprecationWarning`s, improving readability and confidence in the test results.
+### [2025-08-11 22:31:00] - **Decision: Clean Up Test Runner Configuration**
+**Problem**: The universal test runner (`tests/run_all_tests.py`) was configured to run two test files that no longer exist in the project: `tests/unit/test_timing_validation.py` and `tests/integration/logging/test_hierarchical_tracing.py`. This resulted in unnecessary and confusing "Skipping missing test" warnings in the test output.
+**Solution**: The references to these two non-existent files were removed from the `test_categories` dictionary within the `AITradingTestRunner` class.
+**Rationale**: A clean test execution output is crucial for developer confidence. Removing references to deleted files ensures that the test runner's output is concise, accurate, and free of irrelevant warnings, allowing developers to focus on actual test results.
+**Result**: The test suite now runs without any warnings about missing files, providing a cleaner and more professional development experience.
 ### [2025-08-11 22:08:00] - **Architectural Decision: Refactor `BinanceApiClient` to Use `StructuredLogger`**
 **Problem**: The `BinanceApiClient` was using Python's standard `logging.Logger`. This resulted in logs that lacked critical context, appearing with `"service": "default_service"` and `"operation": "unknown"`. This broke the unified logging schema and made it difficult to trace the origin and purpose of API-related log entries.
 **Solution**: The `BinanceApiClient` will be refactored to accept and use the project's custom `StructuredLogger`.
