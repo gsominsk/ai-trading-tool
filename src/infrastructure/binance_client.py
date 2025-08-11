@@ -1,22 +1,24 @@
 import requests
+import requests
 import logging
 import time
 import uuid
 from typing import Optional
 
 from .exceptions import ApiClientError, RateLimitError, APIResponseError, ErrorContext
+from src.logging_system.json_formatter import StructuredLogger
 
 class BinanceApiClient:
     """
     A client for interacting with the Binance API.
     Handles request signing, error handling, and rate limiting.
     """
-    def __init__(self, logger: logging.Logger, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+    def __init__(self, logger: StructuredLogger, api_key: Optional[str] = None, api_secret: Optional[str] = None):
         """
         Initializes the Binance API client.
 
         Args:
-            logger: A configured logger instance.
+            logger: A configured StructuredLogger instance.
             api_key: Your Binance API key.
             api_secret: Your Binance API secret.
         """
@@ -28,7 +30,7 @@ class BinanceApiClient:
         if self.api_key:
             self.session.headers.update({"X-MBX-APIKEY": self.api_key})
 
-        self.logger.info("BinanceApiClient initialized.")
+        self.logger.info("BinanceApiClient initialized", operation="initialization")
 
     # --- Public Methods ---
 
@@ -46,7 +48,9 @@ class BinanceApiClient:
         endpoint = f"{self.base_url}/time"
         self.logger.info(
             "Requesting server time from API",
-            extra={"endpoint": endpoint, "trace_id": trace_id},
+            operation="get_server_time",
+            context={"endpoint": endpoint},
+            trace_id=trace_id,
         )
 
         start_time = time.time()
@@ -60,19 +64,22 @@ class BinanceApiClient:
 
             self.logger.info(
                 "Server time request successful",
-                extra={
+                operation="get_server_time",
+                context={
                     "endpoint": endpoint,
                     "duration_ms": int(duration * 1000),
                     "server_time": server_time,
-                    "trace_id": trace_id,
                 },
+                trace_id=trace_id,
             )
             return server_time
 
         except (requests.exceptions.RequestException, ApiClientError) as e:
             self.logger.error(
                 "Failed to get server time",
-                extra={"error": str(e), "trace_id": trace_id},
+                operation="get_server_time",
+                context={"error": str(e)},
+                trace_id=trace_id,
             )
             raise
 
@@ -90,11 +97,12 @@ class BinanceApiClient:
 
         self.logger.error(
             "API request failed",
-            extra={
+            operation="api_request",
+            context={
                 "status_code": response.status_code,
                 "response_text": response.text,
-                "trace_id": trace_id,
             },
+            trace_id=trace_id,
         )
 
         if response.status_code == 429:
@@ -127,7 +135,7 @@ class BinanceApiClient:
         Creates a new order.
         NOTE: This is a placeholder and is not yet implemented.
         """
-        self.logger.warning("create_order is not yet implemented.", extra={"trace_id": trace_id})
+        self.logger.warning("create_order is not yet implemented.", operation="create_order", trace_id=trace_id)
         raise NotImplementedError("Order creation functionality is not yet implemented.")
 
     def cancel_order(self, symbol: str, order_id: str, trace_id: Optional[str] = None):
@@ -135,7 +143,7 @@ class BinanceApiClient:
         Cancels an existing order.
         NOTE: This is a placeholder and is not yet implemented.
         """
-        self.logger.warning("cancel_order is not yet implemented.", extra={"trace_id": trace_id})
+        self.logger.warning("cancel_order is not yet implemented.", operation="cancel_order", trace_id=trace_id)
         raise NotImplementedError("Order cancellation functionality is not yet implemented.")
 
     def get_order_status(self, symbol: str, order_id: str, trace_id: Optional[str] = None):
@@ -143,7 +151,7 @@ class BinanceApiClient:
         Retrieves the status of an order.
         NOTE: This is a placeholder and is not yet implemented.
         """
-        self.logger.warning("get_order_status is not yet implemented.", extra={"trace_id": trace_id})
+        self.logger.warning("get_order_status is not yet implemented.", operation="get_order_status", trace_id=trace_id)
         raise NotImplementedError("Order status retrieval functionality is not yet implemented.")
 
 
@@ -166,7 +174,9 @@ class BinanceApiClient:
 
         self.logger.info(
             "Requesting klines from API",
-            extra={"endpoint": endpoint, "params": params, "trace_id": trace_id},
+            operation="get_klines",
+            context={"endpoint": endpoint, "params": params},
+            trace_id=trace_id,
         )
 
         start_time = time.time()
@@ -179,18 +189,21 @@ class BinanceApiClient:
 
             self.logger.info(
                 "Klines request successful",
-                extra={
+                operation="get_klines",
+                context={
                     "endpoint": endpoint,
                     "duration_ms": int(duration * 1000),
                     "records_returned": len(data),
-                    "trace_id": trace_id,
                 },
+                trace_id=trace_id,
             )
             return data
 
         except (requests.exceptions.RequestException, ApiClientError) as e:
             self.logger.error(
                 "Failed to get klines",
-                extra={"error": str(e), "params": params, "trace_id": trace_id},
+                operation="get_klines",
+                context={"error": str(e), "params": params},
+                trace_id=trace_id,
             )
             raise

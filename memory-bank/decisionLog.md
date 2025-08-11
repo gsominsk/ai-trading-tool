@@ -4,6 +4,13 @@
 Complete decision history with full details (approx. 522 lines before this optimization) is archived in [`memory-bank/archive/decisionLog.md`](memory-bank/archive/decisionLog.md). The full, unabridged history is preserved there.
 
 ## Recent Decisions (Last 10 Entries)
+### [2025-08-11 22:08:00] - **Architectural Decision: Refactor `BinanceApiClient` to Use `StructuredLogger`**
+**Problem**: The `BinanceApiClient` was using Python's standard `logging.Logger`. This resulted in logs that lacked critical context, appearing with `"service": "default_service"` and `"operation": "unknown"`. This broke the unified logging schema and made it difficult to trace the origin and purpose of API-related log entries.
+**Solution**: The `BinanceApiClient` will be refactored to accept and use the project's custom `StructuredLogger`.
+1.  The `__init__` method will be updated to require a `StructuredLogger` instance.
+2.  All logging calls (`.info()`, `.error()`, etc.) will be replaced with the structured equivalents, passing key information like `operation`, `context`, and `trace_id` as explicit parameters.
+**Result**: This change will ensure that all logs originating from the `BinanceApiClient` are fully structured and conform to the project's logging standards. It will provide complete context, including the service name and operation, making the entire system's behavior more transparent and easier to debug.
+
 ### [2025-08-11 14:23:00] - **Architectural Decision: Complete Test Suite Refactoring for `MarketDataService`**
 **Problem**: A major architectural refactoring to introduce a `BinanceApiClient` and a dedicated infrastructure layer had broken the entire unit test suite for `MarketDataService`. The tests were using an outdated strategy of mocking the low-level `requests` library, which was no longer directly used by the service. This resulted in a cascade of `DataInsufficientError` and `AttributeError` failures, rendering the tests useless.
 **Solution**: A systematic, multi-wave refactoring of all affected unit tests (`test_market_data_api.py`, `test_market_data_core.py`, `test_market_data_edge_cases.py`) was executed.

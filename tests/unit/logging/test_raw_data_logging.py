@@ -17,6 +17,7 @@ from decimal import Decimal
 
 from src.market_data.market_data_service import MarketDataService
 from src.logging_system import MarketDataLogger, configure_ai_logging
+from src.logging_system.json_formatter import StructuredLogger
 from src.infrastructure.binance_client import BinanceApiClient
 from src.infrastructure.exceptions import DataInsufficientError
 
@@ -43,10 +44,10 @@ class TestRawDataLogging:
         # Mock for the MarketDataService logger
         self.mock_market_data_logger = MagicMock(spec=MarketDataLogger)
         
-        # Mock for the BinanceApiClient logger (standard logger)
-        self.mock_api_client_logger = MagicMock(spec=logging.Logger)
+        # Mock for the BinanceApiClient logger (now a StructuredLogger)
+        self.mock_api_client_logger = MagicMock(spec=StructuredLogger)
         
-        # Use a real BinanceApiClient with a mocked standard logger
+        # Use a real BinanceApiClient with a mocked StructuredLogger
         self.api_client = BinanceApiClient(logger=self.mock_api_client_logger)
         
         # Patch the session.get method to control network requests
@@ -86,7 +87,12 @@ class TestRawDataLogging:
         self.service.get_market_data("BTCUSDT", trace_id="test_trace")
 
         # Verify the logger was called by the real client
-        self.mock_api_client_logger.info.assert_any_call("Requesting klines from API", extra=ANY)
+        self.mock_api_client_logger.info.assert_any_call(
+            "Requesting klines from API",
+            operation="get_klines",
+            context=ANY,
+            trace_id=ANY
+        )
     
     def test_enhanced_api_metrics_logging(self):
         """Test enhanced API metrics capture (Task 8.4)."""
@@ -108,7 +114,9 @@ class TestRawDataLogging:
         # Check for the specific log message from the client
         self.mock_api_client_logger.info.assert_any_call(
             "Klines request successful",
-            extra=ANY
+            operation="get_klines",
+            context=ANY,
+            trace_id=ANY
         )
     
     def test_performance_metrics_categorization(self):
@@ -130,7 +138,9 @@ class TestRawDataLogging:
         # Verify the logger was called
         self.mock_api_client_logger.info.assert_any_call(
             "Klines request successful",
-            extra=ANY
+            operation="get_klines",
+            context=ANY,
+            trace_id=ANY
         )
     
     def test_trace_id_integration_with_raw_logging(self):
@@ -156,7 +166,9 @@ class TestRawDataLogging:
         )
         self.mock_api_client_logger.info.assert_any_call(
             "Requesting klines from API",
-            extra={'endpoint': ANY, 'params': ANY, 'trace_id': 'test_trace_id_123'}
+            operation="get_klines",
+            context={'endpoint': ANY, 'params': ANY},
+            trace_id='test_trace_id_123'
         )
     
     def test_raw_data_logging_disabled_when_no_logger(self):
@@ -191,7 +203,7 @@ class TestRawDataIntegration:
         """Set up integration test environment."""
         configure_ai_logging(log_level="DEBUG", console_output=False)
         self.mock_market_data_logger = MagicMock(spec=MarketDataLogger)
-        self.mock_api_client_logger = MagicMock(spec=logging.Logger)
+        self.mock_api_client_logger = MagicMock(spec=StructuredLogger)
         self.api_client = BinanceApiClient(logger=self.mock_api_client_logger)
         self.session_patcher = patch.object(self.api_client.session, 'get')
         self.mock_get = self.session_patcher.start()

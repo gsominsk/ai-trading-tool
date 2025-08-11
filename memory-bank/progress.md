@@ -4,6 +4,10 @@
 Complete progress history (1,179 lines before this optimization) is archived in [`memory-bank/archive/progress.md`](memory-bank/archive/progress.md). The full, unabridged history is preserved there.
 
 ## Recent Progress (Last 10 Entries)
+[2025-08-11 22:14:00] - **Logging System Refactoring Complete**: Successfully refactored the logging system to improve structure, context, and consistency. `BinanceApiClient` now uses the custom `StructuredLogger`, ensuring all logs are fully contextualized. The structure of demo logs in `main.py` has been improved to maintain valid JSON formatting. All 239 tests pass, confirming the stability of the changes.
+
+[2025-08-11 22:08:00] - **Logging Refactoring (Phase 1 Started)**: Began refactoring of the logging system to improve structure and context. The first step involves modifying `BinanceApiClient` to use the custom `StructuredLogger`, ensuring all API-related logs are fully contextualized with `service` and `operation` fields.
+
 [2025-08-11 14:23:00] - **MILESTONE: Test Suite Refactoring Complete (Wave 5)**: Successfully completed the full-scale refactoring of the `MarketDataService` unit tests. All tests in `tests/unit/market_data/` have been updated to align with the new `BinanceApiClient` architecture, resolving all `DataInsufficientError` and `AttributeError` failures. The entire project test suite (239 tests) is now passing, marking the successful completion of the architectural refactoring and stabilization phase.
 
 [2025-08-11 01:29:00] - **Test Refactoring (Wave 5)**: Systematically refactored all tests in `tests/integration/market_data/test_market_data_integration.py` and `tests/integration/system/test_comprehensive_integration.py` to align with the new `BinanceApiClient` architecture. This resolved a cascade of `DataInsufficientError` failures caused by outdated mocking strategies.
