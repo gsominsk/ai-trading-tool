@@ -2,7 +2,7 @@ import pytest
 import sqlite3
 from src.trading.oms_repository import OmsRepository
 from src.infrastructure.exceptions import RepositoryError
-from datetime import datetime
+from datetime import datetime, timezone
 
 @pytest.fixture
 def db_path(tmp_path):
@@ -12,7 +12,7 @@ def db_path(tmp_path):
 @pytest.fixture
 def sample_order():
     """Fixture for a single sample order."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     return {
         "order_id": "order1",
         "symbol": "BTCUSDT",

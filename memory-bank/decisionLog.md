@@ -9,6 +9,11 @@ Complete decision history with full details (approx. 522 lines before this optim
 **Solution**: The obsolete test was permanently deleted from the test file.
 **Rationale**: Leaving skipped, obsolete tests in the codebase creates "noise" and can lead to confusion for developers. It is better to remove them entirely to maintain a clean and relevant test suite. The functionality it once tested is now covered by other, more appropriate exception handling tests.
 **Result**: The test suite is cleaner and more maintainable. The removal was validated by a full test run, which confirmed that no regressions were introduced.
+### [2025-08-11 22:27:00] - **Decision: Modernize Datetime Calls to Eliminate Deprecation Warnings**
+**Problem**: The test suite was generating multiple `DeprecationWarning`s because `tests/unit/trading/test_oms_repository_sqlite.py` used the `datetime.utcnow()` method, which is deprecated. These warnings cluttered the test output and signaled the use of outdated practices.
+**Solution**: All instances of `datetime.utcnow()` were replaced with the modern, timezone-aware equivalent: `datetime.now(timezone.utc)`. The necessary `timezone` object was imported from the `datetime` module.
+**Rationale**: Using up-to-date, non-deprecated methods is crucial for long-term code health and maintainability. This change ensures the codebase is aligned with current Python best practices and will be compatible with future versions.
+**Result**: The test suite now runs cleanly without any `DeprecationWarning`s, improving readability and confidence in the test results.
 ### [2025-08-11 22:08:00] - **Architectural Decision: Refactor `BinanceApiClient` to Use `StructuredLogger`**
 **Problem**: The `BinanceApiClient` was using Python's standard `logging.Logger`. This resulted in logs that lacked critical context, appearing with `"service": "default_service"` and `"operation": "unknown"`. This broke the unified logging schema and made it difficult to trace the origin and purpose of API-related log entries.
 **Solution**: The `BinanceApiClient` will be refactored to accept and use the project's custom `StructuredLogger`.
