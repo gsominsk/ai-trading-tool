@@ -5,6 +5,15 @@ Complete decision history with full details (approx. 522 lines before this optim
 
 ## Recent Decisions (Last 10 Entries)
 
+### [2025-08-10 23:44:00] - **Architectural Decision: Decouple API Logic into a Dedicated Infrastructure Layer**
+**Problem**: The current implementation has API interaction logic (URLs, request/response handling) tightly coupled within the `MarketDataService`. This violates the Single Responsibility Principle, makes the service difficult to test without real network calls, and hinders flexibility for supporting other exchanges or data sources in the future.
+**Solution**: A dedicated infrastructure layer will be created to abstract all external API interactions.
+1.  **New Directory**: A new directory, `src/infrastructure`, will be created to house all external service clients.
+2.  **`BinanceApiClient`**: A new `BinanceApiClient` class will be created in this layer. Its sole responsibility will be to handle the specifics of communicating with the Binance API (endpoints, error codes, rate limits).
+3.  **Shared Exceptions**: A new, more generic exception hierarchy will be created in `src/infrastructure/exceptions.py`, evolving from the existing `market_data` exceptions. This allows any client in the infrastructure layer to use a common set of errors (`ApiClientError`, `RateLimitError`, etc.).
+4.  **Dependency Injection**: The `MarketDataService` will be refactored to receive the `BinanceApiClient` via dependency injection, making it completely unaware of the underlying API details.
+**Result**: This architectural refactoring will lead to a cleaner, more modular, and highly testable system. It promotes separation of concerns, simplifies the `MarketDataService`, and establishes a clear pattern for adding new external data sources in the future.
+
 ### [2025-08-09 23:22:00] - **Architectural Decision: Final Documentation and Diagram Enhancement**
 **Problem**: The architectural diagram, while functionally correct, lacked explicit textual descriptions of each component's role, leading to potential ambiguity (e.g., the exact responsibility of the OMS vs. the Exchange Interface).
 **Solution**: The main architectural document, `docs/architecture/project_structure.txt`, was significantly enhanced.

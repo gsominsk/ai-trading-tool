@@ -180,3 +180,4 @@ models/
 # Temporary directory for Memory Bank reference repo
 temp_memory_bank_repo/
 roocode-reference/
+docs/external/
