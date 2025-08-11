@@ -1,5 +1,7 @@
 import requests
 import logging
+import time
+import uuid
 from typing import Optional
 
 from .exceptions import ApiClientError, RateLimitError, APIResponseError, ErrorContext
@@ -28,6 +30,51 @@ class BinanceApiClient:
 
         self.logger.info("BinanceApiClient initialized.")
 
+    # --- Public Methods ---
+
+    def get_server_time(self, trace_id: Optional[str] = None) -> int:
+        """
+        Tests connectivity to the Rest API and gets the current server time.
+
+        Args:
+            trace_id: The trace ID for logging correlation.
+
+        Returns:
+            The server time in milliseconds.
+        """
+        trace_id = trace_id or f"time_{uuid.uuid4().hex[:8]}"
+        endpoint = f"{self.base_url}/time"
+        self.logger.info(
+            "Requesting server time from API",
+            extra={"endpoint": endpoint, "trace_id": trace_id},
+        )
+
+        start_time = time.time()
+        try:
+            response = self.session.get(endpoint, timeout=5)
+            duration = time.time() - start_time
+            self._handle_response(response, trace_id)
+            
+            data = response.json()
+            server_time = data.get("serverTime")
+
+            self.logger.info(
+                "Server time request successful",
+                extra={
+                    "endpoint": endpoint,
+                    "duration_ms": int(duration * 1000),
+                    "server_time": server_time,
+                    "trace_id": trace_id,
+                },
+            )
+            return server_time
+
+        except (requests.exceptions.RequestException, ApiClientError) as e:
+            self.logger.error(
+                "Failed to get server time",
+                extra={"error": str(e), "trace_id": trace_id},
+            )
+            raise
 
     def _handle_response(self, response: requests.Response, trace_id: str):
         """
@@ -98,3 +145,52 @@ class BinanceApiClient:
         """
         self.logger.warning("get_order_status is not yet implemented.", extra={"trace_id": trace_id})
         raise NotImplementedError("Order status retrieval functionality is not yet implemented.")
+
+
+    def get_klines(self, symbol: str, interval: str, limit: int, trace_id: Optional[str] = None) -> list:
+        """
+        Get candlestick/kline data.
+
+        Args:
+            symbol: The trading symbol (e.g., 'BTCUSDT').
+            interval: The interval of candlestick ('1m', '1h', '1d', etc.).
+            limit: The number of candles to retrieve (max 1000).
+            trace_id: The trace ID for logging correlation.
+
+        Returns:
+            A list of kline data.
+        """
+        trace_id = trace_id or f"klines_{uuid.uuid4().hex[:8]}"
+        endpoint = f"{self.base_url}/klines"
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
+
+        self.logger.info(
+            "Requesting klines from API",
+            extra={"endpoint": endpoint, "params": params, "trace_id": trace_id},
+        )
+
+        start_time = time.time()
+        try:
+            response = self.session.get(endpoint, params=params, timeout=10)
+            duration = time.time() - start_time
+            self._handle_response(response, trace_id)
+
+            data = response.json()
+
+            self.logger.info(
+                "Klines request successful",
+                extra={
+                    "endpoint": endpoint,
+                    "duration_ms": int(duration * 1000),
+                    "records_returned": len(data),
+                    "trace_id": trace_id,
+                },
+            )
+            return data
+
+        except (requests.exceptions.RequestException, ApiClientError) as e:
+            self.logger.error(
+                "Failed to get klines",
+                extra={"error": str(e), "params": params, "trace_id": trace_id},
+            )
+            raise
