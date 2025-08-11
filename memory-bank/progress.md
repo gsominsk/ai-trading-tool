@@ -4,6 +4,7 @@
 Complete progress history (1,179 lines before this optimization) is archived in [`memory-bank/archive/progress.md`](memory-bank/archive/progress.md). The full, unabridged history is preserved there.
 
 ## Recent Progress (Last 10 Entries)
+[2025-08-11 22:24:00] - **Test Suite Cleanup**: Removed an obsolete test (`test_logging_integration_handles_logger_failure`) from `tests/unit/logging/test_logging_components.py`. The test was no longer valid due to the dependency injection architecture. This cleanup reduces noise in the test suite and improves maintainability.
 [2025-08-11 22:14:00] - **Logging System Refactoring Complete**: Successfully refactored the logging system to improve structure, context, and consistency. `BinanceApiClient` now uses the custom `StructuredLogger`, ensuring all logs are fully contextualized. The structure of demo logs in `main.py` has been improved to maintain valid JSON formatting. All 239 tests pass, confirming the stability of the changes.
 
 [2025-08-11 22:08:00] - **Logging Refactoring (Phase 1 Started)**: Began refactoring of the logging system to improve structure and context. The first step involves modifying `BinanceApiClient` to use the custom `StructuredLogger`, ensuring all API-related logs are fully contextualized with `service` and `operation` fields.

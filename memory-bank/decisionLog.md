@@ -4,6 +4,11 @@
 Complete decision history with full details (approx. 522 lines before this optimization) is archived in [`memory-bank/archive/decisionLog.md`](memory-bank/archive/decisionLog.md). The full, unabridged history is preserved there.
 
 ## Recent Decisions (Last 10 Entries)
+### [2025-08-11 22:24:00] - **Decision: Remove Obsolete Test from Test Suite**
+**Problem**: The test suite contained a skipped test, `test_logging_integration_handles_logger_failure`, in `tests/unit/logging/test_logging_components.py`. This test was marked as obsolete because the underlying logic it was designed to validate (logger initialization within a service) was removed during a previous architectural refactoring that introduced dependency injection.
+**Solution**: The obsolete test was permanently deleted from the test file.
+**Rationale**: Leaving skipped, obsolete tests in the codebase creates "noise" and can lead to confusion for developers. It is better to remove them entirely to maintain a clean and relevant test suite. The functionality it once tested is now covered by other, more appropriate exception handling tests.
+**Result**: The test suite is cleaner and more maintainable. The removal was validated by a full test run, which confirmed that no regressions were introduced.
 ### [2025-08-11 22:08:00] - **Architectural Decision: Refactor `BinanceApiClient` to Use `StructuredLogger`**
 **Problem**: The `BinanceApiClient` was using Python's standard `logging.Logger`. This resulted in logs that lacked critical context, appearing with `"service": "default_service"` and `"operation": "unknown"`. This broke the unified logging schema and made it difficult to trace the origin and purpose of API-related log entries.
 **Solution**: The `BinanceApiClient` will be refactored to accept and use the project's custom `StructuredLogger`.

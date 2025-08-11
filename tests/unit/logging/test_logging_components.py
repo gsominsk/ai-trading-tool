@@ -288,14 +288,6 @@ class TestLoggingExceptionHandling:
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
     
-    def test_logging_integration_handles_logger_failure(self):
-        """Test that service handles logger initialization failures."""
-        # This test is no longer valid. The service receives a logger instance
-        # via dependency injection. It does not initialize the logger itself.
-        # If a faulty logger is passed, the service should still operate
-        # gracefully, which is tested in other exception handling tests.
-        pytest.skip("Test is obsolete due to dependency injection of logger.")
-    
     def test_log_operation_methods_handle_exceptions(self):
         """Test that all log operation methods gracefully handle exceptions."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
