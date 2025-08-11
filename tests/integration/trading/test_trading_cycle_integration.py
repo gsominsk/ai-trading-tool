@@ -4,6 +4,9 @@ from src.trading.trading_cycle import TradingCycle
 from src.trading.oms import OrderManagementSystem
 from src.trading.oms_repository import OmsRepository
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
+from src.logging_system import MarketDataLogger
+from unittest.mock import MagicMock
 
 @pytest.fixture(scope="function")
 def oms_integration_setup(tmp_path):
@@ -29,7 +32,9 @@ def test_trading_cycle_full_integration_with_oms(oms_integration_setup):
     """
     # 1. Setup
     oms, repository = oms_integration_setup
-    market_data_service = MarketDataService()
+    mock_api_client = MagicMock(spec=BinanceApiClient)
+    mock_logger = MagicMock(spec=MarketDataLogger)
+    market_data_service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
     trading_cycle = TradingCycle(oms=oms, market_data_service=market_data_service)
 
     # 2. Manually place an order to test the state change

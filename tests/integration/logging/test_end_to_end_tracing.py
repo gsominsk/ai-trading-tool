@@ -10,6 +10,7 @@ from src.trading.trading_cycle import TradingCycle
 from src.trading.oms import OrderManagementSystem
 from src.trading.oms_repository import OmsRepository
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
 from src.logging_system import MarketDataLogger
 from src.logging_system.logger_config import configure_ai_logging
 
@@ -50,7 +51,8 @@ class TestEndToEndTracing(unittest.TestCase):
 
         self.repository = OmsRepository(db_path=db_path, logger=self.repo_logger)
         self.oms = OrderManagementSystem(repository=self.repository, logger=self.oms_logger)
-        self.market_data_service = MarketDataService(enable_logging=True) # Enable logging
+        self.mock_api_client = MagicMock(spec=BinanceApiClient)
+        self.market_data_service = MarketDataService(api_client=self.mock_api_client, logger=self.mds_logger)
         self.market_data_service.logger = self.mds_logger
 
         # 4. Create the TradingCycle instance
@@ -83,19 +85,25 @@ class TestEndToEndTracing(unittest.TestCase):
         # Mock the underlying klines method to allow get_market_data to run and log.
         # This is better than mocking get_market_data itself for an end-to-end tracing test.
         # We need to return a valid DataFrame with enough data for calculations.
-        def mock_get_klines(symbol, interval, limit, trace_id=None):
-            # Ensure we have enough data for MA calculations (e.g., 50 periods)
-            if limit < 50:
-                limit = 50
-            return pd.DataFrame({
-                'timestamp': pd.to_datetime(pd.date_range(end=pd.Timestamp.now(tz='UTC'), periods=limit, freq='H')),
-                'open': np.random.uniform(64000, 66000, size=limit),
-                'high': np.random.uniform(66000, 67000, size=limit),
-                'low': np.random.uniform(63000, 64000, size=limit),
-                'close': np.random.uniform(65000, 65500, size=limit),
-                'volume': np.random.uniform(100, 500, size=limit)
-            })
-        self.market_data_service._get_klines = MagicMock(side_effect=mock_get_klines)
+        # Mock the get_klines method on the API client to return valid raw kline data
+        def mock_get_klines_data(symbol, interval, limit, trace_id=None):
+            # The service needs enough data for calculations (e.g., > 50 periods)
+            limit = max(limit, 51)
+            # Return data as a list of lists, just like the real API client
+            return [
+                [
+                    int((pd.Timestamp.now(tz='UTC') - pd.Timedelta(hours=i)).timestamp() * 1000),
+                    np.random.uniform(64000, 66000),
+                    np.random.uniform(66000, 67000),
+                    np.random.uniform(63000, 64000),
+                    np.random.uniform(65000, 65500),
+                    np.random.uniform(100, 500),
+                    0, 0, 0, 0, 0, 0  # Fill remaining columns
+                ] for i in range(limit)
+            ]
+        
+        # Configure the mock_api_client, which is already injected into the service
+        self.mock_api_client.get_klines.side_effect = mock_get_klines_data
         
         # --- ACT ---
         self.trading_cycle.run_cycle()

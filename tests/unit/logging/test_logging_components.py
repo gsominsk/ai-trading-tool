@@ -10,6 +10,7 @@ Consolidates:
 - test_logging_json_schema_validation.py (JSON schema validation for AI analysis)
 """
 
+import logging
 import pytest
 import json
 import tempfile
@@ -18,7 +19,7 @@ import threading
 import time
 import jsonschema
 from jsonschema import validate, ValidationError
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 
 from src.logging_system import (
     configure_ai_logging,
@@ -29,85 +30,94 @@ from src.logging_system import (
 )
 from src.logging_system.json_formatter import AIOptimizedJSONFormatter
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
 
 
 @pytest.mark.unit
 @pytest.mark.logging
 class TestLoggingLevels:
-    """Test log level filtering and performance optimization."""
-    
+    """Test log level filtering and the service's interaction with the logger."""
+
     def setup_method(self):
         """Set up test environment."""
         self.temp_dir = tempfile.mkdtemp()
-    
+        # Reset logging state before each test to ensure isolation
+        from src.logging_system.logger_config import reset_logging_state
+        reset_logging_state()
+
     def teardown_method(self):
         """Clean up test environment."""
         import shutil
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
-    
-    def test_log_level_filtering_hierarchy(self):
-        """Test complete log level filtering hierarchy."""
-        test_cases = [
-            ("DEBUG", ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]),
-            ("INFO", ["INFO", "WARNING", "ERROR", "CRITICAL"]),
-            ("WARNING", ["WARNING", "ERROR", "CRITICAL"]),
-            ("ERROR", ["ERROR", "CRITICAL"]),
-            ("CRITICAL", ["CRITICAL"])
-        ]
+        from src.logging_system.logger_config import reset_logging_state
+        reset_logging_state()
+
+    def test_log_level_filtering_on_real_logger(self):
+        """Tests the real logger's filtering mechanism directly."""
+        # Get the actual underlying standard logger
+        std_logger = MarketDataLogger("test_real", service_name="test").logger.logger
         
-        for level, expected_levels in test_cases:
-            service = MarketDataService(log_level=level)
-            
-            # Test level filtering
-            for test_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-                should_log = service._should_log(test_level)
-                expected = test_level in expected_levels
-                assert should_log == expected, f"Level {level}: {test_level} should be {expected}"
-    
-    def test_log_level_case_insensitive(self):
-        """Test that log levels are case insensitive."""
-        service = MarketDataService(log_level="warning")  # lowercase
+        # Test filtering with string levels
+        std_logger.setLevel("WARNING")
+        assert not std_logger.isEnabledFor(logging.INFO)
+        assert std_logger.isEnabledFor(logging.WARNING)
+        assert std_logger.isEnabledFor(logging.ERROR)
+
+        # Test filtering with integer levels
+        std_logger.setLevel(logging.DEBUG)
+        assert std_logger.isEnabledFor(logging.DEBUG)
+
+    def test_service_delegates_to_logger(self):
+        """
+        Tests that the MarketDataService correctly calls the logger's methods,
+        without testing the logger's internal filtering logic.
+        """
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock() # No spec, we just check if methods are called
         
-        assert service._log_level == "WARNING"  # Should be converted to uppercase
-        assert service._should_log("WARNING") == True
-        assert service._should_log("warning") == True  # lowercase should work
-        assert service._should_log("Warning") == True  # mixed case should work
-    
-    def test_invalid_log_level_defaults_to_info(self):
-        """Test that invalid log levels default to INFO."""
-        service = MarketDataService(log_level="INVALID")
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
-        # Should default to INFO behavior
-        assert service._should_log("DEBUG") == False
-        assert service._should_log("INFO") == True
-        assert service._should_log("WARNING") == True
-    
-    def test_logging_integration_level_filtering(self):
-        """Test that MarketDataService respects level filtering."""
-        service = MarketDataService(log_level="WARNING", enable_logging=True)
+        # Call a service method that is supposed to log
+        service._log_operation_start("test_op", symbol="BTC")
         
-        # WARNING level should filter appropriately
-        assert service._should_log("DEBUG") == False
-        assert service._should_log("INFO") == False
-        assert service._should_log("WARNING") == True
-        assert service._should_log("ERROR") == True
-        assert service._should_log("CRITICAL") == True
-    
-    def test_production_performance_optimization(self):
-        """Test that high log levels improve performance by skipping operations."""
-        service = MarketDataService(log_level="ERROR", enable_logging=True)
+        # Verify the service delegated the call to the logger
+        mock_logger.log_operation_start.assert_called_once_with(
+            operation="test_op",
+            symbol="BTC",
+            context={},
+            trace_id=None
+        )
+
+        # Verify another method
+        service._log_operation_error("test_op_2", Exception("test error"), symbol="ETH")
+        mock_logger.log_validation_error.assert_called_once_with(
+            field="test_op_2",
+            value=ANY,
+            expected="successful_operation",
+            error_msg=ANY,
+            trace_id=None
+        )
+
+    def test_invalid_log_level_raises_error(self):
+        """
+        Tests that setting an invalid level on the underlying logger
+        raises a ValueError, which is the correct behavior of Python's logging.
+        """
+        std_logger = MarketDataLogger("test_invalid", service_name="test").logger.logger
         
-        # Test level filtering directly on service
-        assert service._should_log("DEBUG") == False
-        assert service._should_log("INFO") == False
-        assert service._should_log("WARNING") == False
-        assert service._should_log("ERROR") == True
-        assert service._should_log("CRITICAL") == True
+        with pytest.raises(ValueError, match="Unknown level: 'INVALID_LEVEL'"):
+            std_logger.setLevel("INVALID_LEVEL")
+
+    def test_log_level_case_insensitivity(self):
+        """Tests that the underlying logger handles case-insensitivity for levels."""
+        std_logger = MarketDataLogger("test_case", service_name="test").logger.logger
         
-        # Verify the service log level is set correctly
-        assert service._log_level == "ERROR"
-        assert hasattr(service, 'logger')
+        std_logger.setLevel("WARNING")
+        assert std_logger.isEnabledFor(logging.WARNING)
+        
+        std_logger.setLevel("DEBUG")
+        assert std_logger.isEnabledFor(logging.DEBUG)
     
     @pytest.mark.performance
     def test_high_volume_log_throughput(self):
@@ -208,36 +218,42 @@ class TestLoggingLevels:
         print(f"✅ Average JSON formatting time: {average_time*1000:.2f}ms per message")
     
     def _create_log_record(self, message, level="INFO"):
-        """Helper to create a log record for testing."""
-        import time
-        return type('LogRecord', (), {
-            'levelname': level,
-            'msg': message,
-            'args': (),
-            'created': time.time(),
-            'filename': 'test.py',
-            'funcName': 'test_function',
-            'lineno': 42,
-            'module': 'test_module',
-            'msecs': 123,
-            'name': 'test_logger',
-            'pathname': '/test/test.py',
-            'process': 12345,
-            'processName': 'TestProcess',
-            'relativeCreated': 1000,
-            'thread': 67890,
-            'threadName': 'TestThread',
-            'exc_info': None,
-            'exc_text': None,
-            'stack_info': None,
-            'getMessage': lambda self: message
-        })()
-    
+        """Helper to create a real log record for testing."""
+        # Create a real LogRecord instance
+        record = logging.LogRecord(
+            name='test_logger',
+            level=logging.getLevelName(level),
+            pathname='/test/test.py',
+            lineno=42,
+            msg=message,
+            args=(),
+            exc_info=None,
+            func='test_function',
+            sinfo=None
+        )
+        # Add other standard attributes if needed by the formatter
+        record.process = 12345
+        record.processName = 'TestProcess'
+        record.thread = 67890
+        record.threadName = 'TestThread'
+        record.created = time.time()
+        record.msecs = (record.created - int(record.created)) * 1000
+        if not hasattr(logging, '_startTime'):
+             logging._startTime = time.time()
+        record.relativeCreated = (record.created - logging._startTime) * 1000
+        
+        # Add custom attributes our formatter might look for
+        record.service_name = 'test_service'
+        record.operation = 'test_operation'
+        
+        return record
+
     def _create_complex_log_record(self, index):
         """Helper to create a complex log record with nested data."""
         from decimal import Decimal
         message = f"complex_message_{index}"
-        record = self._create_log_record(message)
+        # Use the corrected helper
+        record = self._create_log_record(message, level="INFO")
         
         # Add complex data that should be in extra/context fields
         complex_data = {
@@ -252,6 +268,7 @@ class TestLoggingLevels:
         
         # Add as context data for formatter
         record.context = {'complex_data': complex_data}
+        record.operation = 'complex_formatting' # Override default operation
         
         return record
 
@@ -273,16 +290,17 @@ class TestLoggingExceptionHandling:
     
     def test_logging_integration_handles_logger_failure(self):
         """Test that service handles logger initialization failures."""
-        with patch('src.market_data.market_data_service.MarketDataLogger') as mock_logger_class:
-            mock_logger_class.side_effect = Exception("Logger initialization failed")
-            
-            # Service should handle logging failure gracefully
-            with pytest.raises(Exception):
-                service = MarketDataService(enable_logging=True)
+        # This test is no longer valid. The service receives a logger instance
+        # via dependency injection. It does not initialize the logger itself.
+        # If a faulty logger is passed, the service should still operate
+        # gracefully, which is tested in other exception handling tests.
+        pytest.skip("Test is obsolete due to dependency injection of logger.")
     
     def test_log_operation_methods_handle_exceptions(self):
         """Test that all log operation methods gracefully handle exceptions."""
-        service = MarketDataService(enable_logging=True)
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Test all logging methods with mocked failures
         with patch.object(service.logger, 'log_operation_start') as mock_start, \
@@ -302,7 +320,9 @@ class TestLoggingExceptionHandling:
     
     def test_specialized_logging_methods_handle_exceptions(self):
         """Test that specialized logging methods handle exceptions."""
-        service = MarketDataService(enable_logging=True)
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Mock all specialized logging methods to fail
         with patch.object(service.logger, 'log_api_call') as mock_api, \
@@ -322,7 +342,9 @@ class TestLoggingExceptionHandling:
     
     def test_get_operation_metrics_handles_exceptions(self):
         """Test that service operations continue despite logging failures."""
-        service = MarketDataService(enable_logging=True)
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Mock logger to fail
         with patch.object(service.logger, 'log_operation_start') as mock_log:
@@ -337,7 +359,9 @@ class TestLoggingExceptionHandling:
     
     def test_reset_metrics_handles_exceptions(self):
         """Test that service continues working even if logging fails."""
-        service = MarketDataService(enable_logging=True)
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Mock logger to fail
         with patch.object(service.logger, 'log_operation_start') as mock_log:
@@ -352,7 +376,9 @@ class TestLoggingExceptionHandling:
     
     def test_complete_system_failure_protection(self):
         """Test complete protection from logging system failures."""
-        service = MarketDataService(enable_logging=True)
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Simulate complete logging system failure
         with patch.object(service.logger, 'log_operation_start') as mock_log:

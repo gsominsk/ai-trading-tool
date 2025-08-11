@@ -1,7 +1,7 @@
 import pytest
 import sqlite3
 from src.trading.oms_repository import OmsRepository
-from src.market_data.exceptions import RepositoryError
+from src.infrastructure.exceptions import RepositoryError
 from datetime import datetime
 
 @pytest.fixture

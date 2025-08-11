@@ -4,6 +4,8 @@
 Complete project history (928 lines before this optimization) is archived in [`memory-bank/archive/activeContext.md`](memory-bank/archive/activeContext.md). The full, unabridged history is preserved there.
 
 ## Current Focus
+[2025-08-11 01:29:00] - **Current Focus: Test Fixing (Wave 5)**. Continuing the systematic process of fixing tests broken by the `BinanceApiClient` refactoring. The primary issue is an outdated mocking strategy (`patch('requests.get')`) that needs to be replaced with configuration of the mock `BinanceApiClient`. Having fixed `test_market_data_integration.py` and `test_comprehensive_integration.py`, the current focus is on applying the same fix to `tests/unit/logging/test_http_filter.py`.
+[2025-08-11 01:16:00] - **Current Focus: Correcting Flawed Logic**. The immediate task is to revert an incorrect "graceful degradation" implementation in `MarketDataService`. This faulty logic was suppressing a `DataInsufficientError`, causing a test to fail because it correctly expected an exception. The plan is to remove the fallback mechanism and restore the test to validate the "fail-fast" behavior, aligning the code with the original design principles.
 **🚀 MILESTONE: Codebase Modernization & Full Test Suite Pass**
 - **`utcnow()` Deprecation Fixed**: Systematically replaced all deprecated `datetime.utcnow()` calls with the timezone-aware `datetime.now(timezone.utc)` across the entire codebase (`src` and `tests`).
 - **Test Suite Stabilized**: Fixed all resulting test failures, including missing dependencies (`jsonschema`, `psutil`) and incorrect assertions related to timestamp formats and JSON schemas.

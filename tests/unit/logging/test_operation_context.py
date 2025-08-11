@@ -159,11 +159,21 @@ class TestOperationContextIntegration:
         from src.market_data.market_data_service import MarketDataService
         
         log_file = configure_test_logging
-        service = MarketDataService()
+        from src.infrastructure.binance_client import BinanceApiClient
+        from src.logging_system import MarketDataLogger
+        from unittest.mock import MagicMock
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        # Provide valid data to the mock client to prevent DataInsufficientError
+        valid_klines = [[1640995200000, "50000", "51000", "49000", "50500", "100", 1640995259999, "1", 50, "50000", "0.1", ""] for _ in range(180)]
+        mock_api_client.get_klines.return_value = valid_klines
+        
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         try:
             # This should generate operations with proper context
-            market_data = service.get_market_data("BTCUSDT")
+            market_data = service.get_market_data("BTCUSDT", trace_id="test_trace")
+            assert market_data is not None
             
             # Check that operation logs have proper identification
             with open(log_file, 'r') as f:
@@ -194,11 +204,21 @@ class TestOperationContextIntegration:
         from src.market_data.market_data_service import MarketDataService
         
         log_file = configure_test_logging
-        service = MarketDataService()
+        from src.infrastructure.binance_client import BinanceApiClient
+        from src.logging_system import MarketDataLogger
+        from unittest.mock import MagicMock
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        # Provide valid data to the mock client to prevent DataInsufficientError
+        valid_klines = [[1640995200000, "50000", "51000", "49000", "50500", "100", 1640995259999, "1", 50, "50000", "0.1", ""] for _ in range(180)]
+        mock_api_client.get_klines.return_value = valid_klines
+        
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         try:
             # Run market data operation
             market_data = service.get_market_data("BTCUSDT", trace_id="test_trace")
+            assert market_data is not None
             
             # Parse log file to check trace_id consistency
             with open(log_file, 'r') as f:

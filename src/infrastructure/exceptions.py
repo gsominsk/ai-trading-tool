@@ -112,8 +112,15 @@ class ApiClientError(Exception):
             "message": self.message,
             "operation": self.operation,
             "symbol": self.symbol,
-            **self.additional_context
         })
+        
+        # Unpack the nested context_data if it exists, and merge all other context
+        additional_context_copy = self.additional_context.copy()
+        if 'context_data' in additional_context_copy and isinstance(additional_context_copy['context_data'], dict):
+            context_dict.update(additional_context_copy.pop('context_data'))
+        
+        context_dict.update(additional_context_copy)
+            
         return context_dict
     
     def __str__(self) -> str:
@@ -278,7 +285,7 @@ class SymbolValidationError(ValidationError):
     Maintains backward compatibility with existing symbol validation tests.
     """
     
-    def __init__(self, message: str, symbol: str, **kwargs):
+    def __init__(self, message: str, symbol: str, context: Optional[ErrorContext] = None, **kwargs):
         # Remove conflicting parameters from kwargs to avoid conflicts
         kwargs.pop('field_name', None)
         kwargs.pop('field_value', None)
@@ -287,6 +294,7 @@ class SymbolValidationError(ValidationError):
         
         super().__init__(
             message,
+            context=context,
             field_name="symbol",
             field_value=symbol,
             expected_format=expected_format,
@@ -359,9 +367,11 @@ class RateLimitError(NetworkError):
         limit_type: str = "requests",
         **kwargs
     ):
+        # Ensure status_code is set to 429, but don't pass it twice.
+        kwargs.setdefault('status_code', 429)
+        
         super().__init__(
             message,
-            status_code=429,
             retry_after=retry_after,
             limit_type=limit_type,
             **kwargs

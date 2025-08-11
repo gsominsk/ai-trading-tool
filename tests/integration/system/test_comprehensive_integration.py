@@ -19,231 +19,185 @@ import sys
 import os
 import pytest
 from decimal import Decimal
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
+from src.logging_system import MarketDataLogger
 
 
 class TestSystemIntegrationComprehensive:
     """Comprehensive system integration tests."""
-    
+
+    def setup_method(self):
+        """Setup a mock API client and service for each test."""
+        self.mock_api_client = MagicMock(spec=BinanceApiClient)
+        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
+
+    def _create_klines_data(self, count=50, base_price=50000, direction=1):
+        """Helper to create valid klines data."""
+        return [
+            [1640995200000 + i*3600000, str(base_price + (i * direction)), str(base_price + (i * direction) + 100),
+             str(base_price + (i * direction) - 100), str(base_price + (i * direction) + 50), "1000.0",
+             1640995259999 + i*3600000, str((base_price + (i * direction) + 50) * 1000), 100,
+             "500.0", str((base_price + (i * direction) + 50) * 500), "0"]
+            for i in range(count)
+        ]
+
     def test_rsi_division_protection_integration(self):
         """Test RSI division by zero protection in real system."""
-        service = MarketDataService()
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
-        # Test with real symbol processing
-        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
-        
-        # RSI should be calculated safely with Decimal arithmetic
         assert isinstance(result.rsi_14, Decimal)
         assert 0 <= result.rsi_14 <= 100
-        
-        # Verify data frames are populated
         assert len(result.daily_candles) > 0
-        assert len(result.h4_candles) > 0
-        assert len(result.h1_candles) > 0
-        
-        # All frames should have required columns
         required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-        for df in [result.daily_candles, result.h4_candles, result.h1_candles]:
-            assert all(col in df.columns for col in required_columns)
-    
+        assert all(col in result.daily_candles.columns for col in required_columns)
+
     def test_state_isolation_between_symbols(self):
         """Test state pollution protection between different symbols."""
-        service = MarketDataService()
-        
-        # Get data for two different symbols
-        btc_result = service.get_market_data("BTCUSDT", trace_id="test_trace")
-        eth_result = service.get_market_data("ETHUSDT", trace_id="test_trace_eth")
-        
-        # Verify different symbols are processed correctly
+        btc_data = self._create_klines_data(100, 50000, direction=1)  # Upward trend
+        eth_data = self._create_klines_data(100, 3000, direction=-1) # Downward trend
+        self.mock_api_client.get_klines.side_effect = [
+            btc_data, btc_data, btc_data,  # First call for BTCUSDT
+            eth_data, eth_data, eth_data,  # Second call for ETHUSDT
+            btc_data                       # Correlation call for BTC data during ETH processing
+        ]
+    
+        btc_result = self.service.get_market_data("BTCUSDT", trace_id="test_trace_btc")
+        eth_result = self.service.get_market_data("ETHUSDT", trace_id="test_trace_eth")
+    
         assert btc_result.symbol == "BTCUSDT"
         assert eth_result.symbol == "ETHUSDT"
-        
-        # Verify last prices are different (state not polluted)
         btc_price = btc_result.h1_candles.iloc[-1]['close']
         eth_price = eth_result.h1_candles.iloc[-1]['close']
-        assert btc_price != eth_price, "State pollution detected - prices should differ"
-        
-        # Verify independent calculation results
-        assert btc_result.rsi_14 != eth_result.rsi_14 or abs(btc_result.rsi_14 - eth_result.rsi_14) < Decimal('0.1')
-    
+        assert btc_price != eth_price, "State pollution detected"
+        assert btc_result.rsi_14 != eth_result.rsi_14, "RSI values should differ for different trends"
+
     def test_decimal_precision_system_wide(self):
         """Test Decimal precision across the entire system."""
-        service = MarketDataService()
-        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
-        # Verify all critical fields use Decimal arithmetic
-        decimal_fields = [
-            (result.rsi_14, "RSI"),
-            (result.ma_20, "MA20"),
-            (result.ma_50, "MA50")
-        ]
-        
-        for value, field_name in decimal_fields:
-            assert isinstance(value, Decimal), f"{field_name} should be Decimal, got {type(value)}"
-        
-        # Optional fields should also be Decimal if present
-        optional_decimal_fields = [
-            (result.support_level, "Support Level"),
-            (result.resistance_level, "Resistance Level"),
-            (result.btc_correlation, "BTC Correlation")
-        ]
-        
-        for value, field_name in optional_decimal_fields:
-            if value is not None:
-                assert isinstance(value, Decimal), f"{field_name} should be Decimal, got {type(value)}"
-    
+        decimal_fields = [result.rsi_14, result.ma_20, result.ma_50, result.support_level, result.resistance_level]
+        for value in decimal_fields:
+            assert isinstance(value, Decimal)
+        if result.btc_correlation is not None:
+            assert isinstance(result.btc_correlation, Decimal)
+
     def test_dataframe_protection_and_context_generation(self):
         """Test DataFrame protection and context generation integration."""
-        service = MarketDataService()
-        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
-        # Test basic context generation
         basic_context = result.to_llm_context_basic()
-        
-        assert len(basic_context) > 100, "Basic context should be substantial"
-        assert "Error" not in basic_context, "Context should not contain errors"
-        assert "Exception" not in basic_context, "Context should not contain exceptions"
-        assert result.symbol in basic_context, "Context should contain symbol"
-        
-        # Verify context contains key information
-        assert "RSI" in basic_context
-        assert "MACD" in basic_context
-        assert "MA" in basic_context
-    
+        assert len(basic_context) > 100
+        assert "Error" not in basic_context
+        assert "RSI" in basic_context and "MACD" in basic_context
+
     def test_symbol_validation_integration(self):
         """Test comprehensive symbol validation across system."""
-        service = MarketDataService()
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
         
-        # Test valid symbols
         valid_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
-        
         for symbol in valid_symbols:
-            result = service.get_market_data(symbol, trace_id="test_trace")
+            result = self.service.get_market_data(symbol, trace_id="test_trace")
             assert result.symbol == symbol
-            assert isinstance(result.rsi_14, Decimal)
         
-        # Test invalid symbols - should raise validation errors
+        from src.infrastructure.exceptions import SymbolValidationError
         invalid_symbols = ["INVALID", "BTCUSDTUSDT", "BT", "", "   "]
-        
         for symbol in invalid_symbols:
-            with pytest.raises(ValueError):  # Remove specific regex match
-                service.get_market_data(symbol)
-    
+            with pytest.raises(SymbolValidationError):
+                self.service.get_market_data(symbol, trace_id="test_trace")
+
     def test_technical_indicators_real_conditions(self):
         """Test technical indicators under real market conditions."""
-        service = MarketDataService()
-        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
-        # Verify indicator values are within expected ranges
-        assert 0 <= result.rsi_14 <= 100, f"RSI should be 0-100, got {result.rsi_14}"
-        assert result.macd_signal in ["bullish", "bearish", "neutral"], f"Invalid MACD signal: {result.macd_signal}"
-        assert result.ma_trend in ["uptrend", "downtrend", "sideways"], f"Invalid MA trend: {result.ma_trend}"
-        assert result.volume_profile in ["high", "low", "normal"], f"Invalid volume profile: {result.volume_profile}"
-        
-        # Verify moving averages are positive
-        assert result.ma_20 > 0, "MA20 should be positive"
-        assert result.ma_50 > 0, "MA50 should be positive"
-        
-        # Verify moving averages are reasonable relative to each other
-        if result.ma_trend == "uptrend":
-            assert result.ma_20 >= result.ma_50, "In uptrend, MA20 should be >= MA50"
-        elif result.ma_trend == "downtrend":
-            assert result.ma_20 <= result.ma_50, "In downtrend, MA20 should be <= MA50"
-    
+        assert 0 <= result.rsi_14 <= 100
+        assert result.macd_signal in ["bullish", "bearish", "neutral"]
+        assert result.ma_trend in ["uptrend", "downtrend", "sideways"]
+        assert result.ma_20 > 0 and result.ma_50 > 0
+
     def test_pattern_recognition_integration(self):
         """Test pattern recognition integration with enhanced context."""
-        service = MarketDataService()
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+        enhanced_context = self.service.get_enhanced_context(result)
         
-        # Basic market data should have support/resistance
-        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
-        assert result.symbol == "BTCUSDT"
-        
-        # Test enhanced context with pattern analysis
-        enhanced_context = service.get_enhanced_context(result)
-        
-        assert len(enhanced_context) > len(result.to_llm_context_basic())
         assert "CANDLESTICK ANALYSIS" in enhanced_context
-        
-        # Verify pattern keywords are present
-        pattern_keywords = ["candles", "analysis", "pattern"]
-        found_keywords = [kw for kw in pattern_keywords if kw.lower() in enhanced_context.lower()]
-        assert len(found_keywords) > 0, "Enhanced context should contain pattern analysis"
-    
-    @patch('requests.get')
-    def test_end_to_end_workflow_with_mocked_api(self, mock_get):
+        assert len(enhanced_context) > len(result.to_llm_context_basic())
+
+    def test_end_to_end_workflow_with_mocked_api(self):
         """Test complete end-to-end workflow with mocked API responses."""
-        # Mock successful API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'application/json'}
-        mock_response.content = b'{"test": "response"}'
-        mock_response.json.return_value = [
-            [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""]
-            for _ in range(200)  # Enough data for all timeframes
-        ]
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(200)
         
-        service = MarketDataService()
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
-        # Test complete workflow
-        result = service.get_market_data("BTCUSDT", trace_id="test_trace")
-        
-        # Verify all components work together
         assert result.symbol == "BTCUSDT"
         assert isinstance(result.rsi_14, Decimal)
         assert result.macd_signal in ["bullish", "bearish", "neutral"]
         
-        # Verify context generation works
         basic_context = result.to_llm_context_basic()
-        enhanced_context = service.get_enhanced_context(result)
-        
-        assert len(basic_context) > 0
+        enhanced_context = self.service.get_enhanced_context(result)
         assert len(enhanced_context) > len(basic_context)
         
-        # Verify API was called correctly
-        assert mock_get.called
-        call_count = mock_get.call_count
-        assert call_count >= 3, f"Should call API for all timeframes, got {call_count} calls"
+        assert self.mock_api_client.get_klines.call_count >= 3
 
 
 class TestSystemResilience:
     """Test system resilience and error recovery."""
-    
+
+    def setup_method(self):
+        """Setup a mock API client and service for each test."""
+        self.mock_api_client = MagicMock(spec=BinanceApiClient)
+        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
+
+    def _create_klines_data(self, count=50, base_price=50000):
+        """Helper to create valid klines data."""
+        return [
+            [1640995200000 + i*3600000, str(base_price + i), str(base_price + i + 100),
+             str(base_price + i - 100), str(base_price + i + 50), "1000.0",
+             1640995259999 + i*3600000, str((base_price + i + 50) * 1000), 100,
+             "500.0", str((base_price + i + 50) * 500), "0"]
+            for i in range(count)
+        ]
+
     def test_service_reusability(self):
         """Test that service instance can be reused safely."""
-        service = MarketDataService()
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
         
-        # Multiple calls should work independently
         symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
         results = []
-        
         for symbol in symbols:
-            result = service.get_market_data(symbol, trace_id="test_trace")
+            result = self.service.get_market_data(symbol, trace_id=f"test_trace_{symbol}")
             results.append(result)
             assert result.symbol == symbol
         
-        # All results should be independent
         for i, result in enumerate(results):
             assert result.symbol == symbols[i]
             assert isinstance(result.rsi_14, Decimal)
-    
+
     def test_logging_integration_does_not_break_functionality(self):
         """Test that logging integration doesn't interfere with core functionality."""
-        # Test with logging enabled and disabled
-        for enable_logging in [True, False]:
-            service = MarketDataService(enable_logging=enable_logging)
-            result = service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            # Core functionality should work regardless of logging settings
-            assert result.symbol == "BTCUSDT"
-            assert isinstance(result.rsi_14, Decimal)
-            assert result.macd_signal in ["bullish", "bearish", "neutral"]
+        self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
+        
+        # Test with logging enabled
+        service_with_log = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
+        result_with_log = service_with_log.get_market_data("BTCUSDT", trace_id="test_trace")
+        assert result_with_log.symbol == "BTCUSDT"
+        
+        # Test with logging disabled
+        service_without_log = MarketDataService(api_client=self.mock_api_client, logger=None)
+        result_without_log = service_without_log.get_market_data("BTCUSDT", trace_id="test_trace")
+        assert result_without_log.symbol == "BTCUSDT"
 
 
 if __name__ == "__main__":

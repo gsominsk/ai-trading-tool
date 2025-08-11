@@ -17,15 +17,17 @@ Consolidated from: tests/test_backward_compatibility.py (474 lines)
 
 import pytest
 import requests
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 from decimal import Decimal
 import pandas as pd
 from datetime import datetime, timezone
 
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
-from src.market_data.exceptions import (
+from src.infrastructure.binance_client import BinanceApiClient
+from src.logging_system import MarketDataLogger
+from src.infrastructure.exceptions import (
     ErrorContext,
-    MarketDataError,
+    ApiClientError as MarketDataError,
     ValidationError,
     NetworkError,
     ProcessingError,
@@ -44,7 +46,9 @@ class TestValueErrorInheritanceCompatibility:
     
     def test_symbol_validation_error_as_value_error(self):
         """Test that SymbolValidationError can be caught as ValueError."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Test catching as specific type
         with pytest.raises(SymbolValidationError):
@@ -154,7 +158,9 @@ class TestLegacyExceptionHandlingPatterns:
     
     def test_legacy_try_except_value_error_pattern(self):
         """Test legacy try/except ValueError pattern still works."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Legacy pattern: catch all validation errors as ValueError
         validation_error_caught = False
@@ -168,7 +174,9 @@ class TestLegacyExceptionHandlingPatterns:
     
     def test_legacy_multiple_exception_catching(self):
         """Test legacy pattern of catching multiple exception types."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Legacy pattern: catch ValueError and Exception
         error_caught = False
@@ -183,11 +191,15 @@ class TestLegacyExceptionHandlingPatterns:
         assert error_caught
         assert "Symbol must be a non-empty string" in error_message
     
-    @patch('requests.get')
-    def test_legacy_network_error_handling(self, mock_get):
+    def test_legacy_network_error_handling(self):
         """Test that network errors can still be caught as generic exceptions."""
-        mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        
+        # Configure the mock client to raise the error
+        mock_api_client.get_klines.side_effect = APIConnectionError("Failed to connect")
+        
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Legacy pattern: catch broad Exception for network issues
         network_error_caught = False
@@ -258,20 +270,23 @@ class TestMarketDataServiceBackwardCompatibility:
     def test_default_constructor_compatibility(self):
         """Test that default constructor still works without parameters."""
         # Legacy usage: no parameters
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Should have default values
-        assert hasattr(service, '_enable_logging')
-        assert hasattr(service, '_fail_fast')
         assert hasattr(service, 'logger')  # New DI architecture uses direct logger
+        assert service.logger is not None
     
     def test_constructor_with_legacy_parameters(self):
         """Test constructor compatibility with potential legacy parameters."""
         # Test various constructor combinations that should work
-        service1 = MarketDataService()
-        service2 = MarketDataService(enable_logging=True)
-        service3 = MarketDataService(fail_fast=True)
-        service4 = MarketDataService(enable_logging=True, fail_fast=False)
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service1 = MarketDataService(api_client=mock_api_client, logger=mock_logger)
+        service2 = MarketDataService(api_client=mock_api_client, logger=mock_logger)
+        service3 = MarketDataService(api_client=mock_api_client, logger=mock_logger)
+        service4 = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # All should be valid instances
         for service in [service1, service2, service3, service4]:
@@ -279,22 +294,19 @@ class TestMarketDataServiceBackwardCompatibility:
             assert hasattr(service, 'get_market_data')
             assert hasattr(service, 'get_enhanced_context')
     
-    @patch('requests.get')
-    def test_get_market_data_method_signature_compatibility(self, mock_get):
+    def test_get_market_data_method_signature_compatibility(self):
         """Test that get_market_data method signature is backward compatible."""
-        # Mock successful response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'application/json'}
-        mock_response.content = b'{"test": "response"}'
-        mock_response.json.return_value = [
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        
+        # Mock successful kline data from the client
+        mock_klines = [
             [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""]
             for _ in range(50)
         ]
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        mock_api_client.get_klines.return_value = mock_klines
         
-        service = MarketDataService()
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Legacy usage: just symbol parameter
         result = service.get_market_data("BTCUSDT", trace_id="test_trace")
@@ -343,7 +355,9 @@ class TestNoBreakingChangesPublicAPI:
     
     def test_market_data_service_public_methods_exist(self):
         """Test that all expected public methods still exist."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Public methods that should exist
         expected_methods = [
@@ -391,8 +405,8 @@ class TestNoBreakingChangesPublicAPI:
     def test_exception_types_accessibility(self):
         """Test that exception types are properly accessible for importing."""
         # Test that exceptions can be imported and used
-        from src.market_data.exceptions import (
-            MarketDataError,
+        from src.infrastructure.exceptions import (
+            ApiClientError as MarketDataError,
             ValidationError,
             NetworkError,
             ProcessingError
@@ -408,7 +422,9 @@ class TestNoBreakingChangesPublicAPI:
     
     def test_backwards_compatible_error_messages(self):
         """Test that error messages remain understandable and informative."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Test symbol validation error message
         try:
@@ -427,7 +443,9 @@ class TestExistingTestCompatibility:
     
     def test_pytest_exception_matching_compatibility(self):
         """Test that pytest exception matching still works."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # pytest.raises should work with ValueError
         with pytest.raises(ValueError, match="Invalid symbol format"):
@@ -439,7 +457,9 @@ class TestExistingTestCompatibility:
     
     def test_exception_info_extraction_compatibility(self):
         """Test that exception info extraction patterns still work."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Pattern: extract exception info for assertions
         with pytest.raises(ValueError) as exc_info:
@@ -460,18 +480,25 @@ class TestExistingTestCompatibility:
     
     def test_mock_patching_compatibility(self):
         """Test that mock patching patterns still work."""
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = requests.exceptions.Timeout("Timeout")
-            
-            service = MarketDataService()
-            
-            # Should be able to catch as broad Exception
-            with pytest.raises(Exception):
-                service.get_market_data("BTCUSDT")
-            
-            # Should also be able to catch as specific type
-            with pytest.raises(APIConnectionError):
-                service.get_market_data("BTCUSDT", trace_id="test_trace")
+        # The new pattern is to mock the client directly, not 'requests.get'
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        
+        # Configure the mock to raise the desired exception
+        mock_api_client.get_klines.side_effect = APIConnectionError("Timeout")
+        
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
+        
+        # Should be able to catch as broad Exception
+        with pytest.raises(Exception):
+            service.get_market_data("BTCUSDT")
+        
+        # Reset mock for the next call
+        mock_api_client.get_klines.side_effect = APIConnectionError("Timeout")
+        
+        # Should also be able to catch as specific type
+        with pytest.raises(APIConnectionError):
+            service.get_market_data("BTCUSDT", trace_id="test_trace")
 
 
 if __name__ == "__main__":

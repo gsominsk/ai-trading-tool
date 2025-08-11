@@ -15,6 +15,9 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
+from src.logging_system import MarketDataLogger
+from src.infrastructure.exceptions import ProcessingError
 
 
 class TestMarketDataServiceEdgeCases:
@@ -22,7 +25,9 @@ class TestMarketDataServiceEdgeCases:
     
     def setup_method(self):
         """Setup test environment."""
-        self.service = MarketDataService()
+        self.mock_api_client = MagicMock(spec=BinanceApiClient)
+        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
     
     def _generate_edge_case_klines(self, scenario: str, count: int = 180) -> list:
         """Generate klines for various edge case scenarios."""
@@ -106,44 +111,31 @@ class TestMarketDataServiceEdgeCases:
         for scenario, description in scenarios:
             klines = self._generate_edge_case_klines(scenario)
             
-            with patch('requests.get') as mock_get:
-                mock_response = MagicMock()
-                mock_response.status_code = 200
-                mock_response.raise_for_status.return_value = None
-                mock_response.json.return_value = klines
-                mock_get.return_value = mock_response
+            self.mock_api_client.get_klines.return_value = klines
+            
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+            rsi = result.rsi_14
+            
+            # Verify RSI correctness
+            assert isinstance(rsi, Decimal), f"RSI should be Decimal, got {type(rsi)}"
+            assert 0 <= rsi <= 100, f"RSI out of bounds [0,100]: {rsi}"
+            
+            # Specific checks for each scenario
+            if scenario == "insufficient_data":
+                # With insufficient data RSI can vary, but should be valid
+                assert Decimal('0') <= rsi <= Decimal('100'), f"RSI should be in range [0,100], got {rsi}"
                 
-                try:
-                    result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-                    rsi = result.rsi_14
-                    
-                    # Verify RSI correctness
-                    assert isinstance(rsi, Decimal), f"RSI should be Decimal, got {type(rsi)}"
-                    assert 0 <= rsi <= 100, f"RSI out of bounds [0,100]: {rsi}"
-                    
-                    # Specific checks for each scenario
-                    if scenario == "insufficient_data":
-                        # With insufficient data RSI can vary, but should be valid
-                        assert Decimal('0') <= rsi <= Decimal('100'), f"RSI should be in range [0,100], got {rsi}"
-                        
-                    elif scenario == "zero_volatility":
-                        # With zero volatility RSI should be 50 (neutral)
-                        assert rsi == Decimal('50.0'), f"With zero volatility RSI should be 50.0, got {rsi}"
-                        
-                    elif scenario == "gradual_increase":
-                        # With constant growth RSI should be high (>50, approaching 100)
-                        assert rsi >= Decimal('50.0'), f"With constant growth RSI should be >=50, got {rsi}"
-                        
-                    elif scenario == "gradual_decrease":
-                        # With constant decline RSI should be low (<50, approaching 0)
-                        assert rsi <= Decimal('50.0'), f"With constant decline RSI should be <=50, got {rsi}"
-                    
-                except Exception as e:
-                    if scenario == "insufficient_data":
-                        # Expected behavior - return neutral RSI
-                        pass
-                    else:
-                        raise AssertionError(f"Failed for {description}: {e}")
+            elif scenario == "zero_volatility":
+                # With zero volatility RSI should be 50 (neutral)
+                assert rsi == Decimal('50.0'), f"With zero volatility RSI should be 50.0, got {rsi}"
+                
+            elif scenario == "gradual_increase":
+                # With constant growth RSI should be high (>50, approaching 100)
+                assert rsi >= Decimal('90.0'), f"With constant growth RSI should be >=90, got {rsi}"
+                
+            elif scenario == "gradual_decrease":
+                # With constant decline RSI should be low (<50, approaching 0)
+                assert rsi <= Decimal('10.0'), f"With constant decline RSI should be <=10, got {rsi}"
     
     # =================
     # MACD EDGE CASES
@@ -161,30 +153,21 @@ class TestMarketDataServiceEdgeCases:
         for scenario, description in scenarios:
             klines = self._generate_edge_case_klines(scenario, 180)  # Enough for all validations
             
-            with patch('requests.get') as mock_get:
-                mock_response = MagicMock()
-                mock_response.status_code = 200
-                mock_response.raise_for_status.return_value = None
-                mock_response.json.return_value = klines
-                mock_get.return_value = mock_response
+            self.mock_api_client.get_klines.return_value = klines
+            
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+            macd_signal = result.macd_signal
+            
+            # Verify MACD signal correctness
+            assert macd_signal in ["bullish", "bearish", "neutral"], f"Invalid MACD signal: {macd_signal}"
+            
+            # Specific checks
+            if scenario == "insufficient_data":
+                # With insufficient data MACD can be any valid value
+                assert macd_signal in ["bullish", "bearish", "neutral"], f"MACD should be valid, got {macd_signal}"
                 
-                try:
-                    result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-                    macd_signal = result.macd_signal
-                    
-                    # Verify MACD signal correctness
-                    assert macd_signal in ["bullish", "bearish", "neutral"], f"Invalid MACD signal: {macd_signal}"
-                    
-                    # Specific checks
-                    if scenario == "insufficient_data":
-                        # With insufficient data MACD can be any valid value
-                        assert macd_signal in ["bullish", "bearish", "neutral"], f"MACD should be valid, got {macd_signal}"
-                        
-                    elif scenario == "zero_volatility":
-                        assert macd_signal == "neutral", f"With zero volatility MACD should be neutral, got {macd_signal}"
-                    
-                except Exception as e:
-                    raise AssertionError(f"Failed for {description}: {e}")
+            elif scenario == "zero_volatility":
+                assert macd_signal == "neutral", f"With zero volatility MACD should be neutral, got {macd_signal}"
     
     # =================
     # MA TREND EDGE CASES
@@ -202,42 +185,33 @@ class TestMarketDataServiceEdgeCases:
         for scenario, description in scenarios:
             klines = self._generate_edge_case_klines(scenario, 180)  # Enough for all validations
             
-            with patch('requests.get') as mock_get:
-                mock_response = MagicMock()
-                mock_response.status_code = 200
-                mock_response.raise_for_status.return_value = None
-                mock_response.json.return_value = klines
-                mock_get.return_value = mock_response
+            self.mock_api_client.get_klines.return_value = klines
+            
+            result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+            ma_trend = result.ma_trend
+            ma_20 = result.ma_20
+            ma_50 = result.ma_50
+            
+            # Verify correctness
+            assert isinstance(ma_20, Decimal), f"MA20 should be Decimal"
+            assert isinstance(ma_50, Decimal), f"MA50 should be Decimal"
+            assert ma_trend in ["uptrend", "downtrend", "sideways"], f"Invalid MA trend: {ma_trend}"
+            
+            # Specific checks (more realistic expectations)
+            if scenario == "gradual_increase":
+                # With uptrend expect uptrend, but can be sideways due to threshold values
+                assert ma_trend in ["uptrend", "sideways"], f"With uptrend MA trend should be uptrend or sideways, got {ma_trend}"
                 
-                try:
-                    result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-                    ma_trend = result.ma_trend
-                    ma_20 = result.ma_20
-                    ma_50 = result.ma_50
-                    
-                    # Verify correctness
-                    assert isinstance(ma_20, Decimal), f"MA20 should be Decimal"
-                    assert isinstance(ma_50, Decimal), f"MA50 should be Decimal"
-                    assert ma_trend in ["uptrend", "downtrend", "sideways"], f"Invalid MA trend: {ma_trend}"
-                    
-                    # Specific checks (more realistic expectations)
-                    if scenario == "gradual_increase":
-                        # With uptrend expect uptrend, but can be sideways due to threshold values
-                        assert ma_trend in ["uptrend", "sideways"], f"With uptrend MA trend should be uptrend or sideways, got {ma_trend}"
-                        
-                    elif scenario == "gradual_decrease":
-                        # With downtrend expect downtrend, but can be sideways due to threshold values
-                        assert ma_trend in ["downtrend", "sideways"], f"With downtrend MA trend should be downtrend or sideways, got {ma_trend}"
-                        
-                    elif scenario == "zero_volatility":
-                        assert ma_trend == "sideways", f"With zero volatility MA trend should be sideways, got {ma_trend}"
-                        
-                    elif scenario == "insufficient_data":
-                        # With insufficient data can be any valid trend
-                        assert ma_trend in ["uptrend", "downtrend", "sideways"], f"MA trend should be valid, got {ma_trend}"
-                    
-                except Exception as e:
-                    raise AssertionError(f"Failed for {description}: {e}")
+            elif scenario == "gradual_decrease":
+                # With downtrend expect downtrend, but can be sideways due to threshold values
+                assert ma_trend in ["downtrend", "sideways"], f"With downtrend MA trend should be downtrend or sideways, got {ma_trend}"
+                
+            elif scenario == "zero_volatility":
+                assert ma_trend == "sideways", f"With zero volatility MA trend should be sideways, got {ma_trend}"
+                
+            elif scenario == "insufficient_data":
+                # With insufficient data can be any valid trend
+                assert ma_trend in ["uptrend", "downtrend", "sideways"], f"MA trend should be valid, got {ma_trend}"
     
     # =================
     # DIVISION BY ZERO PROTECTION
@@ -248,25 +222,16 @@ class TestMarketDataServiceEdgeCases:
         # Create data with zero changes (all same prices)
         klines = self._generate_edge_case_klines("zero_volatility", 180)  # Enough for all validations
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = klines
-            mock_get.return_value = mock_response
-            
-            try:
-                result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-                
-                # All indicators should work without errors
-                assert isinstance(result.rsi_14, Decimal)
-                assert result.macd_signal in ["bullish", "bearish", "neutral"]
-                assert isinstance(result.ma_20, Decimal)
-                assert isinstance(result.ma_50, Decimal)
-                assert result.ma_trend in ["uptrend", "downtrend", "sideways"]
-                
-            except Exception as e:
-                raise AssertionError(f"Division by zero protection failed: {e}")
+        self.mock_api_client.get_klines.return_value = klines
+        
+        result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+        
+        # All indicators should work without errors
+        assert isinstance(result.rsi_14, Decimal)
+        assert result.macd_signal in ["bullish", "bearish", "neutral"]
+        assert isinstance(result.ma_20, Decimal)
+        assert isinstance(result.ma_50, Decimal)
+        assert result.ma_trend in ["uptrend", "downtrend", "sideways"]
     
     # =================
     # EXTREME VALUES
@@ -281,17 +246,12 @@ class TestMarketDataServiceEdgeCases:
             for i in range(50)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = large_klines_data
-            mock_get.return_value = mock_response
-            
-            # Should fail validation due to too large values
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            assert "ma_20 too large" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = large_klines_data
+        
+        # Should fail validation due to too large values
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+        assert "too large" in str(exc_info.value)
     
     def test_extremely_small_numbers(self):
         """Test handling of extremely small financial numbers."""
@@ -302,17 +262,12 @@ class TestMarketDataServiceEdgeCases:
             for i in range(50)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = small_klines_data
-            mock_get.return_value = mock_response
-            
-            # Should fail validation due to MA values being too small (rounded to 0)
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("SHIUSDT", trace_id="test_trace")
-            assert "ma_20 must be positive" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = small_klines_data
+        
+        # Should fail validation due to MA values being too small (rounded to 0)
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service.get_market_data("SHIUSDT", trace_id="test_trace")
+        assert "must be positive" in str(exc_info.value)
     
     def test_zero_volume_candles(self):
         """Test handling of candles with zero volume."""
@@ -325,16 +280,11 @@ class TestMarketDataServiceEdgeCases:
                 1640995259999 + i*3600000, "0.0", 0, "0.0", "0.0", "0"
             ])
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = zero_volume_data
-            mock_get.return_value = mock_response
-            
-            result = self.service.get_market_data("DEADUSDT", trace_id="test_trace")
-            assert result.volume_profile in ["high", "low", "normal"]
-            assert 0 <= result.rsi_14 <= 100
+        self.mock_api_client.get_klines.return_value = zero_volume_data
+        
+        result = self.service.get_market_data("DEADUSDT", trace_id="test_trace")
+        assert result.volume_profile in ["high", "low", "normal"]
+        assert 0 <= result.rsi_14 <= 100
     
     def test_constant_price_candles(self):
         """Test handling of candles with constant prices."""
@@ -347,17 +297,12 @@ class TestMarketDataServiceEdgeCases:
                 1640995259999 + i*3600000, "50000000.0", 100, "500.0", "25000000.0", "0"
             ])
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = constant_price_data
-            mock_get.return_value = mock_response
-            
-            result = self.service.get_market_data("STABUSDT", trace_id="test_trace")
-            # RSI can be 100 with constant upward movement, even tiny
-            assert 0 <= result.rsi_14 <= 100  # Valid RSI range
-            assert result.ma_trend == "sideways"
+        self.mock_api_client.get_klines.return_value = constant_price_data
+        
+        result = self.service.get_market_data("STABUSDT", trace_id="test_trace")
+        # RSI can be 100 with constant upward movement, even tiny
+        assert 0 <= result.rsi_14 <= 100  # Valid RSI range
+        assert result.ma_trend == "sideways"
     
     def test_extreme_volatility_candles(self):
         """Test handling of extremely volatile price data."""
@@ -377,17 +322,12 @@ class TestMarketDataServiceEdgeCases:
                     1640995259999 + i*3600000, "10000000.0", 2000, "1000000.0", "5000000.0", "0"
                 ])
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = volatile_data
-            mock_get.return_value = mock_response
-            
-            # Should fail validation due to extreme price deviation from MA20
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("VOLUSDT", trace_id="test_trace")
-            assert "too far from MA20" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = volatile_data
+        
+        # Should fail validation due to extreme price deviation from MA20
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service.get_market_data("VOLUSDT", trace_id="test_trace")
+        assert "too far from MA20" in str(exc_info.value)
 
 
 if __name__ == "__main__":

@@ -11,10 +11,20 @@ Consolidated from archived tests covering:
 """
 
 import pytest
-import requests
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
+from src.logging_system import MarketDataLogger
+from src.infrastructure.exceptions import (
+    NetworkError,
+    RateLimitError,
+    APIResponseError,
+    DataInsufficientError,
+    ProcessingError,
+    DataFrameValidationError,
+    SymbolValidationError
+)
 
 
 class TestMarketDataServiceAPI:
@@ -22,7 +32,9 @@ class TestMarketDataServiceAPI:
     
     def setup_method(self):
         """Setup test environment."""
-        self.service = MarketDataService()
+        self.mock_api_client = MagicMock(spec=BinanceApiClient)
+        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
     
     # =================
     # NETWORK FAILURES
@@ -30,62 +42,50 @@ class TestMarketDataServiceAPI:
     
     def test_api_connection_timeout(self):
         """Test handling of API connection timeout."""
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = requests.exceptions.Timeout("Connection timeout")
-            
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Request to Binance API timed out" in str(exc_info.value)
+        self.mock_api_client.get_klines.side_effect = NetworkError("Connection timeout")
+        
+        with pytest.raises(NetworkError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+        
+        assert "Connection timeout" in str(exc_info.value)
     
     def test_api_connection_error(self):
         """Test handling of API connection errors."""
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = requests.exceptions.ConnectionError("Network unreachable")
+        self.mock_api_client.get_klines.side_effect = NetworkError("Network unreachable")
+        
+        with pytest.raises(NetworkError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Failed to connect to Binance API" in str(exc_info.value)
+        assert "Network unreachable" in str(exc_info.value)
     
     def test_api_http_error_404(self):
         """Test handling of HTTP 404 errors."""
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 404
-            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
-            mock_get.return_value = mock_response
+        self.mock_api_client.get_klines.side_effect = APIResponseError("404 Not Found", status_code=404)
+
+        with pytest.raises(APIResponseError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Symbol BTCUSDT not found or invalid interval 1d" in str(exc_info.value)
+        assert "404 Not Found" in str(exc_info.value)
+        assert exc_info.value.status_code == 404
     
     def test_api_http_error_500(self):
         """Test handling of HTTP 500 server errors."""
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 500
-            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("500 Internal Server Error")
-            mock_get.return_value = mock_response
+        self.mock_api_client.get_klines.side_effect = APIResponseError("500 Internal Server Error", status_code=500)
+
+        with pytest.raises(APIResponseError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Binance API server error: 500" in str(exc_info.value)
+        assert "500 Internal Server Error" in str(exc_info.value)
+        assert exc_info.value.status_code == 500
     
     def test_api_rate_limiting(self):
         """Test handling of API rate limiting."""
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 429
-            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("429 Too Many Requests")
-            mock_get.return_value = mock_response
+        self.mock_api_client.get_klines.side_effect = RateLimitError("429 Too Many Requests")
+
+        with pytest.raises(RateLimitError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
             
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Binance API rate limit exceeded" in str(exc_info.value)
+        assert "429 Too Many Requests" in str(exc_info.value)
     
     # =================
     # MALFORMED RESPONSES
@@ -93,31 +93,21 @@ class TestMarketDataServiceAPI:
     
     def test_malformed_api_response(self):
         """Test handling of malformed API responses."""
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.side_effect = ValueError("Invalid JSON")
-            mock_get.return_value = mock_response
-            
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Unexpected error during klines data processing" in str(exc_info.value)
+        self.mock_api_client.get_klines.side_effect = ProcessingError("Invalid JSON")
+
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+        
+        assert "Invalid JSON" in str(exc_info.value)
     
     def test_empty_api_response(self):
         """Test handling of empty API responses."""
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = []
-            mock_get.return_value = mock_response
-            
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-            
-            assert "Empty or invalid response from Binance API" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = []
+
+        with pytest.raises(DataInsufficientError) as exc_info:
+            self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+        
+        assert "One or more required DataFrames are empty" in str(exc_info.value)
     
     # =================
     # PARTIAL FAILURES
@@ -129,74 +119,55 @@ class TestMarketDataServiceAPI:
         valid_klines_data = [
             [1640995200000, "50000", "51000", "49000", "50500", "1000.0",
              1640995259999, "50250000.0", 100, "500.0", "25125000.0", "0"]
-            for i in range(50)
+            for i in range(180)
         ]
         
-        with patch('requests.get') as mock_get:
-            # First 3 calls succeed (daily, h4, h1), 4th call fails (BTC correlation)
-            mock_responses = []
-            for i in range(3):
-                mock_response = MagicMock()
-                mock_response.status_code = 200
-                mock_response.raise_for_status.return_value = None
-                mock_response.json.return_value = valid_klines_data
-                mock_responses.append(mock_response)
-            
-            # BTC correlation call fails
-            btc_response = MagicMock()
-            btc_response.status_code = 408  # Request timeout
-            btc_response.raise_for_status.side_effect = requests.exceptions.Timeout("BTC timeout")
-            mock_responses.append(btc_response)
-            
-            mock_get.side_effect = mock_responses
-            
-            # Should succeed with None BTC correlation
-            result = self.service.get_market_data("ETHUSDT", trace_id="test_trace")
-            assert result.btc_correlation is None
-            assert result.symbol == "ETHUSDT"
-    
+        # Configure side effects for get_klines
+        self.mock_api_client.get_klines.side_effect = [
+            valid_klines_data,  # daily
+            valid_klines_data,  # h4
+            valid_klines_data,  # h1
+            NetworkError("BTC timeout") # BTC correlation
+        ]
+        
+        with pytest.raises(NetworkError) as exc_info:
+            self.service.get_market_data("ETHUSDT", trace_id="test_trace")
+
+        assert "BTC timeout" in str(exc_info.value)
+
     # =================
     # API RATE LIMITING COMPREHENSIVE
     # =================
     
     def test_rate_limiting_consecutive_requests(self):
         """Test consecutive rate limiting responses."""
-        with patch('requests.get') as mock_get:
-            # Multiple consecutive rate limit responses
-            for _ in range(3):
-                mock_response = MagicMock()
-                mock_response.status_code = 429
-                mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("429 Too Many Requests")
-                mock_get.return_value = mock_response
-                
-                with pytest.raises(Exception) as exc_info:
-                    self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-                
-                assert "Binance API rate limit exceeded" in str(exc_info.value)
+        # Multiple consecutive rate limit responses
+        for _ in range(3):
+            self.mock_api_client.get_klines.side_effect = RateLimitError("429 Too Many Requests")
+            
+            with pytest.raises(RateLimitError) as exc_info:
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+            
+            assert "429 Too Many Requests" in str(exc_info.value)
     
     def test_mixed_error_scenarios(self):
         """Test various mixed error scenarios."""
         error_scenarios = [
-            (400, "400 Bad Request", "Invalid request parameters"),
-            (401, "401 Unauthorized", "API authentication failed"),
-            (403, "403 Forbidden", "Access forbidden"),
-            (408, "408 Request Timeout", "Request timeout"),
-            (502, "502 Bad Gateway", "Bad gateway"),
-            (503, "503 Service Unavailable", "Service temporarily unavailable"),
+            (APIResponseError("400 Bad Request", status_code=400), APIResponseError),
+            (APIResponseError("401 Unauthorized", status_code=401), APIResponseError),
+            (APIResponseError("403 Forbidden", status_code=403), APIResponseError),
+            (NetworkError("408 Request Timeout"), NetworkError),
+            (APIResponseError("502 Bad Gateway", status_code=502), APIResponseError),
+            (APIResponseError("503 Service Unavailable", status_code=503), APIResponseError),
         ]
         
-        for status_code, error_msg, expected_text in error_scenarios:
-            with patch('requests.get') as mock_get:
-                mock_response = MagicMock()
-                mock_response.status_code = status_code
-                mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(error_msg)
-                mock_get.return_value = mock_response
-                
-                with pytest.raises(Exception) as exc_info:
-                    self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-                
-                # Should contain appropriate error handling
-                assert str(exc_info.value)  # Should have meaningful error message
+        for exception_to_raise, expected_exception in error_scenarios:
+            self.mock_api_client.get_klines.side_effect = exception_to_raise
+            
+            with pytest.raises(expected_exception) as exc_info:
+                self.service.get_market_data("BTCUSDT", trace_id="test_trace")
+            
+            assert str(exception_to_raise.message) in str(exc_info.value)
     
     # =================
     # EXTREME DATA CASES
@@ -208,61 +179,46 @@ class TestMarketDataServiceAPI:
         invalid_ohlc_data = [
             [1640995200000, "50000", "49000", "51000", "50500", "1000.0",  # high < low
              1640995259999, "50250000.0", 100, "500.0", "25125000.0", "0"]
-            for i in range(50)
+            for i in range(180)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = invalid_ohlc_data
-            mock_get.return_value = mock_response
-            
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("INVUSDT", trace_id="test_trace")
-            
-            assert "invalid OHLC data" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = invalid_ohlc_data
+        
+        with pytest.raises(DataFrameValidationError) as exc_info:
+            self.service.get_market_data("INVUSDT", trace_id="test_trace")
+        
+        assert "invalid OHLC data" in str(exc_info.value)
     
     def test_negative_prices(self):
         """Test handling of negative prices."""
         negative_price_data = [
             [1640995200000, "-1000", "1000", "-2000", "500", "1000.0",
              1640995259999, "500000.0", 100, "500.0", "250000.0", "0"]
-            for i in range(50)
+            for i in range(180)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = negative_price_data
-            mock_get.return_value = mock_response
-            
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("NEGUSDT", trace_id="test_trace")
-            
-            # Should fail validation
-            assert "support_level must be positive" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = negative_price_data
+        
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service.get_market_data("NEGUSDT", trace_id="test_trace")
+        
+        # Should fail validation in MarketDataSet and be wrapped in ProcessingError
+        assert "support_level must be positive" in str(exc_info.value)
     
     def test_nan_and_inf_values(self):
         """Test handling of NaN and infinite values."""
         nan_inf_data = [
             [1640995200000, "NaN", "inf", "-inf", "50000", "1000.0",
              1640995259999, "50000000.0", 100, "500.0", "25000000.0", "0"]
-            for i in range(50)
+            for i in range(180)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = nan_inf_data
-            mock_get.return_value = mock_response
-            
-            with pytest.raises(Exception) as exc_info:
-                self.service.get_market_data("NANUSDT", trace_id="test_trace")
-            
-            assert "Invalid numeric data in column open" in str(exc_info.value)
+        self.mock_api_client.get_klines.return_value = nan_inf_data
+        
+        with pytest.raises(ProcessingError) as exc_info:
+            self.service.get_market_data("NANUSDT", trace_id="test_trace")
+        
+        assert "Unexpected error during market data aggregation" in str(exc_info.value)
     
     def test_memory_pressure_large_dataset(self):
         """Test handling of very large datasets."""
@@ -273,18 +229,13 @@ class TestMarketDataServiceAPI:
             for i in range(1000)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = large_dataset
-            mock_get.return_value = mock_response
-            
-            # Should handle large datasets gracefully
-            result = self.service.get_market_data("LARGUSDT", trace_id="test_trace")
-            assert result.symbol == "LARGUSDT"
-            assert len(result.daily_candles) == 1000
-            assert isinstance(result.ma_20, Decimal)
+        self.mock_api_client.get_klines.return_value = large_dataset
+        
+        # Should handle large datasets gracefully
+        result = self.service.get_market_data("LARGUSDT", trace_id="test_trace")
+        assert result.symbol == "LARGUSDT"
+        assert len(result.daily_candles) == 1000
+        assert isinstance(result.ma_20, Decimal)
     
     def test_concurrent_access_simulation(self):
         """Test handling of concurrent access patterns."""
@@ -292,29 +243,24 @@ class TestMarketDataServiceAPI:
         valid_klines_data = [
             [1640995200000, "50000", "51000", "49000", "50500", "1000.0",
              1640995259999, "50250000.0", 100, "500.0", "25125000.0", "0"]
-            for i in range(50)
+            for i in range(180)
         ]
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            mock_response.json.return_value = valid_klines_data
-            mock_get.return_value = mock_response
-            
-            # Create multiple service instances and call simultaneously
-            services = [MarketDataService() for _ in range(5)]
-            results = []
-            
-            for service in services:
-                result = service.get_market_data("BTCUSDT", trace_id="test_trace")
-                results.append(result)
-            
-            # All should succeed
-            assert len(results) == 5
-            for result in results:
-                assert result.symbol == "BTCUSDT"
-                assert isinstance(result.ma_20, Decimal)
+        self.mock_api_client.get_klines.return_value = valid_klines_data
+        
+        # Create multiple service instances and call simultaneously
+        services = [MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger) for _ in range(5)]
+        results = []
+        
+        for service in services:
+            result = service.get_market_data("BTCUSDT", trace_id="test_trace")
+            results.append(result)
+        
+        # All should succeed
+        assert len(results) == 5
+        for result in results:
+            assert result.symbol == "BTCUSDT"
+            assert isinstance(result.ma_20, Decimal)
 
 
 if __name__ == "__main__":

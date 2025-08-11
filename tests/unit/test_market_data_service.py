@@ -11,8 +11,13 @@ from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any
 
+import logging
+
 # Import the module to test
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
+from src.infrastructure.binance_client import BinanceApiClient
+from src.infrastructure.exceptions import SymbolValidationError, DataFrameValidationError
+from src.logging_system import MarketDataLogger
 
 
 class TestMarketDataService:
@@ -20,7 +25,9 @@ class TestMarketDataService:
     
     def setup_method(self):
         """Set up test fixtures before each test method."""
-        self.service = MarketDataService(enable_logging=False)
+        self.mock_api_client = MagicMock(spec=BinanceApiClient)
+        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
     
     @pytest.mark.unit
     @pytest.mark.financial
@@ -53,7 +60,7 @@ class TestMarketDataService:
         invalid_symbols = ["BTC", "ETH-USD", "bitcoin", "", "TOOLONGUSDT123", "123USDT"]
         
         for symbol in invalid_symbols:
-            with pytest.raises(ValueError):
+            with pytest.raises(SymbolValidationError):
                 self.service._validate_symbol_input(symbol)
     
     def _generate_sufficient_klines(self, count: int, start_price: float = 50000.0) -> list:
@@ -96,40 +103,22 @@ class TestMarketDataService:
         return klines
 
     @pytest.mark.unit
-    @patch('requests.get')
-    def test_get_market_data_structure_real_service(self, mock_get):
+    def test_get_market_data_structure_real_service(self):
         """Test that get_market_data returns properly structured MarketDataSet."""
         # Generate sufficient mock data for all timeframes
         daily_data = self._generate_sufficient_klines(180, 50000.0)  # 6 months
         h4_data = self._generate_sufficient_klines(84, 50000.0)      # 2 weeks
         h1_data = self._generate_sufficient_klines(60, 50000.0)      # 60 hours
         
-        def mock_side_effect(*args, **kwargs):
-            params = kwargs.get('params', {})
-            interval = params.get('interval', '1h')
-            
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            
-            # Add proper headers and content for logging compatibility
-            mock_response.headers = {
-                'content-type': 'application/json',
-                'x-mbx-used-weight': '1',
-                'x-mbx-used-weight-1m': '1'
-            }
-            mock_response.content = b'{"test": "response"}'
-            
+        def mock_api_side_effect(symbol, interval, limit, trace_id):
             if interval == '1d':
-                mock_response.json.return_value = daily_data
+                return daily_data
             elif interval == '4h':
-                mock_response.json.return_value = h4_data
-            else:  # '1h'
-                mock_response.json.return_value = h1_data
+                return h4_data
+            else:  # '1h' or BTC correlation call
+                return h1_data
                 
-            return mock_response
-        
-        mock_get.side_effect = mock_side_effect
+        self.mock_api_client.get_klines.side_effect = mock_api_side_effect
         
         # Test the real service
         result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
@@ -150,40 +139,22 @@ class TestMarketDataService:
         assert result.ma_trend in ["uptrend", "downtrend", "sideways"]
     
     @pytest.mark.unit
-    @patch('requests.get')
-    def test_decimal_precision_real_service(self, mock_get):
+    def test_decimal_precision_real_service(self):
         """Test that real service maintains Decimal precision for financial calculations."""
         # Generate sufficient mock data with high precision
         daily_data = self._generate_sufficient_klines(180, 50000.12345678)
         h4_data = self._generate_sufficient_klines(84, 50000.12345678)
         h1_data = self._generate_sufficient_klines(60, 50000.12345678)
         
-        def mock_side_effect(*args, **kwargs):
-            params = kwargs.get('params', {})
-            interval = params.get('interval', '1h')
-            
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.raise_for_status.return_value = None
-            
-            # Add proper headers and content for logging compatibility
-            mock_response.headers = {
-                'content-type': 'application/json',
-                'x-mbx-used-weight': '1',
-                'x-mbx-used-weight-1m': '1'
-            }
-            mock_response.content = b'{"test": "response"}'
-            
+        def mock_api_side_effect(symbol, interval, limit, trace_id):
             if interval == '1d':
-                mock_response.json.return_value = daily_data
+                return daily_data
             elif interval == '4h':
-                mock_response.json.return_value = h4_data
-            else:  # '1h'
-                mock_response.json.return_value = h1_data
+                return h4_data
+            else:  # '1h' or BTC correlation call
+                return h1_data
                 
-            return mock_response
-        
-        mock_get.side_effect = mock_side_effect
+        self.mock_api_client.get_klines.side_effect = mock_api_side_effect
         
         # Test the service
         result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
@@ -328,17 +299,17 @@ class TestMarketDataService:
     def test_error_handling_real_service(self):
         """Test error handling in real service."""
         # Test invalid symbol validation
-        with pytest.raises(ValueError, match="Symbol must be a non-empty string"):
+        with pytest.raises(SymbolValidationError, match="Symbol must be a non-empty string"):
             self.service.get_market_data("", trace_id="test_trace")
         
-        with pytest.raises(ValueError, match="Invalid symbol format"):
+        with pytest.raises(SymbolValidationError, match="Invalid symbol format"):
             self.service.get_market_data("BTC")
         
-        with pytest.raises(ValueError, match="Invalid symbol format"):
+        with pytest.raises(SymbolValidationError, match="Invalid symbol format"):
             self.service.get_market_data("ETHBTC")  # Not USDT pair
         
         # Test MarketDataSet validation
-        with pytest.raises(ValueError, match="Invalid symbol format"):
+        with pytest.raises(SymbolValidationError, match="Invalid symbol format"):
             MarketDataSet(
                 symbol="INVALID",
                 timestamp=datetime.now(timezone.utc),
@@ -497,58 +468,20 @@ class TestMarketDataServiceIntegration:
         return klines
 
     @pytest.mark.unit
-    @patch('requests.get')
-    def test_binance_api_mock_response(self, mock_get):
+    def test_binance_api_mock_response(self):
         """Test MarketDataService with correctly structured Binance API klines response."""
         # Generate realistic klines data (Binance API format)
         test_klines = self._generate_test_klines(60)
         
-        # Mock successful API response with correct klines structure
-        mock_response = Mock()
-        mock_response.json.return_value = test_klines
-        mock_response.status_code = 200
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        # Setup mocks
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
         
-        # Test API structure validation
-        assert mock_response.status_code == 200
-        klines_data = mock_response.json()
-        
-        # Verify it's a list of klines (not dict with symbol/price)
-        assert isinstance(klines_data, list), "API should return list of klines"
-        assert len(klines_data) == 60, f"Expected 60 klines, got {len(klines_data)}"
-        
-        # Verify kline structure
-        sample_kline = klines_data[0]
-        assert len(sample_kline) == 12, f"Each kline should have 12 fields, got {len(sample_kline)}"
-        assert str(sample_kline[0]).isdigit(), "Timestamp should be numeric"
-        assert isinstance(sample_kline[1], str), "OHLCV should be strings"
-        
-        # Test price precision
-        open_price = Decimal(sample_kline[1])
-        assert 45000 <= open_price <= 55000, f"Price should be around base value: {open_price}"
+        # Configure the mock client to return our test data
+        mock_api_client.get_klines.return_value = test_klines
         
         # Verify this structure works with MarketDataService
-        service = MarketDataService(enable_logging=False)
-        
-        # Mock all timeframe calls
-        def mock_side_effect(*args, **kwargs):
-            mock_resp = Mock()
-            mock_resp.status_code = 200
-            mock_resp.raise_for_status.return_value = None
-            mock_resp.json.return_value = test_klines
-            
-            # Add proper headers and content for logging compatibility
-            mock_resp.headers = {
-                'content-type': 'application/json',
-                'x-mbx-used-weight': '1',
-                'x-mbx-used-weight-1m': '1'
-            }
-            mock_resp.content = b'{"test": "response"}'
-            
-            return mock_resp
-        
-        mock_get.side_effect = mock_side_effect
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # This should work without errors now
         try:

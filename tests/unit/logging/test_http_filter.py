@@ -17,6 +17,9 @@ sys.path.insert(0, str(project_root))
 
 from src.logging_system.logger_config import configure_ai_logging
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
+from src.logging_system import MarketDataLogger
+from unittest.mock import MagicMock
 
 
 @pytest.fixture
@@ -54,18 +57,25 @@ class TestHTTPFilter:
     
     def test_market_data_service_with_http_filtering(self, configure_test_logging):
         """Test MarketDataService operations with HTTP filtering active."""
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        # Provide valid data to the mock client to prevent DataInsufficientError
+        valid_klines = [[1640995200000, "50000", "51000", "49000", "50500", "100", 1640995259999, "1", 50, "50000", "0.1", ""] for _ in range(180)]
+        mock_api_client.get_klines.return_value = valid_klines
+        
+        real_logger = MarketDataLogger(module_name="http_filter_test", service_name="test_service")
+        service = MarketDataService(api_client=mock_api_client, logger=real_logger)
         
         try:
-            # This will generate HTTP requests but should filter verbose logs
-            market_data = service.get_market_data("BTCUSDT")
+            # This will now succeed because the mock provides data
+            market_data = service.get_market_data("BTCUSDT", trace_id="test_trace")
             
             # Test passes if no exception and we get some result
             assert market_data is not None
+            assert market_data.symbol == "BTCUSDT"
             
         except Exception as e:
             # Allow network errors but ensure they're not logging-related
-            assert "logging" not in str(e).lower()
+            pytest.fail(f"Test should not fail, but got: {e}")
     
     def test_log_file_creation(self, configure_test_logging):
         """Test that log file is created and contains structured logs."""
@@ -130,23 +140,26 @@ class TestHTTPFilterIntegration:
     def test_full_market_data_workflow_with_filtering(self, configure_test_logging):
         """Test complete market data workflow with HTTP filtering active."""
         log_file = configure_test_logging
-        service = MarketDataService()
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        # Provide valid data to the mock client
+        valid_klines = [[1640995200000, "50000", "51000", "49000", "50500", "100", 1640995259999, "1", 50, "50000", "0.1", ""] for _ in range(180)]
+        mock_api_client.get_klines.return_value = valid_klines
+        
+        real_logger = MarketDataLogger(module_name="http_filter_integration_test", service_name="test_service")
+        service = MarketDataService(api_client=mock_api_client, logger=real_logger)
         
         try:
             # Run a complete market data operation
             market_data = service.get_market_data("BTCUSDT", trace_id="test_trace")
             
-            # Verify we got some data (if network is available)
-            if market_data:
-                # MarketDataSet has different structure, check correct attributes
-                assert hasattr(market_data, 'symbol')
-                assert hasattr(market_data, 'daily_candles')
-                assert hasattr(market_data, 'h1_candles')
-                assert market_data.symbol == "BTCUSDT"
+            # Verify we got some data
+            assert market_data is not None
+            assert hasattr(market_data, 'symbol')
+            assert hasattr(market_data, 'daily_candles')
+            assert hasattr(market_data, 'h1_candles')
+            assert market_data.symbol == "BTCUSDT"
             
             # Verify logging system worked without errors
-            # (logs go to stderr as shown in captured output, not file)
-            # Test passes if market data was retrieved and no logging errors occurred
             assert True  # HTTP filtering and market data workflow completed successfully
                     
         except Exception as e:

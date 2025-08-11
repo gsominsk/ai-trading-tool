@@ -33,6 +33,7 @@ from src.logging_system.json_formatter import AIOptimizedJSONFormatter
 from src.logging_system.logger_config import reset_logging_state
 from src.logging_system.flow_context import advance_to_stage
 from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.binance_client import BinanceApiClient
 
 
 @pytest.mark.integration
@@ -329,61 +330,73 @@ class TestTradingLoggingIntegration:
     
     def test_market_data_service_logging_integration(self, caplog):
         """Test MarketDataService integration with logging system."""
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        # Use a real logger to allow caplog to capture output
+        real_logger = MarketDataLogger(module_name="test_market_data_service", service_name="market_data_service_integration")
+        service = MarketDataService(api_client=mock_api_client, logger=real_logger)
         
         # Test that service has logger
         assert hasattr(service, 'logger')
         assert service.logger is not None
         
-        # Test logging operations work
-        service._log_operation_start("test_operation", symbol="BTCUSDT")
-        service._log_operation_success("test_operation", symbol="BTCUSDT")
+        with caplog.at_level("INFO"):
+            # Test logging operations work
+            service._log_operation_start("test_operation", symbol="BTCUSDT", trace_id="trace1")
+            service._log_operation_success("test_operation", symbol="BTCUSDT", trace_id="trace1")
         
         # Verify logs were created
-        assert len(caplog.records) >= 2
+        assert len(caplog.records) >= 2, "Should capture start and success logs"
         
         # Verify log content
-        log_messages = [record.message for record in caplog.records]
-        assert any("test_operation initiated" in msg for msg in log_messages)
-        assert any("test_operation completed successfully" in msg for msg in log_messages)
+        formatter = AIOptimizedJSONFormatter()
+        json_logs = [json.loads(formatter.format(rec)) for rec in caplog.records]
+        operations = [log.get("operation") for log in json_logs]
+        assert "test_operation" in operations
     
     def test_complete_market_data_flow_integration(self, caplog):
         """Test complete market data operation flow with logging."""
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        # Use a real logger to allow caplog to capture output
+        real_logger = MarketDataLogger(module_name="test_market_data_flow", service_name="market_data_flow_integration")
+        service = MarketDataService(api_client=mock_api_client, logger=real_logger)
         
-        # Simulate complete market data workflow
-        with flow_operation("BTCUSDT", "get_market_data") as trace_id:
-            # Start operation
-            service._log_operation_start("get_market_data", symbol="BTCUSDT")
-            
-            # Symbol validation stage
-            advance_to_stage("symbol_validation")
-            
-            # Data collection stage
-            advance_to_stage("data_collection")
-            # Test API call logging through the new DI system
-            service.logger.log_api_call("BTCUSDT", "1d", 180, response_time_ms=150)
-            
-            # Technical indicators stage
-            advance_to_stage("technical_indicators")
-            # Test calculation logging through the new DI system
-            service.logger.log_calculation("RSI", "BTCUSDT", result="65")
-            
-            # Complete operation
-            advance_to_stage("completion")
-            service._log_operation_success("get_market_data", symbol="BTCUSDT")
+        with caplog.at_level("DEBUG"):
+            # Simulate complete market data workflow
+            with flow_operation("BTCUSDT", "get_market_data") as trace_id:
+                # Start operation
+                service._log_operation_start("get_market_data", symbol="BTCUSDT", trace_id=trace_id)
+                
+                # Symbol validation stage
+                advance_to_stage("symbol_validation")
+                
+                # Data collection stage
+                advance_to_stage("data_collection")
+                service.logger.log_api_call("BTCUSDT", "1d", 180, response_time_ms=150, trace_id=trace_id)
+                
+                # Technical indicators stage
+                advance_to_stage("technical_indicators")
+                service.logger.log_calculation("RSI", "BTCUSDT", result="65", trace_id=trace_id)
+                
+                # Complete operation
+                advance_to_stage("completion")
+                service._log_operation_success("get_market_data", symbol="BTCUSDT", trace_id=trace_id)
         
         # Verify complete workflow was logged
-        assert len(caplog.records) >= 4
+        assert len(caplog.records) >= 4, "Should capture start, api, calc, and success logs"
         
-        # Verify flow progression
-        log_messages = [record.message for record in caplog.records]
-        assert any("get_market_data initiated" in msg for msg in log_messages)
-        assert any("get_market_data completed successfully" in msg for msg in log_messages)
+        # Verify flow progression by checking for key operations in the logs
+        formatter = AIOptimizedJSONFormatter()
+        json_logs = [json.loads(formatter.format(rec)) for rec in caplog.records]
+        operations = [log.get("operation") for log in json_logs]
+        assert "get_market_data" in operations
+        assert "api_call" in operations
+        assert "calculation" in operations
     
     def test_trading_operations_logging_integration(self):
         """Test trading operations logging integration."""
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Test all trading operation logging methods
         try:
@@ -403,7 +416,9 @@ class TestTradingLoggingIntegration:
     
     def test_logging_system_resilience_during_trading(self):
         """Test that trading operations continue even if logging fails."""
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        mock_logger = MagicMock(spec=MarketDataLogger)
+        service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Simulate logging system failure
         with patch.object(service.logger, 'log_operation_start') as mock_log:
@@ -443,7 +458,8 @@ class TestCompleteLoggingWorkflows:
         
         # Create multiple loggers and services
         market_logger = MarketDataLogger("integration_test")
-        service = MarketDataService(enable_logging=True, log_level="DEBUG")
+        mock_api_client = MagicMock(spec=BinanceApiClient)
+        service = MarketDataService(api_client=mock_api_client, logger=market_logger)
         
         with flow_operation("BTCUSDT", "complete_integration_test") as trace_id:
             # Test all major logging components

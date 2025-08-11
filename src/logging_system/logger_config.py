@@ -330,7 +330,7 @@ class MarketDataLogger:
             
         self.logger.debug(
             "Binance API call executed",
-            operation="_get_klines",
+            operation="api_call",
             context=context,
             tags=["api_call", "binance", "data_collection"],
             flow=get_flow_summary(),
@@ -353,7 +353,7 @@ class MarketDataLogger:
             
         self.logger.debug(
             f"{indicator} calculation completed",
-            operation=f"_calculate_{indicator.lower()}",
+            operation="calculation",
             context=context,
             tags=["calculation", indicator.lower(), "technical_analysis"],
             flow=get_flow_summary(),

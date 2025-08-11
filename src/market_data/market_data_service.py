@@ -9,7 +9,6 @@ Provides structured market data for LLM trading decisions with three data levels
 Includes technical indicators and market context for comprehensive analysis.
 """
 
-import requests
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta, timezone
@@ -19,11 +18,11 @@ from decimal import Decimal, ROUND_HALF_UP
 import time
 import json
 import os
+import logging
 
-# Error hierarchy imports for Phase 2 - Integration
-from .exceptions import (
-    ErrorContext,
-    MarketDataError,
+# Updated exception and client imports
+from src.infrastructure.exceptions import (
+    ApiClientError,
     ValidationError,
     NetworkError,
     ProcessingError,
@@ -33,14 +32,13 @@ from .exceptions import (
     RateLimitError,
     APIResponseError,
     CalculationError,
-    DataInsufficientError
+    DataInsufficientError,
+    ErrorContext
 )
+from src.infrastructure.binance_client import BinanceApiClient
 
 # Direct logging imports - simplified approach
-from src.logging_system import (
-    configure_ai_logging,
-    MarketDataLogger
-)
+from src.logging_system import MarketDataLogger
 
 
 @dataclass
@@ -370,47 +368,16 @@ MA Trend: {self.ma_trend.upper()}
 class MarketDataService:
     """Service for aggregating multi-timeframe cryptocurrency market data."""
     
-    def __init__(self, cache_dir: str = "data/cache", enable_logging: bool = True,
-                 log_level: str = "INFO", fail_fast: bool = False):
-        self.cache_dir = cache_dir
-        self.base_url = "https://api.binance.com/api/v3"
-        self._ensure_cache_dir()
-        
-        # Error context infrastructure for Phase 2 - Integration
-        # self._current_trace_id = None # REMOVED to prevent stateful trace IDs and enable hierarchical tracing
-        
-        # Simple direct logging setup (simplified architecture)
-        self._enable_logging = enable_logging
-        self._log_level = log_level.upper()
-        
-        # Direct logger initialization - no monkey patching
-        if self._enable_logging:
-            try:
-                # Check if logging is already configured to avoid overwriting test handlers
-                import logging
-                if not logging.getLogger().handlers:
-                    import os
-                    os.makedirs("logs", exist_ok=True)
-                    configure_ai_logging(
-                        log_level=self._log_level,
-                        log_file="logs/trading_operations.log",
-                        console_output=True,
-                        max_bytes=50*1024*1024,
-                        backup_count=10,
-                        filter_http_noise=True
-                    )
-                self.logger = MarketDataLogger("market_data_service", service_name="market_data_service")
-            except Exception as e:
-                # If logging initialization fails, raise the exception
-                # This allows tests to validate error handling behavior
-                raise e
-        else:
-            self.logger = None
-        
-        # Fail-fast vs recovery strategy configuration
-        self._fail_fast = fail_fast
-        self._critical_failures = {"symbol_validation", "api_connection", "data_validation", "basic_data_processing"}
-        self._recoverable_operations = {"btc_correlation", "volume_profile", "technical_indicators", "enhanced_analysis", "market_sentiment"}
+    def __init__(self, api_client: BinanceApiClient, logger: MarketDataLogger):
+        """
+        Initializes the MarketDataService.
+
+        Args:
+            api_client: An instance of BinanceApiClient.
+            logger: A configured MarketDataLogger instance.
+        """
+        self.api_client = api_client
+        self.logger = logger
         
         # Initialize metrics attributes to prevent AttributeError
         self._operation_metrics: Dict[str, Dict[str, int]] = {}
@@ -476,9 +443,6 @@ class MarketDataService:
                 # Graceful degradation: logging failures should not crash operations
                 pass
         
-    def _ensure_cache_dir(self):
-        """Create cache directory if it doesn't exist."""
-        os.makedirs(self.cache_dir, exist_ok=True)
     
     def get_market_data(self, symbol: str, trace_id: Optional[str] = None) -> MarketDataSet:
         """
@@ -495,15 +459,20 @@ class MarketDataService:
         
         try:
             # Validate input parameters - may raise SymbolValidationError
-            self._validate_symbol_input(symbol)
+            self._validate_symbol_input(symbol, trace_id=trace_id)
             
             if not trace_id:
                 raise ValidationError("A trace_id is required for all market data operations.")
             
-            # Fetch multi-timeframe data, passing the main trace_id
-            daily_data = self._get_klines(symbol, "1d", 180, trace_id=trace_id)
-            h4_data = self._get_klines(symbol, "4h", 84, trace_id=trace_id)
-            h1_data = self._get_klines(symbol, "1h", 100, trace_id=trace_id)
+            # Fetch multi-timeframe data using the API client
+            daily_data_raw = self.api_client.get_klines(symbol, "1d", 180, trace_id=trace_id)
+            h4_data_raw = self.api_client.get_klines(symbol, "4h", 84, trace_id=trace_id)
+            h1_data_raw = self.api_client.get_klines(symbol, "1h", 100, trace_id=trace_id)
+
+            # Convert raw list data to DataFrame
+            daily_data = self._create_dataframe_from_klines(daily_data_raw)
+            h4_data = self._create_dataframe_from_klines(h4_data_raw)
+            h1_data = self._create_dataframe_from_klines(h1_data_raw)
             
             # Defensive check for empty DataFrames before calculations
             if daily_data.empty or h4_data.empty or h1_data.empty:
@@ -539,15 +508,15 @@ class MarketDataService:
                 support_level = resistance_level - price_buffer
             
             # Calculate technical indicators with graceful degradation
-            rsi = self._calculate_rsi_with_fallback(symbol, h1_data, 14, trace_id=trace_id)
-            macd_signal = self._calculate_macd_signal_with_fallback(symbol, h1_data, trace_id=trace_id)
-            ma_20 = self._calculate_ma_with_fallback(symbol, h1_data, 20, trace_id=trace_id)
-            ma_50 = self._calculate_ma_with_fallback(symbol, h1_data, 50, trace_id=trace_id)
-            ma_trend = self._determine_ma_trend_with_fallback(ma_20, ma_50, trace_id=trace_id)
+            rsi = self._calculate_rsi(symbol, h1_data, 14, trace_id=trace_id)
+            macd_signal = self._calculate_macd_signal(symbol, h1_data, trace_id=trace_id)
+            ma_20 = self._calculate_ma(symbol, h1_data, 20, trace_id=trace_id)
+            ma_50 = self._calculate_ma(symbol, h1_data, 50, trace_id=trace_id)
+            ma_trend = self._determine_ma_trend(ma_20, ma_50, trace_id=trace_id)
             
-            # Get market context with graceful degradation
-            btc_correlation = self._calculate_btc_correlation_with_fallback(symbol, h1_data, trace_id=trace_id) if symbol != "BTCUSDT" else None
-            volume_profile = self._analyze_volume_profile_with_fallback(symbol, h1_data, trace_id=trace_id)
+            # Get market context
+            btc_correlation = self._calculate_btc_correlation(symbol, h1_data, trace_id=trace_id) if symbol != "BTCUSDT" else None
+            volume_profile = self._analyze_volume_profile(symbol, h1_data, trace_id=trace_id)
             
             market_data_set = MarketDataSet(
                 symbol=symbol,
@@ -575,11 +544,27 @@ class MarketDataService:
             
             return market_data_set
             
-        except (ValidationError, NetworkError, ProcessingError) as e:
-            self._log_operation_error("get_market_data", e, symbol=symbol, level="ERROR", error_type=type(e).__name__, trace_id=trace_id)
+        except ApiClientError as e:
+            # Ensure the trace_id from the operation is attached to the exception
+            if trace_id and (not hasattr(e.context, 'trace_id') or not e.context.trace_id.startswith('trd_')):
+                 e.context.trace_id = trace_id
+                 # Also update the trace_id in the string representation if it's an error-specific one
+                 if "err_" in str(e):
+                     e.message = str(e).split(' [')[0] # Keep original message
+
+            self._log_operation_error(
+                "get_market_data", e, symbol=symbol, trace_id=trace_id, error_type="ApiClientError"
+            )
+            raise
+        except (ValidationError, ProcessingError) as e:
+            self._log_operation_error(
+                "get_market_data", e, symbol=symbol, trace_id=trace_id, error_type=type(e).__name__
+            )
             raise
         except Exception as e:
-            self._log_operation_error("get_market_data", e, symbol=symbol, level="CRITICAL", error_type="unexpected", trace_id=trace_id)
+            self._log_operation_error(
+                "get_market_data", e, symbol=symbol, trace_id=trace_id, error_type="UnexpectedError", level="CRITICAL"
+            )
             raise ProcessingError(
                 message=f"Unexpected error during market data aggregation: {str(e)}",
                 operation="get_market_data",
@@ -588,35 +573,55 @@ class MarketDataService:
                 error_details=str(e)
             )
     
-    def _validate_symbol_input(self, symbol: str):
+    def _create_dataframe_from_klines(self, klines_data: list) -> pd.DataFrame:
+        """Converts raw kline list data to a pandas DataFrame."""
+        if not klines_data:
+            return pd.DataFrame()
+            
+        df = pd.DataFrame(klines_data, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'close_time', 'quote_asset_volume', 'number_of_trades',
+            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+        ])
+        
+        numeric_columns = ['open', 'high', 'low', 'close', 'volume']
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col])
+            
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        
+        return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+
+    def _validate_symbol_input(self, symbol: str, trace_id: Optional[str] = None):
         """Validate symbol input before processing."""
         try:
+            error_context = self._get_error_context("symbol_validation", trace_id)
             if not symbol or not isinstance(symbol, str):
-                raise SymbolValidationError("Symbol must be a non-empty string", symbol=str(symbol))
+                raise SymbolValidationError("Symbol must be a non-empty string", symbol=str(symbol), context=error_context)
             if not symbol.endswith("USDT") or len(symbol) < 6:
-                raise SymbolValidationError(f"Invalid symbol format: {symbol}. Expected XXXUSDT format", symbol=symbol)
+                raise SymbolValidationError(f"Invalid symbol format: {symbol}. Expected XXXUSDT format", symbol=symbol, context=error_context)
             if len(symbol) > 12:  # Reasonable length limit
-                raise SymbolValidationError(f"Symbol too long: {symbol}", symbol=symbol)
+                raise SymbolValidationError(f"Symbol too long: {symbol}", symbol=symbol, context=error_context)
             
             # Extract base currency by removing only the trailing USDT
             if symbol.count("USDT") > 1:
-                raise SymbolValidationError(f"Invalid symbol format: {symbol}. Multiple USDT occurrences not allowed", symbol=symbol)
+                raise SymbolValidationError(f"Invalid symbol format: {symbol}. Multiple USDT occurrences not allowed", symbol=symbol, context=error_context)
             
             base_currency = symbol[:-4]  # Remove last 4 characters (USDT)
             if not base_currency or not base_currency.isalpha() or not base_currency.isupper():
-                raise SymbolValidationError(f"Invalid base currency: '{base_currency}'. Must be uppercase letters only", symbol=symbol)
+                raise SymbolValidationError(f"Invalid base currency: '{base_currency}'. Must be uppercase letters only", symbol=symbol, context=error_context)
             
             # Validate base currency length (cryptocurrency standards)
             if len(base_currency) < 3:
-                raise SymbolValidationError(f"Base currency too short: '{base_currency}'. Must be at least 3 characters", symbol=symbol)
+                raise SymbolValidationError(f"Base currency too short: '{base_currency}'. Must be at least 3 characters", symbol=symbol, context=error_context)
             if len(base_currency) > 5:
-                raise SymbolValidationError(f"Base currency too long: '{base_currency}'. Must be 5 characters or less", symbol=symbol)
+                raise SymbolValidationError(f"Base currency too long: '{base_currency}'. Must be 5 characters or less", symbol=symbol, context=error_context)
         except SymbolValidationError:
             # Re-raise SymbolValidationError as-is to maintain rich context
             raise
         except Exception as e:
             # Wrap unexpected errors in SymbolValidationError for consistency
-            raise SymbolValidationError(f"Unexpected error during symbol validation: {str(e)}", symbol=str(symbol))
+            raise SymbolValidationError(f"Unexpected error during symbol validation: {str(e)}", symbol=str(symbol), context=error_context)
     
     def get_enhanced_context(self, market_data: MarketDataSet) -> str:
         """Get enhanced market context with candlestick analysis and structured error handling."""
@@ -715,212 +720,6 @@ Error Details:
 Please check system logs and contact support.
 """
     
-    def _get_klines(self, symbol: str, interval: str, limit: int, trace_id: Optional[str] = None) -> pd.DataFrame:
-        """Fetch candlestick data from Binance API with structured error handling."""
-        url = f"{self.base_url}/klines"
-        params = {"symbol": symbol, "interval": interval, "limit": limit}
-
-        self._log_operation_start(
-            "get_klines",
-            symbol=symbol,
-            interval=interval,
-            limit=limit,
-            trace_id=trace_id
-        )
-        error_context = self._get_error_context("get_klines", trace_id)
-
-        try:
-            import time
-            start_time = time.time()
-            
-            response = requests.get(url, params=params, timeout=30)
-            
-            # Calculate request timing
-            request_duration_ms = int((time.time() - start_time) * 1000)
-            
-            # Handle specific HTTP status codes with rich error context
-            if response.status_code == 429:
-                raise RateLimitError(
-                    message="Binance API rate limit exceeded",
-                    operation="get_klines",
-                    context=error_context,
-                    retry_after=response.headers.get('Retry-After'),
-                    rate_limit_type="request_weight"
-                )
-            elif response.status_code == 404:
-                raise APIResponseError(
-                    message=f"Symbol {symbol} not found or invalid interval {interval}",
-                    operation="get_klines",
-                    context=error_context,
-                    status_code=404,
-                    response_body=response.text[:500]
-                )
-            elif response.status_code >= 500:
-                raise APIConnectionError(
-                    message=f"Binance API server error: {response.status_code}",
-                    operation="get_klines",
-                    context=error_context,
-                    endpoint=url,
-                    status_code=response.status_code
-                )
-            
-            # Raise for other HTTP errors
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            # Task 8.2 & 8.4: Log raw API response data with enhanced metrics
-            if self.logger:
-                # Extract key performance and rate limit headers
-                rate_limit_headers = {
-                    "x-mbx-used-weight": response.headers.get("x-mbx-used-weight"),
-                    "x-mbx-used-weight-1m": response.headers.get("x-mbx-used-weight-1m"),
-                    "retry-after": response.headers.get("retry-after"),
-                    "x-mbx-order-count-1s": response.headers.get("x-mbx-order-count-1s"),
-                    "x-mbx-order-count-1m": response.headers.get("x-mbx-order-count-1m")
-                }
-                
-                # Performance metrics
-                performance_metrics = {
-                    "request_duration_ms": request_duration_ms,
-                    "content_length": len(response.content),
-                    "response_time_category": (
-                        "fast" if request_duration_ms < 500 else
-                        "normal" if request_duration_ms < 1000 else
-                        "slow" if request_duration_ms < 2000 else "very_slow"
-                    ),
-                    "compression": response.headers.get("content-encoding"),
-                    "cache_status": response.headers.get("x-cache", "unknown")
-                }
-                
-                self.logger.log_raw_data(
-                    data_type="binance_api_response",
-                    data_sample={
-                        "endpoint": url,
-                        "symbol": symbol,
-                        "interval": interval,
-                        "limit": limit,
-                        "response_size": len(data) if isinstance(data, list) else 1,
-                        "status_code": response.status_code,
-                        "headers": dict(response.headers),
-                        "rate_limit_headers": rate_limit_headers,
-                        "performance_metrics": performance_metrics,
-                        "first_candle": data[0] if isinstance(data, list) and len(data) > 0 else None,
-                        "last_candle": data[-1] if isinstance(data, list) and len(data) > 0 else None,
-                        "request_params": params
-                    },
-                    data_stats={
-                        "endpoint": "klines",
-                        "symbol": symbol,
-                        "interval": interval,
-                        "response_candles": len(data) if isinstance(data, list) else 0,
-                        "status_code": response.status_code,
-                        "content_length": len(response.content),
-                        "request_duration_ms": request_duration_ms,
-                        "rate_limit_weight": response.headers.get("x-mbx-used-weight", "unknown"),
-                        "performance_category": performance_metrics["response_time_category"]
-                    },
-                    trace_id=trace_id
-                )
-            
-            # Validate API response structure
-            if not isinstance(data, list) or len(data) == 0:
-                raise APIResponseError(
-                    message="Empty or invalid response from Binance API, no data to process.",
-                    operation="get_klines",
-                    context=error_context,
-                    status_code=response.status_code,
-                    response_body=str(data)
-                )
-            
-            # Convert to DataFrame
-            df = pd.DataFrame(data, columns=[
-                'timestamp', 'open', 'high', 'low', 'close', 'volume',
-                'close_time', 'quote_asset_volume', 'number_of_trades',
-                'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
-            ])
-            
-            # Convert to proper types with error handling
-            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-            for col in numeric_columns:
-                try:
-                    df[col] = pd.to_numeric(df[col])
-                except (ValueError, TypeError) as e:
-                    raise APIResponseError(
-                        message=f"Invalid numeric data in column {col}: {str(e)}",
-                        operation="get_klines",
-                        context=error_context,
-                        status_code=response.status_code,
-                        response_body=f"Column {col} data validation failed"
-                    )
-            
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            
-            result_df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
-            
-            # Logging integration point: successful API call (DEBUG level for performance)
-            self._log_operation_success("get_klines", symbol=symbol, level="DEBUG",
-                                      interval=interval, rows_returned=len(result_df),
-                                      status_code=response.status_code, trace_id=trace_id)
-            
-            return result_df
-            
-        except requests.exceptions.Timeout as e:
-            timeout_error = APIConnectionError(
-                message="Request to Binance API timed out",
-                operation="get_klines",
-                context=error_context,
-                endpoint=url,
-                timeout_duration=30
-            )
-            # Logging integration point: timeout error
-            self._log_operation_error("get_klines", timeout_error, symbol=symbol, level="WARNING",
-                                    error_type="timeout", endpoint=url, trace_id=trace_id)
-            raise timeout_error
-        except requests.exceptions.ConnectionError as e:
-            connection_error = APIConnectionError(
-                message=f"Failed to connect to Binance API: {str(e)}",
-                operation="get_klines",
-                context=error_context,
-                endpoint=url,
-                connection_error=str(e)
-            )
-            # Logging integration point: connection error
-            self._log_operation_error("get_klines", connection_error, symbol=symbol, level="ERROR",
-                                    error_type="connection", endpoint=url, trace_id=trace_id)
-            raise connection_error
-        except requests.exceptions.RequestException as e:
-            # Catch any other requests-related errors
-            request_error = APIConnectionError(
-                message=f"Network request failed: {str(e)}",
-                operation="get_klines",
-                context=error_context,
-                endpoint=url,
-                request_error=str(e)
-            )
-            # Logging integration point: request error
-            self._log_operation_error("get_klines", request_error, symbol=symbol,
-                                    error_type="request", endpoint=url, trace_id=trace_id)
-            raise request_error
-        except (RateLimitError, APIResponseError, APIConnectionError) as e:
-            # Logging integration point: structured API error
-            self._log_operation_error("get_klines", e, symbol=symbol,
-                                    error_type=type(e).__name__, endpoint=url, trace_id=trace_id)
-            # Re-raise our custom exceptions as-is to maintain rich context
-            raise
-        except Exception as e:
-            # Wrap any unexpected errors in a ProcessingError
-            processing_error = ProcessingError(
-                message=f"Unexpected error during klines data processing: {str(e)}",
-                operation="get_klines",
-                context=error_context,
-                processing_stage="data_conversion",
-                error_details=str(e)
-            )
-            # Logging integration point: unexpected error
-            self._log_operation_error("get_klines", processing_error, symbol=symbol,
-                                    error_type="unexpected", endpoint=url, trace_id=trace_id)
-            raise processing_error
     
     def _calculate_rsi(self, symbol: str, df: pd.DataFrame, period: int = 14, trace_id: Optional[str] = None) -> Decimal:
         """Calculate RSI indicator with Decimal precision and division by zero protection."""
@@ -1155,7 +954,8 @@ Please check system logs and contact support.
 
         try:
             # Fetch BTC data for correlation calculation, passing the trace_id
-            btc_data = self._get_klines("BTCUSDT", "1h", len(df), trace_id=trace_id)
+            btc_data_raw = self.api_client.get_klines("BTCUSDT", "1h", len(df), trace_id=trace_id)
+            btc_data = self._create_dataframe_from_klines(btc_data_raw)
 
             # Ensure we have enough data points for meaningful correlation
             if len(btc_data) < 10 or len(df) < 10:
@@ -1239,71 +1039,7 @@ Please check system logs and contact support.
                 error_details=str(e)
             )
     
-    def _calculate_btc_correlation_with_fallback(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> Optional[Decimal]:
-        """Calculate BTC correlation with graceful degradation for all errors."""
-        try:
-            return self._calculate_btc_correlation(symbol, df, trace_id=trace_id)
-        except (DataInsufficientError, ProcessingError, NetworkError) as e:
-            # Graceful degradation: log the issue but continue without correlation
-            self._log_operation_error("btc_correlation_fallback", e, symbol=symbol,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
-            return None  # Graceful degradation: no correlation data
 
-    def _analyze_volume_profile_with_fallback(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> str:
-        """Analyze volume profile with graceful degradation for calculation failures."""
-        try:
-            return self._analyze_volume_profile(symbol, df, trace_id=trace_id)
-        except Exception as e:
-            # Graceful degradation: default to "normal" volume profile
-            self._log_operation_error("volume_profile_fallback", e, symbol=symbol,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
-            return "normal"  # Safe default value
-
-    def _calculate_rsi_with_fallback(self, symbol: str, df: pd.DataFrame, period: int = 14, trace_id: Optional[str] = None) -> Decimal:
-        """Calculate RSI with graceful degradation to neutral value."""
-        try:
-            return self._calculate_rsi(symbol=symbol, df=df, period=period, trace_id=trace_id)
-        except Exception as e:
-            # Graceful degradation: return neutral RSI
-            self._log_operation_error("rsi_fallback", e, period=period,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
-            return Decimal('50.0')  # Neutral RSI value
-
-    def _calculate_macd_signal_with_fallback(self, symbol: str, df: pd.DataFrame, trace_id: Optional[str] = None) -> str:
-        """Calculate MACD signal with graceful degradation to neutral."""
-        try:
-            return self._calculate_macd_signal(symbol, df, trace_id=trace_id)
-        except Exception as e:
-            # Graceful degradation: return neutral signal
-            self._log_operation_error("macd_fallback", e,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
-            return "neutral"  # Safe default signal
-
-    def _calculate_ma_with_fallback(self, symbol: str, df: pd.DataFrame, period: int, trace_id: Optional[str] = None) -> Decimal:
-        """Calculate moving average with graceful degradation to current price."""
-        try:
-            return self._calculate_ma(symbol, df, period, trace_id=trace_id)
-        except Exception as e:
-            # Graceful degradation: use current price as MA fallback
-            self._log_operation_error("ma_fallback", e, period=period,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
-            try:
-                # Try to use current price as fallback
-                current_price = Decimal(str(df['close'].iloc[-1]))
-                return current_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            except Exception:
-                # Ultimate fallback: return a reasonable default price
-                return Decimal('50000.00')  # Conservative estimate for crypto
-
-    def _determine_ma_trend_with_fallback(self, ma_20: Decimal, ma_50: Decimal, trace_id: Optional[str] = None) -> str:
-        """Determine MA trend with graceful degradation to sideways."""
-        try:
-            return self._determine_ma_trend(ma_20, ma_50, trace_id=trace_id)
-        except Exception as e:
-            # Graceful degradation: return sideways trend
-            self._log_operation_error("ma_trend_fallback", e,
-                                    error_type=type(e).__name__, fallback_used=True, trace_id=trace_id)
-            return "sideways"  # Safe default trend
     
     def _get_market_data_with_fallback(self, symbol: str) -> dict:
         """
@@ -1442,7 +1178,7 @@ Please check system logs and contact support.
             trace_id: Optional trace ID for correlation
             **kwargs: Additional context for logging
         """
-        if self._enable_logging:
+        if self.logger:
             # Future logging implementation will go here
             # For now, this is a placeholder that maintains current functionality
             pass

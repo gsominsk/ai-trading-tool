@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from .oms_repository import OmsRepository
 from typing import Optional
 from src.logging_system.logger_config import MarketDataLogger
-from src.market_data.exceptions import RepositoryError
+from src.infrastructure.exceptions import RepositoryError
 
 class OrderManagementSystem:
     """

@@ -1,7 +1,8 @@
 import csv
 from datetime import datetime
 from src.trading.oms import OrderManagementSystem
-from src.market_data.market_data_service import MarketDataService, MarketDataError
+from src.market_data.market_data_service import MarketDataService
+from src.infrastructure.exceptions import ApiClientError as MarketDataError
 from src.logging_system import MarketDataLogger
 from src.logging_system.trace_generator import get_trace_id
 
@@ -64,15 +65,15 @@ class TradingCycle:
                     # Поэтому убираем return и log_operation_complete.
             except Exception as e:
                 self.logger.log_operation_error("sync_order_status", error=str(e), context={"order_id": order_id}, trace_id=master_trace_id)
-                self.logger.log_operation_complete("run_cycle", status="failed", trace_id=master_trace_id)
+                self.logger.log_operation_error("run_cycle", error=str(e), context={"order_id": order_id}, trace_id=master_trace_id)
                 return
-
+ 
         # Шаг 2: Получение рыночных данных
         try:
             market_data = self.market_data_service.get_market_data(symbol, trace_id=master_trace_id)
         except MarketDataError as e:
             self.logger.log_operation_error("get_market_data", error=str(e), trace_id=master_trace_id)
-            self.logger.log_operation_complete("run_cycle", status="failed", trace_id=master_trace_id)
+            self.logger.log_operation_error("run_cycle", error="Failed to get market data", trace_id=master_trace_id)
             return
 
         # Шаг 3: Взаимодействие с ИИ

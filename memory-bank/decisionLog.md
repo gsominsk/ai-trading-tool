@@ -4,6 +4,27 @@
 Complete decision history with full details (approx. 522 lines before this optimization) is archived in [`memory-bank/archive/decisionLog.md`](memory-bank/archive/decisionLog.md). The full, unabridged history is preserved there.
 
 ## Recent Decisions (Last 10 Entries)
+### [2025-08-11 14:23:00] - **Architectural Decision: Complete Test Suite Refactoring for `MarketDataService`**
+**Problem**: A major architectural refactoring to introduce a `BinanceApiClient` and a dedicated infrastructure layer had broken the entire unit test suite for `MarketDataService`. The tests were using an outdated strategy of mocking the low-level `requests` library, which was no longer directly used by the service. This resulted in a cascade of `DataInsufficientError` and `AttributeError` failures, rendering the tests useless.
+**Solution**: A systematic, multi-wave refactoring of all affected unit tests (`test_market_data_api.py`, `test_market_data_core.py`, `test_market_data_edge_cases.py`) was executed.
+1.  **Standardized Mocking**: All tests were updated to mock the `api_client.get_klines` method, which is the correct point of interaction after the refactoring.
+2.  **Correct Exception Handling**: Tests were updated to assert for the correct, high-level exceptions (`ProcessingError`, `NetworkError`, etc.) that are now raised by the service, instead of low-level `requests` exceptions.
+3.  **Removal of Private Method Tests**: Tests that directly targeted private methods were removed in favor of testing the same logic through the public `get_market_data` interface, making the tests more robust and less brittle.
+**Result**: The entire unit test suite for `MarketDataService` is now fully aligned with the new, decoupled architecture. The tests are more reliable, easier to maintain, and correctly validate the service's contract. All 239 tests in the project now pass, confirming the stability of the system after the major architectural overhaul.
+
+### [2025-08-11 01:29:00] - **Test Refactoring Strategy: Adapt Tests to Mock `BinanceApiClient`**
+**Problem**: A significant number of tests were failing with `DataInsufficientError`. The root cause was identified as an outdated testing strategy. Tests were written to mock the low-level `requests.get` library, but the `MarketDataService` was refactored to use a high-level, injected `BinanceApiClient`. The existing mocks were therefore completely ignored, causing the service to receive no data.
+**Solution**: A systematic refactoring of all affected test files will be performed.
+1.  **Remove `patch('requests.get')`**: All tests that use this pattern will be updated.
+2.  **Configure Mock API Client**: The tests will now correctly configure the `side_effect` or `return_value` of the `mock_api_client.get_klines` method, which is injected into the service during test setup.
+**Result**: This aligns the entire test suite with the current dependency injection architecture. It makes the tests more robust, easier to understand, and correctly isolates the `MarketDataService` from the underlying transport layer, which is the purpose of the `BinanceApiClient`.
+### [2025-08-11 01:16:00] - **Architectural Correction: Revert Graceful Degradation in Favor of Fail-Fast**
+**Problem**: During test fixing, I incorrectly implemented a "graceful degradation" feature in `MarketDataService`'s `_calculate_btc_correlation_with_fallback` method. This feature suppressed `DataInsufficientError` exceptions, which contradicted the established "fail-fast" design principle and broke existing tests that correctly expected an exception to be raised.
+**Solution**: Based on direct user feedback, the incorrect implementation will be reverted.
+1.  The `_calculate_btc_correlation_with_fallback` method will be removed.
+2.  The `get_market_data` method will call `_calculate_btc_correlation` directly.
+3.  The corresponding unit test (`test_btc_correlation_processing_error`) will be restored to assert that a `DataInsufficientError` is raised.
+**Result**: The system's error handling strategy is restored to the intended "fail-fast" behavior. This ensures that data processing does not silently continue with incomplete or missing data, which is critical for financial safety. The codebase is now correctly aligned with the test suite's expectations.
 
 ### [2025-08-10 23:44:00] - **Architectural Decision: Decouple API Logic into a Dedicated Infrastructure Layer**
 **Problem**: The current implementation has API interaction logic (URLs, request/response handling) tightly coupled within the `MarketDataService`. This violates the Single Responsibility Principle, makes the service difficult to test without real network calls, and hinders flexibility for supporting other exchanges or data sources in the future.

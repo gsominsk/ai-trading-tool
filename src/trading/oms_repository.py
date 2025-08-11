@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from typing import Dict, Any, Optional
-from src.market_data.exceptions import RepositoryError
+from src.infrastructure.exceptions import RepositoryError
 from src.logging_system.logger_config import MarketDataLogger
 
 class OmsRepository:

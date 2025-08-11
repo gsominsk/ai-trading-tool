@@ -13,8 +13,8 @@ from unittest.mock import Mock
 from decimal import Decimal
 from datetime import datetime
 
-from src.market_data.exceptions import (
-    MarketDataError,
+from src.infrastructure.exceptions import (
+    ApiClientError,
     ValidationError,
     NetworkError,
     ProcessingError,
@@ -35,10 +35,10 @@ class TestExceptionHierarchy:
     def test_exception_hierarchy_structure(self):
         """Test that exception hierarchy is properly structured."""
         # Test inheritance hierarchy
-        assert issubclass(ValidationError, MarketDataError)
+        assert issubclass(ValidationError, ApiClientError)
         assert issubclass(ValidationError, ValueError)
-        assert issubclass(NetworkError, MarketDataError)
-        assert issubclass(ProcessingError, MarketDataError)
+        assert issubclass(NetworkError, ApiClientError)
+        assert issubclass(ProcessingError, ApiClientError)
         
         # Test specific exceptions
         assert issubclass(SymbolValidationError, ValidationError)
@@ -60,7 +60,7 @@ class TestExceptionHierarchy:
         
         # Should be both types
         assert isinstance(error, ValueError)
-        assert isinstance(error, MarketDataError)
+        assert isinstance(error, ApiClientError)
         
         # Should pass isinstance checks that existing tests use
         assert isinstance(error, ValueError)
@@ -87,7 +87,7 @@ class TestExceptionHierarchy:
             # Should maintain ValueError inheritance
             assert isinstance(error, ValueError)
             assert isinstance(error, ValidationError)
-            assert isinstance(error, MarketDataError)
+            assert isinstance(error, ApiClientError)
             
             # Should be catchable in existing test patterns
             try:
@@ -164,12 +164,12 @@ class TestErrorContext:
         assert context_dict['stack_depth'] > 0
 
 
-class TestMarketDataError:
-    """Test MarketDataError base functionality."""
+class TestApiClientError:
+    """Test ApiClientError base functionality."""
     
-    def test_market_data_error_rich_context(self):
-        """Test MarketDataError provides rich context for debugging."""
-        error = MarketDataError(
+    def test_api_client_error_rich_context(self):
+        """Test ApiClientError provides rich context for debugging."""
+        error = ApiClientError(
             "Test error message",
             operation="test_operation",
             symbol="BTCUSDT",
@@ -178,7 +178,7 @@ class TestMarketDataError:
         
         # Should have rich context
         context = error.get_context()
-        assert context["error_type"] == "MarketDataError"
+        assert context["error_type"] == "ApiClientError"
         assert context["message"] == "Test error message"
         assert context["operation"] == "test_operation"
         assert context["symbol"] == "BTCUSDT"
@@ -186,10 +186,10 @@ class TestMarketDataError:
         assert "trace_id" in context
         assert "timestamp" in context
     
-    def test_market_data_error_context_integration(self):
-        """Test MarketDataError context integration."""
+    def test_api_client_error_context_integration(self):
+        """Test ApiClientError context integration."""
         context = ErrorContext(trace_id="test_456", operation="test_operation")
-        error = MarketDataError(
+        error = ApiClientError(
             message="Test error message",
             context=context,
             operation="test_operation",
@@ -212,7 +212,7 @@ class TestMarketDataError:
         
         # Check context dictionary
         context_dict = error.get_context()
-        assert context_dict['error_type'] == 'MarketDataError'
+        assert context_dict['error_type'] == 'ApiClientError'
         assert context_dict['message'] == 'Test error message'
         assert context_dict['operation'] == 'test_operation'
         assert context_dict['symbol'] == 'BTCUSDT'
@@ -233,7 +233,7 @@ class TestNetworkErrors:
         )
         
         assert isinstance(error, NetworkError)
-        assert isinstance(error, MarketDataError)
+        assert isinstance(error, ApiClientError)
         assert error.endpoint == "/api/v3/klines"
         assert error.status_code == 500
         
@@ -280,7 +280,7 @@ class TestProcessingErrors:
         )
         
         assert isinstance(error, ProcessingError)
-        assert isinstance(error, MarketDataError)
+        assert isinstance(error, ApiClientError)
         assert error.calculation_type == "RSI_calculation"
         
         context = error.get_context()
@@ -337,7 +337,7 @@ class TestExceptionStringRepresentation:
     def test_exception_string_representation(self):
         """Test that exceptions have useful string representations."""
         # Test base MarketDataError
-        error1 = MarketDataError(
+        error1 = ApiClientError(
             "Base error message",
             operation="test_op",
             symbol="BTCUSDT"
