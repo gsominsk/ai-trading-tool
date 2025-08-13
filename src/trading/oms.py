@@ -53,6 +53,8 @@ class OrderManagementSystem:
             # In a real system, we might want to handle this more gracefully
             # For now, we'll re-raise to make the failure visible.
             raise
+        if self.logger:
+            self.logger.log_operation_complete("place_order", trace_id=trace_id, context={"order_id": order_id, "status": "success"})
         return order_id
 
     def cancel_order(self, order_id: str, trace_id: Optional[str] = None):

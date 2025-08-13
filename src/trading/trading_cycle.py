@@ -21,16 +21,18 @@ class TradingCycle:
         Формирует промпт для ИИ и возвращает решение.
         На Фазе 2 возвращает жестко закодированное решение.
         """
-        # Convert market data to a structured JSON string
-        json_context = market_data.to_json_context()
+        # Get the context as a dictionary for logging.
+        context_dict = market_data.to_context_dict()
+        # Get the context as a compact JSON string for the LLM.
+        json_context_str = market_data.to_json_context()
 
         prompt = f"""
-        Market Analysis (JSON): {json_context}
+        Market Analysis (JSON): {json_context_str}
         Current Position: {current_position}
         What is your next action (BUY, SELL, HOLD)?
         """
-        # Log the JSON context itself for better debuggability
-        self.logger.log_operation_start("get_ai_decision", trace_id=trace_id, context={"json_context": json_context})
+        # Log the context as a dictionary for proper structured logging.
+        self.logger.log_operation_start("get_ai_decision", trace_id=trace_id, context={"json_context": context_dict})
         
         # Заглушка для решения ИИ
         decision = "BUY"

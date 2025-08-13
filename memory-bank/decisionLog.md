@@ -4,6 +4,18 @@
 Complete decision history with full details (approx. 242 lines) is archived in [`memory-bank/archive/20250811T231859Z/decisionLog.md`](memory-bank/archive/20250811T231859Z/decisionLog.md). The full, unabridged history is preserved there.
 
 ## Recent Decisions (Last 10 Entries)
+[2025-08-13 00:22:00] - **Logging Improvement: Added Completion Log to OMS**. Based on a detailed log review, it was identified that the `OrderManagementSystem.place_order` method was missing a log entry upon successful completion.
+    - **Problem**: The operational flow showed a `place_order initiated` log, but no corresponding `completed` log, creating ambiguity about whether the operation finished successfully before the subsequent `repo_save` operation began.
+    - **Solution**: A `self.logger.log_operation_complete(...)` call was added to the end of the `place_order` method.
+    - **Impact**: This enhances system observability by providing a clear, explicit confirmation in the logs that the order placement logic has completed successfully, improving traceability and making debugging easier.
+
+[2025-08-13 00:16:00] - **Architectural Decision: Decouple Data Serialization for Logging and LLM**. To resolve a critical logging issue where nested JSON was being rendered as an escaped string, the `MarketDataSet` class was refactored.
+    - **Problem**: The logger was receiving a pre-serialized JSON string, causing incorrect formatting and making structured log analysis impossible.
+    - **Solution**: The original `to_json_context` method was split into two:
+        1. `to_context_dict() -> dict`: Returns a raw Python dictionary, intended for structured loggers.
+        2. `to_json_context() -> str`: A simple wrapper that calls the above method and dumps the result to a compact JSON string, ensuring backward compatibility for consumers like the LLM client.
+    - **Impact**: This change ensures that logs are correctly formatted with native JSON objects, enabling proper parsing, querying, and analysis, while preserving the required string format for the LLM prompt. This is a crucial fix for system observability and maintainability.
+
 [2025-08-13 00:01:00] - **Architectural Decision: Adopt "Fail-Fast" for Enhanced Context Analysis**. Based on a requirement for absolute data integrity, the `get_enhanced_context` method was refactored from a "graceful degradation" model to a strict "Fail-Fast" policy. Any failure within the internal analysis pipeline (e.g., trend, pattern, or volume analysis) will now immediately raise a `ProcessingError`, halting the operation instead of returning a partial result. This ensures that the LLM never receives incomplete or potentially misleading analysis, prioritizing data reliability over operational continuity in this specific context.
 
 [2025-08-13 00:01:00] - **Architectural Decision: Switch LLM Context from String to Structured JSON**. The core data-passing mechanism to the LLM was refactored from a verbose, custom-formatted string to a structured JSON format via a new `to_json_context()` method in the `MarketDataSet` dataclass.

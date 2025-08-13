@@ -4,6 +4,10 @@
 Complete progress history (approx. 167 lines) is archived in [`memory-bank/archive/20250811T231859Z/progress.md`](memory-bank/archive/20250811T231859Z/progress.md). The full, unabridged history is preserved there.
 
 ## Recent Progress (Last 10 Entries)
+[2025-08-13 00:22:00] - **Logging Improvement: OMS `place_order`**. Added a missing completion log to the `OrderManagementSystem.place_order` method. This provides clearer operational flow tracing and confirms the successful execution of the order placement logic. The change was validated by a full test suite run.
+
+[2025-08-13 00:17:00] - **Logging Fix Complete: Corrected Nested JSON Serialization**. Completed a critical refactoring to fix an issue where nested JSON context was being improperly logged as an escaped string. The `MarketDataSet` class was modified to provide a `to_context_dict()` method for structured logging and a separate `to_json_context()` for the LLM client. The `TradingCycle` was updated to use the correct method for logging. This ensures logs are now correctly formatted and fully analyzable.
+
 [2025-08-13 00:01:00] - **Refactoring Complete: LLM Context to JSON**. Successfully completed the refactoring of the LLM context generation from a string-based format to structured JSON. This involved creating a `to_json_context()` method, updating the trading cycle, and removing obsolete methods. A regression was found in the `get_enhanced_context` method, which was subsequently fixed by implementing a strict "Fail-Fast" error handling policy. The entire test suite of 238 tests now passes, validating the stability and correctness of the changes.
 
 [2025-08-11 22:24:00] - **Test Suite Cleanup**: Removed an obsolete test (`test_logging_integration_handles_logger_failure`) from `tests/unit/logging/test_logging_components.py`. The test was no longer valid due to the dependency injection architecture. This cleanup reduces noise in the test suite and improves maintainability.

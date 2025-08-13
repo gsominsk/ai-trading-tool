@@ -256,8 +256,8 @@ class MarketDataSet:
             if price_diff_ratio > Decimal('0.5'):
                 raise ValueError(f"Recent price ({recent_price}) too far from MA20 ({self.ma_20}), ratio: {price_diff_ratio}")
     
-    def to_json_context(self) -> str:
-        """Serializes the dataset to a structured JSON string for LLM consumption."""
+    def to_context_dict(self) -> dict:
+        """Serializes the dataset to a structured dictionary for consumption."""
         
         def format_candles(df: pd.DataFrame) -> list:
             """Helper to format a DataFrame of candles into a list of dicts."""
@@ -297,7 +297,11 @@ class MarketDataSet:
             }
         }
         
-        return json.dumps(context_dict, indent=2)
+        return context_dict
+
+    def to_json_context(self) -> str:
+        """Serializes the dataset to a compact JSON string for LLM consumption."""
+        return json.dumps(self.to_context_dict())
 
     
     def _analyze_trend(self, df: pd.DataFrame) -> str:
