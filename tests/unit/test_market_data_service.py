@@ -451,13 +451,39 @@ class TestMarketDataService:
         
         # Assert
         assert result is None
-        # Verify that the error was logged using the same exception instance
-        self.mock_logger.log_operation_error.assert_called_once_with(
-            "get_fear_and_greed_index",
+        # Verify that the error was logged using the new method
+        self.mock_logger.log_operation_failure.assert_called_once_with(
+            operation="get_fear_and_greed_index",
             error=str(api_error),
-            context={"reason": "API client failed"},
+            context={"reason": "API client failed to fetch Fear & Greed Index."},
             trace_id="test_api_fail"
         )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("bad_response, expected_reason", [
+        ({}, "Unexpected API response structure: 'data' key missing."),
+        ({"data": []}, "Unexpected API response structure: 'data' is not a non-empty list."),
+        ({"data": [{}]}, "Unexpected API response value: 'value' is missing or not a digit. Got: None"),
+        ({"data": [{"value": "not-a-digit"}]}, "Unexpected API response value: 'value' is missing or not a digit. Got: not-a-digit"),
+        ({"data": [{"value": None}]}, "Unexpected API response value: 'value' is missing or not a digit. Got: None"),
+    ])
+    def test_get_fear_and_greed_index_handles_bad_data_structure(self, bad_response, expected_reason):
+        """Test that the F&G index method handles various malformed data structures and logs a fallback."""
+        # Arrange
+        self.mock_sentiment_client.get_fear_and_greed_index.return_value = bad_response
+        
+        # Act
+        result = self.service._get_fear_and_greed_index(trace_id="test_bad_structure")
+        
+        # Assert
+        assert result is None
+        self.mock_logger.log_fallback_usage.assert_called_once_with(
+            operation="get_fear_and_greed_index",
+            reason=expected_reason,
+            fallback_value=None,
+            trace_id="test_bad_structure"
+        )
+
     @pytest.mark.unit
     def test_no_attribute_error_for_metrics_on_fresh_instance(self):
         """

@@ -313,6 +313,22 @@ class MarketDataLogger:
             trace_id=trace_id
         )
 
+    def log_operation_failure(self, operation: str, error: str,
+                               context: Optional[Dict[str, Any]] = None,
+                               trace_id: Optional[str] = None):
+        """Logs a generic, non-validation-related operation failure."""
+        ctx = context or {}
+        ctx["error_details"] = error
+
+        self.logger.error(
+            f"Operation '{operation}' failed",
+            operation=operation,
+            context=ctx,
+            tags=["operation_failure", operation.lower().replace("_", "")],
+            flow=get_flow_summary(),
+            trace_id=trace_id
+        )
+
     def log_api_call(self, symbol: str, interval: str, limit: int,
                       response_time_ms: Optional[int] = None,
                       status_code: Optional[int] = None,

@@ -1003,17 +1003,42 @@ class MarketDataService:
 
         try:
             data = self.sentiment_client.get_fear_and_greed_index(trace_id=trace_id)
-            # Extract the first value, assuming the structure is consistent
-            if data and 'data' in data and len(data['data']) > 0:
-                value_str = data['data'][0].get('value')
-                if value_str and value_str.isdigit():
-                    return int(value_str)
-            return None
+            # Enhanced data structure validation with logging
+            if not isinstance(data, dict) or 'data' not in data:
+                self.logger.log_fallback_usage(
+                    operation="get_fear_and_greed_index",
+                    reason="Unexpected API response structure: 'data' key missing.",
+                    fallback_value=None,
+                    trace_id=trace_id
+                )
+                return None
+
+            data_list = data['data']
+            if not isinstance(data_list, list) or not data_list:
+                self.logger.log_fallback_usage(
+                    operation="get_fear_and_greed_index",
+                    reason="Unexpected API response structure: 'data' is not a non-empty list.",
+                    fallback_value=None,
+                    trace_id=trace_id
+                )
+                return None
+
+            value_str = data_list[0].get('value')
+            if value_str and value_str.isdigit():
+                return int(value_str)
+            else:
+                self.logger.log_fallback_usage(
+                    operation="get_fear_and_greed_index",
+                    reason=f"Unexpected API response value: 'value' is missing or not a digit. Got: {value_str}",
+                    fallback_value=None,
+                    trace_id=trace_id
+                )
+                return None
         except ApiClientError as e:
-            self.logger.log_operation_error(
-                "get_fear_and_greed_index",
+            self.logger.log_operation_failure(
+                operation="get_fear_and_greed_index",
                 error=str(e),
-                context={"reason": "API client failed"},
+                context={"reason": "API client failed to fetch Fear & Greed Index."},
                 trace_id=trace_id
             )
             return None

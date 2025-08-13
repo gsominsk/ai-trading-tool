@@ -41,6 +41,7 @@ class AITradingTestRunner:
                 'tests': [
                     'tests/unit/test_market_data_service.py',
                     'tests/unit/error_architecture/test_error_exceptions.py',
+                    'tests/unit/infrastructure/test_sentiment_client.py',
                     'tests/unit/logging/test_core_logging.py',
                     'tests/unit/logging/test_logging_components.py',
                     'tests/unit/logging/test_http_filter.py',
@@ -49,6 +50,7 @@ class AITradingTestRunner:
                     'tests/unit/logging/test_trace_generator.py',
                     'tests/unit/market_data/test_market_data_core.py',
                     'tests/unit/market_data/test_market_data_api.py',
+                    'tests/unit/market_data/test_market_data_caching.py',
                     'tests/unit/market_data/test_market_data_edge_cases.py',
                     'tests/unit/trading/test_trading_cycle.py',
                     'tests/unit/trading/test_oms_repository_sqlite.py',
