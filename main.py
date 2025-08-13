@@ -13,6 +13,7 @@ from pathlib import Path
 
 # Imports for the refactored architecture
 from src.infrastructure.binance_client import BinanceApiClient
+from src.infrastructure.sentiment_client import SentimentApiClient
 from src.market_data.market_data_service import MarketDataService
 from src.logging_system.logger_config import configure_ai_logging, get_ai_logger, MarketDataLogger
 from src.trading.oms import OrderManagementSystem
@@ -79,22 +80,31 @@ def main():
         api_client = BinanceApiClient(logger=api_client_logger, api_key=api_key, api_secret=api_secret)
         print("   - BinanceApiClient initialized.")
 
-        # 2. Market Data Service
+        # 2. Sentiment API Client
+        sentiment_logger = MarketDataLogger("SentimentApiClient", service_name="SentimentApiClient")
+        sentiment_client = SentimentApiClient(logger=sentiment_logger)
+        print("   - SentimentApiClient initialized.")
+
+        # 3. Market Data Service
         market_data_logger = MarketDataLogger("MarketDataService", service_name="MarketDataService")
-        market_data_service = MarketDataService(api_client=api_client, logger=market_data_logger)
+        market_data_service = MarketDataService(
+            api_client=api_client,
+            logger=market_data_logger,
+            sentiment_client=sentiment_client
+        )
         print("   - MarketDataService initialized.")
 
-        # 3. OMS Repository (In-memory DB for demo)
+        # 4. OMS Repository (In-memory DB for demo)
         repo_logger = MarketDataLogger("OmsRepository", service_name="OmsRepository")
         oms_repository = OmsRepository(db_path=":memory:", logger=repo_logger)
         print("   - OmsRepository (in-memory) initialized.")
 
-        # 4. Order Management System
+        # 5. Order Management System
         oms_logger = MarketDataLogger("OMS", service_name="OMS")
         oms = OrderManagementSystem(repository=oms_repository, logger=oms_logger)
         print("   - OrderManagementSystem initialized.")
 
-        # 5. Trading Cycle
+        # 6. Trading Cycle
         trading_cycle = TradingCycle(oms=oms, market_data_service=market_data_service)
         print("   - TradingCycle initialized.")
         print("✅ All components are ready.")

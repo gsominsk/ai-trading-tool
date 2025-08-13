@@ -36,6 +36,7 @@ from src.infrastructure.exceptions import (
     ErrorContext
 )
 from src.infrastructure.binance_client import BinanceApiClient
+from src.infrastructure.sentiment_client import SentimentApiClient
 
 # Direct logging imports - simplified approach
 from src.logging_system import MarketDataLogger
@@ -333,16 +334,18 @@ class MarketDataSet:
 class MarketDataService:
     """Service for aggregating multi-timeframe cryptocurrency market data."""
     
-    def __init__(self, api_client: BinanceApiClient, logger: MarketDataLogger):
+    def __init__(self, api_client: BinanceApiClient, logger: MarketDataLogger, sentiment_client: Optional[SentimentApiClient] = None):
         """
         Initializes the MarketDataService.
 
         Args:
             api_client: An instance of BinanceApiClient.
             logger: A configured MarketDataLogger instance.
+            sentiment_client: An optional instance of SentimentApiClient.
         """
         self.api_client = api_client
         self.logger = logger
+        self.sentiment_client = sentiment_client
         
         # Initialize metrics attributes to prevent AttributeError
         self._operation_metrics: Dict[str, Dict[str, int]] = {}
@@ -486,6 +489,7 @@ class MarketDataService:
             # Get market context
             btc_correlation = self._calculate_btc_correlation(symbol, h1_data, trace_id=trace_id) if symbol != "BTCUSDT" else None
             volume_profile = self._analyze_volume_profile(symbol, h1_data, trace_id=trace_id)
+            fear_greed_index = self._get_fear_and_greed_index(trace_id=trace_id)
             
             market_data_set = MarketDataSet(
                 symbol=symbol,
@@ -499,6 +503,7 @@ class MarketDataService:
                 ma_50=ma_50,
                 ma_trend=ma_trend,
                 btc_correlation=btc_correlation,
+                fear_greed_index=fear_greed_index,
                 volume_profile=volume_profile,
                 support_level=support_level,
                 resistance_level=resistance_level,
@@ -990,6 +995,28 @@ class MarketDataService:
                 processing_stage="correlation_calculation",
                 error_details=str(e)
             )
+
+    def _get_fear_and_greed_index(self, trace_id: Optional[str] = None) -> Optional[int]:
+        """Fetches the Fear & Greed Index, with graceful degradation."""
+        if not self.sentiment_client:
+            return None
+
+        try:
+            data = self.sentiment_client.get_fear_and_greed_index(trace_id=trace_id)
+            # Extract the first value, assuming the structure is consistent
+            if data and 'data' in data and len(data['data']) > 0:
+                value_str = data['data'][0].get('value')
+                if value_str and value_str.isdigit():
+                    return int(value_str)
+            return None
+        except ApiClientError as e:
+            self.logger.log_operation_error(
+                "get_fear_and_greed_index",
+                error=str(e),
+                context={"reason": "API client failed"},
+                trace_id=trace_id
+            )
+            return None
     
 
     

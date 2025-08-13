@@ -77,3 +77,5 @@ Complete progress history (approx. 167 lines) is archived in [`memory-bank/archi
 [2025-08-13 20:49:26] - **Phase 1 Complete:** Finished implementation of BTC correlation caching. The feature is stable and all related tests are passing.
 
 [2025-08-13 20:55:24] - **Phase 2 Complete:** Successfully created and tested the new `SentimentApiClient`.
+
+[2025-08-13 21:14:18] - **Phase 3 Complete:** Successfully integrated the `SentimentApiClient` into the `MarketDataService`. The Fear & Greed Index is now fetched and included in the final `MarketDataSet`. All 242 unit and integration tests passed, confirming the stability and correctness of the new feature.

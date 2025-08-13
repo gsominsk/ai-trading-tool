@@ -16,7 +16,8 @@ import logging
 # Import the module to test
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
 from src.infrastructure.binance_client import BinanceApiClient
-from src.infrastructure.exceptions import SymbolValidationError, DataFrameValidationError, ProcessingError
+from src.infrastructure.exceptions import SymbolValidationError, DataFrameValidationError, ProcessingError, ApiClientError
+from src.infrastructure.sentiment_client import SentimentApiClient
 from src.logging_system import MarketDataLogger
 
 
@@ -27,7 +28,12 @@ class TestMarketDataService:
         """Set up test fixtures before each test method."""
         self.mock_api_client = MagicMock(spec=BinanceApiClient)
         self.mock_logger = MagicMock(spec=MarketDataLogger)
-        self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
+        self.mock_sentiment_client = MagicMock(spec=SentimentApiClient)
+        self.service = MarketDataService(
+            api_client=self.mock_api_client,
+            logger=self.mock_logger,
+            sentiment_client=self.mock_sentiment_client
+        )
     
     @pytest.mark.unit
     @pytest.mark.financial
@@ -137,6 +143,7 @@ class TestMarketDataService:
         assert isinstance(result.ma_50, Decimal)
         assert result.macd_signal in ["bullish", "bearish", "neutral"]
         assert result.ma_trend in ["uptrend", "downtrend", "sideways"]
+        assert result.fear_greed_index is None # By default, as it's not mocked here
     
     @pytest.mark.unit
     def test_decimal_precision_real_service(self):
@@ -404,6 +411,53 @@ class TestMarketDataService:
         assert "Internal analysis failed" in str(error)
         assert error.context.trace_id == "test-trace-id-fail-fast"
         assert error.operation == "get_enhanced_context"
+
+    @pytest.mark.unit
+    def test_get_market_data_with_fear_and_greed(self):
+        """Test that get_market_data correctly calls sentiment client and sets the index."""
+        # Arrange
+        daily_data = self._generate_sufficient_klines(180)
+        h4_data = self._generate_sufficient_klines(84)
+        h1_data = self._generate_sufficient_klines(100)
+        btc_data = self._generate_sufficient_klines(100) # For the correlation call
+        
+        self.mock_api_client.get_klines.side_effect = [daily_data, h4_data, h1_data, btc_data]
+        
+        # Mock the sentiment client to return a specific value
+        mock_fgi_response = {"data": [{"value": "78"}]}
+        self.mock_sentiment_client.get_fear_and_greed_index.return_value = mock_fgi_response
+        
+        # Act
+        result = self.service.get_market_data("ETHUSDT", trace_id="test_fgi")
+        
+        # Assert
+        # Verify that the sentiment client was called
+        self.mock_sentiment_client.get_fear_and_greed_index.assert_called_once_with(trace_id="test_fgi")
+        
+        # Verify that the fear_greed_index is correctly set in the result
+        assert result.fear_greed_index == 78
+        assert isinstance(result.fear_greed_index, int)
+
+    @pytest.mark.unit
+    def test_get_fear_and_greed_index_handles_api_error(self):
+        """Test that _get_fear_and_greed_index returns None when the API client fails."""
+        # Arrange
+        # Create the exception instance once to ensure the trace_id is consistent
+        api_error = ApiClientError("API is down")
+        self.mock_sentiment_client.get_fear_and_greed_index.side_effect = api_error
+        
+        # Act
+        result = self.service._get_fear_and_greed_index(trace_id="test_api_fail")
+        
+        # Assert
+        assert result is None
+        # Verify that the error was logged using the same exception instance
+        self.mock_logger.log_operation_error.assert_called_once_with(
+            "get_fear_and_greed_index",
+            error=str(api_error),
+            context={"reason": "API client failed"},
+            trace_id="test_api_fail"
+        )
     @pytest.mark.unit
     def test_no_attribute_error_for_metrics_on_fresh_instance(self):
         """
