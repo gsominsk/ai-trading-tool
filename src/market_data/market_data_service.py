@@ -906,6 +906,8 @@ class MarketDataService:
                 # Update cache
                 self._btc_cache = btc_data
                 self._btc_cache_timestamp = now
+                if self.logger:
+                    self.logger.log_cache_event(cache_name="btc_data", event_type="update", trace_id=trace_id)
 
             # Ensure we have enough data points for meaningful correlation
             if len(btc_data) < 10 or len(df) < 10:
