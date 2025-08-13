@@ -106,7 +106,7 @@ class TestEndToEndTracing(unittest.TestCase):
         self.mock_api_client.get_klines.side_effect = mock_get_klines_data
         
         # --- ACT ---
-        self.trading_cycle.run_cycle()
+        self.trading_cycle.run_cycle(symbol="BTCUSDT")
 
         # --- ASSERT ---
         # Retrieve and parse logs

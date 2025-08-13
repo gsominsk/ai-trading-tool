@@ -51,7 +51,7 @@ def main():
         # Setup advanced logging
         log_config = config.get('logging', {})
         configure_ai_logging(
-            log_level=log_config.get('level', 'INFO'),
+            log_level="DEBUG",  # Always use DEBUG for demo and development
             log_file=log_config.get('file', 'logs/trading_system.log'),
             console_output=True
         )
@@ -101,10 +101,9 @@ def main():
         print("-" * 30)
 
         # --- Run a Single Trading Cycle ---
-        print("\n▶️  Запускаем полный торговый цикл...")
-        trading_cycle.run_cycle()
-        print("\n🏁 Торговый цикл завершен.")
-        print("🔍 Проверьте логи выше или в файле, чтобы увидеть полную цепочку вызовов по trace_id.")
+        print("\n▶️  Запускаем торговый цикл для ETHUSDT...")
+        trading_cycle.run_cycle(symbol="ETHUSDT")
+        print("\n🏁 Демонстрация завершена.")
 
     except Exception as e:
         logging.getLogger(__name__).critical(f"Application startup failed: {e}", exc_info=True)

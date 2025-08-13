@@ -39,13 +39,12 @@ class TradingCycle:
         self.logger.log_operation_complete("get_ai_decision", trace_id=trace_id, context={"decision": decision})
         return decision
 
-    def run_cycle(self):
+    def run_cycle(self, symbol: str):
         """Запускает один полный торговый цикл."""
         master_trace_id = get_trace_id()
         self.logger.log_operation_start("run_cycle", trace_id=master_trace_id)
         
         # Теперь OMS - единственный источник правды о позициях.
-        symbol = "BTCUSDT"
         current_position = self.oms.get_order_by_symbol(symbol, trace_id=master_trace_id)
 
         # Шаг 1: Синхронизация статуса, если есть активный ордер

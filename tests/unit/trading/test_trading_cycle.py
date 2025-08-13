@@ -39,7 +39,7 @@ def test_run_cycle_no_active_order_buy_decision(trading_cycle, mock_oms):
     mock_oms.get_order_by_symbol.return_value = None
 
     # Действие
-    trading_cycle.run_cycle()
+    trading_cycle.run_cycle(symbol="BTCUSDT")
 
     # Проверка
     # 1. Проверить, что был запрошен ордер по символу
@@ -65,7 +65,7 @@ def test_run_cycle_with_pending_order_syncs_it(trading_cycle, mock_oms):
     mock_oms.get_order_by_symbol.return_value = pending_order
 
     # Действие
-    trading_cycle.run_cycle()
+    trading_cycle.run_cycle(symbol="BTCUSDT")
 
     # Проверка
     # 1. Проверить, что get_order_by_symbol был вызван дважды: до и после синхронизации
@@ -91,7 +91,7 @@ def test_run_cycle_with_filled_order_does_nothing(trading_cycle, mock_oms):
     mock_oms.get_order_by_symbol.return_value = filled_order
 
     # Действие
-    trading_cycle.run_cycle()
+    trading_cycle.run_cycle(symbol="BTCUSDT")
 
     # Проверка
     # 1. Проверить, что был запрошен ордер по символу

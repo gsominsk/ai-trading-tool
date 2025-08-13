@@ -18,13 +18,24 @@
 ### Фаза 1: Реализация кеширования для корреляции с BTC
 *Цель: Оптимизировать расчет корреляции, избегая повторных API-запросов.*
 
-[ ] 1.1: В `src/market_data/market_data_service.py`, в классе `MarketDataService`, добавить в `__init__` атрибуты для кеширования: `_btc_cache` и `_btc_cache_timestamp`.
-[ ] 1.2: В методе `_calculate_btc_correlation` добавить логику проверки кеша. Если кеш свежий (например, < 5 минут), использовать его. Иначе, выполнить API-запрос и обновить кеш.
-[ ] 1.3: В `MarketDataService` добавить логирование события 'update' для кеша после успешного API-запроса.
-[ ] 1.4: В тесте `tests/unit/market_data/test_market_data_caching.py` усилить проверки, чтобы убедиться, что `logger.log_cache_event` вызывается с правильными событиями (hit, miss, update).
+[x] 1.1: В `src/market_data/market_data_service.py`, в классе `MarketDataService`, добавить в `__init__` атрибуты для кеширования: `_btc_cache` и `_btc_cache_timestamp`.
+[x] 1.2: В методе `_calculate_btc_correlation` добавить логику проверки кеша. Если кеш свежий (например, < 5 минут), использовать его. Иначе, выполнить API-запрос и обновить кеш.
+[x] 1.3: В `MarketDataService` добавить логирование события 'update' для кеша после успешного API-запроса.
+[x] 1.4: В тесте `tests/unit/market_data/test_market_data_caching.py` усилить проверки, чтобы убедиться, что `logger.log_cache_event` вызывается с правильными событиями (hit, miss, update).
 [ ] 1.5: Запустить все тесты (`tests/run_all_tests.py`) и убедиться, что они проходят успешно.
 [ ] 1.6: Обновить Memory Bank (`progress.md`, `decisionLog.md`), зафиксировав реализацию кеширования.
 [ ] 1.7: Сделать коммит с сообщением 'feat(market_data): Implement caching for BTC correlation'.
+
+---
+### Фаза 1.5: Рефакторинг `TradingCycle`
+*Цель: Устранить жестко закодированный символ, сделав систему гибкой и тестируемой.*
+
+[ ] 1.5.1: В `src/trading/trading_cycle.py`, изменить метод `run_cycle`, чтобы он принимал `symbol: str` как аргумент.
+[ ] 1.5.2: В `main.py`, обновить вызов `trading_cycle.run_cycle()`, передавая в него символ `ETHUSDT`.
+[ ] 1.5.3: Откатить демонстрационные изменения: убрать второй вызов `run_cycle()` в `main.py`.
+[ ] 1.5.4: Запустить `main.py`, чтобы убедиться, что рефакторинг работает корректно.
+[ ] 1.5.5: Обновить Memory Bank, зафиксировав это важное архитектурное решение.
+[ ] 1.5.6: Сделать коммит с сообщением 'refactor(trading): Pass symbol to run_cycle for better flexibility'.
 
 ---
 ### Фаза 2: Создание `SentimentApiClient`

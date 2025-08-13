@@ -79,7 +79,7 @@ class OrderManagementSystem:
         Получает актуальный статус ордера из внутреннего состояния.
         """
         if self.logger:
-            self.logger.log_operation_start("get_order_status", trace_id=trace_id, order_id=order_id)
+            self.logger.log_operation_start("get_order_status", trace_id=trace_id, context={"order_id": order_id})
         if order_id in self._orders:
             order = self._orders[order_id]
             # Для симуляции ручного тестирования, мы можем имитировать

@@ -71,3 +71,5 @@ Complete progress history (approx. 167 lines) is archived in [`memory-bank/archi
 [2025-08-13 19:43:20] - Phase 1 (BTC Correlation Caching) of task 'enrich_market_data' completed. Implemented caching for BTC data in `MarketDataService` and added a new logging method `log_cache_event`. All tests passed.
 
 [2025-08-13 19:52:17] - Phase 1 (BTC Correlation Caching) of task 'enrich_market_data' completed and verified. Implemented caching for BTC data, added a new `log_cache_event` method, and enhanced the corresponding unit tests to ensure full coverage of the new logic. All tests passed.
+
+[2025-08-13 20:48:31] - **Phase 1.5 Complete:** Successfully refactored `TradingCycle` to be symbol-agnostic. All tests passed, confirming the change is stable.

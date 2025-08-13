@@ -150,3 +150,5 @@ Complete decision history with full details (approx. 242 lines) is archived in [
 [2025-08-13 19:43:31] - Implemented a time-based in-memory cache for BTC data to optimize correlation calculations. Added a new `log_cache_event` method to `MarketDataLogger` for semantic logging of cache events, avoiding the use of a generic `.info()` method and maintaining the logger's specialized interface.
 
 [2025-08-13 19:52:17] - Re-verified and enhanced the BTC data caching implementation. Strengthened unit tests to explicitly check for `log_cache_event` calls with correct parameters (`hit`, `miss`, `update`), ensuring the logging mechanism is as robust as the caching logic itself.
+
+[2025-08-13 20:48:31] - **Architectural Refactoring:** Parameterized `TradingCycle.run_cycle` to accept a `symbol` argument instead of using a hardcoded value. This significantly improves flexibility and testability, allowing the same cycle instance to process different assets by passing the symbol at runtime.
