@@ -16,7 +16,7 @@ import logging
 # Import the module to test
 from src.market_data.market_data_service import MarketDataService, MarketDataSet
 from src.infrastructure.binance_client import BinanceApiClient
-from src.infrastructure.exceptions import SymbolValidationError, DataFrameValidationError
+from src.infrastructure.exceptions import SymbolValidationError, DataFrameValidationError, ProcessingError
 from src.logging_system import MarketDataLogger
 
 
@@ -376,30 +376,34 @@ class TestMarketDataService:
             assert not is_valid
 
     @pytest.mark.unit
-    @patch('src.market_data.market_data_service.MarketDataService.get_market_data')
-    def test_get_enhanced_context_no_name_error_on_exception(self, mock_get_market_data):
+    def test_get_enhanced_context_fail_fast_on_exception(self):
         """
-        Test that get_enhanced_context does not raise NameError on unexpected exceptions
-        and correctly includes the trace_id in the error message.
+        Test that get_enhanced_context wraps internal exceptions in ProcessingError
+        and fails fast, preserving the trace_id.
         """
         # Arrange
-        # Configure the mock to raise a generic exception to trigger the problematic code path
-        mock_get_market_data.side_effect = Exception("A critical unexpected error occurred")
-        
-        # Set a trace_id on the service instance to simulate a real operation
-        self.service._current_trace_id = "test-trace-id-12345"
-        
-        # Act
-        # Call the method that is expected to handle the exception gracefully
-        # We now need to pass a MarketDataSet object, so we mock it
         mock_market_data = MagicMock(spec=MarketDataSet)
         mock_market_data.symbol = "BTCUSDT"
-        
-        result = self.service.get_enhanced_context(mock_market_data)
-        
-        # Assert
-        # Check that the error message is returned as a string, not an exception
-        assert isinstance(result, str)
+        mock_market_data.trace_id = "test-trace-id-fail-fast"
+        # Configure the mock with the attributes that will be accessed before the patch is triggered.
+        mock_market_data.daily_candles = MagicMock()
+        mock_market_data.support_level = Decimal("1.0")
+        mock_market_data.resistance_level = Decimal("2.0")
+
+        # Act & Assert
+        # Patch an internal method to simulate a failure during analysis.
+        # This is a cleaner way to test the exception handling of the method.
+        with patch.object(self.service, '_select_key_candles', side_effect=Exception("Internal analysis failed")):
+            with pytest.raises(ProcessingError) as exc_info:
+                self.service.get_enhanced_context(mock_market_data)
+
+        # Check the error context
+        error = exc_info.value
+        assert isinstance(error, ProcessingError)
+        assert "Enhanced context analysis failed" in str(error)
+        assert "Internal analysis failed" in str(error)
+        assert error.context.trace_id == "test-trace-id-fail-fast"
+        assert error.operation == "get_enhanced_context"
     @pytest.mark.unit
     def test_no_attribute_error_for_metrics_on_fresh_instance(self):
         """

@@ -36,10 +36,10 @@ def test_get_enhanced_context_avoids_redundant_api_calls():
     
     # 2. Now, get the enhanced context. This should NOT make new API calls.
     enhanced_context = service.get_enhanced_context(market_data_set)
-    
+
     # Assert that no new API calls were made
     assert mock_api_client.get_klines.call_count == 0, "get_enhanced_context should not make new API calls"
-    
+
     # Verify that we still get a valid context
-    assert "MARKET DATA ANALYSIS" in enhanced_context
+    assert "Enhanced Analysis" in enhanced_context
     assert "ETHUSDT" in enhanced_context

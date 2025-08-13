@@ -256,88 +256,49 @@ class MarketDataSet:
             if price_diff_ratio > Decimal('0.5'):
                 raise ValueError(f"Recent price ({recent_price}) too far from MA20 ({self.ma_20}), ratio: {price_diff_ratio}")
     
-    def to_llm_context(self, include_candlesticks: bool = False) -> str:
-        """Convert to structured text format for LLM consumption.
+    def to_json_context(self) -> str:
+        """Serializes the dataset to a structured JSON string for LLM consumption."""
         
-        Args:
-            include_candlesticks: If True, includes key candlestick analysis
-        """
-        if include_candlesticks:
-            return self.to_llm_context_enhanced()
-        else:
-            return self.to_llm_context_basic()
-    
-    def to_llm_context_basic(self) -> str:
-        """Convert to structured text format for LLM consumption."""
-        # Check for empty DataFrames first
-        if len(self.h1_candles) == 0:
-            return f"""
-MARKET DATA ANALYSIS FOR {self.symbol}
-Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
+        def format_candles(df: pd.DataFrame) -> list:
+            """Helper to format a DataFrame of candles into a list of dicts."""
+            # Convert timestamp to UNIX epoch seconds for brevity
+            df['unix_timestamp'] = (df['timestamp'] - pd.Timestamp("1970-01-01", tz='UTC')) // pd.Timedelta('1s')
+            
+            # Select and rename columns for brevity
+            formatted_df = df[['unix_timestamp', 'open', 'high', 'low', 'close', 'volume']].copy()
+            formatted_df.columns = ['t', 'o', 'h', 'l', 'c', 'v']
+            
+            # Convert to list of dicts
+            return formatted_df.to_dict(orient='records')
 
-⚠️ NO MARKET DATA AVAILABLE
-Status: Insufficient data for analysis
-Reason: Empty price data (h1_candles)
-
-=== TECHNICAL INDICATORS ===
-RSI(14): {self.rsi_14:.2f} - {'Oversold' if self.rsi_14 < Decimal('30') else 'Overbought' if self.rsi_14 > Decimal('70') else 'Neutral'}
-MACD: {self.macd_signal.upper()}
-MA(20): ${'N/A' if self.ma_20 is None else f'{self.ma_20:.2f}'}
-MA(50): ${'N/A' if self.ma_50 is None else f'{self.ma_50:.2f}'}
-Moving Average Trend: {self.ma_trend.upper()}
-"""
+        context_dict = {
+            "symbol": self.symbol,
+            "current_price": float(self.h1_candles.iloc[-1]['close']),
+            "primary_indicators": {
+                "rsi_14": float(self.rsi_14),
+                "ma_20": float(self.ma_20) if self.ma_20 is not None else None,
+                "ma_50": float(self.ma_50) if self.ma_50 is not None else None,
+                "macd_signal": self.macd_signal,
+                "ma_trend": self.ma_trend
+            },
+            "key_levels": {
+                "support": float(self.support_level) if self.support_level is not None else None,
+                "resistance": float(self.resistance_level) if self.resistance_level is not None else None
+            },
+            "market_sentiment": {
+                "btc_correlation": float(self.btc_correlation) if self.btc_correlation is not None else None,
+                "fear_greed_index": self.fear_greed_index,
+                "volume_profile": self.volume_profile
+            },
+            "raw_candles": {
+                "daily": format_candles(self.daily_candles),
+                "h4": format_candles(self.h4_candles),
+                "h1": format_candles(self.h1_candles)
+            }
+        }
         
-        try:
-            current_price = Decimal(str(self.h1_candles.iloc[-1]['close']))
-            change_24h = self._calculate_24h_change()
-            volume_24h = Decimal(str(self.h1_candles['volume'].tail(24).sum()))
-            
-            # Safe format values with Decimal precision
-            ma_20_str = f"${self.ma_20:.2f}" if self.ma_20 is not None else "N/A"
-            ma_50_str = f"${self.ma_50:.2f}" if self.ma_50 is not None else "N/A"
-            btc_corr_str = f"{self.btc_correlation:.3f}" if self.btc_correlation is not None else "N/A"
-            
-            return f"""
-MARKET DATA ANALYSIS FOR {self.symbol}
-Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
+        return json.dumps(context_dict, indent=2)
 
-=== TECHNICAL INDICATORS ===
-RSI(14): {self.rsi_14:.2f} - {'Oversold' if self.rsi_14 < Decimal('30') else 'Overbought' if self.rsi_14 > Decimal('70') else 'Neutral'}
-MACD: {self.macd_signal.upper()}
-MA(20): {ma_20_str}
-MA(50): {ma_50_str}
-Moving Average Trend: {self.ma_trend.upper()}
-
-=== MARKET CONTEXT ===
-BTC Correlation: {btc_corr_str}
-Volume Profile: {self.volume_profile.upper()}
-
-=== RECENT PRICE ACTION ===
-Current Price: ${current_price:.2f}
-24H Change: {change_24h:.2f}%
-24H Volume: {volume_24h:.0f}
-"""
-        except Exception as e:
-            return f"""
-MARKET DATA ANALYSIS FOR {self.symbol}
-Timestamp: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
-
-❌ DATA ACCESS ERROR
-Error: {str(e)}
-Status: Unable to access price data for context generation
-
-=== AVAILABLE TECHNICAL INDICATORS ===
-RSI(14): {self.rsi_14:.2f}
-MACD: {self.macd_signal.upper()}
-MA Trend: {self.ma_trend.upper()}
-"""
-    
-    def to_llm_context_enhanced(self) -> str:
-        """Convert to enhanced format with candlestick analysis (~300-400 tokens)."""
-        basic_context = self.to_llm_context_basic()
-        # Note: Enhanced analysis requires MarketDataService instance access
-        # This would typically be called through the service's get_enhanced_context method
-        return f"{basic_context}\n\nCANDLESTICK ANALYSIS: Enhanced analysis available via service method"
     
     def _analyze_trend(self, df: pd.DataFrame) -> str:
         """Analyze trend direction from price data."""
@@ -588,7 +549,7 @@ class MarketDataService:
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col])
             
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms').dt.tz_localize('UTC')
         
         return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
 
@@ -624,9 +585,8 @@ class MarketDataService:
             raise SymbolValidationError(f"Unexpected error during symbol validation: {str(e)}", symbol=str(symbol), context=error_context)
     
     def get_enhanced_context(self, market_data: MarketDataSet) -> str:
-        """Get enhanced market context with candlestick analysis and structured error handling."""
+        """Get enhanced market context with a strict 'Fail-Fast' error handling policy."""
         symbol = market_data.symbol
-        # Start a new child operation, linking it to the parent trace_id from MarketDataSet
         trace_id = market_data.trace_id
         self._log_operation_start(
             "get_enhanced_context",
@@ -635,90 +595,50 @@ class MarketDataService:
         )
 
         try:
-            basic_context = market_data.to_llm_context_basic()
-            
-            try:
-                key_candles = self._select_key_candles(
-                    market_data.daily_candles.values.tolist(),
-                    market_data.support_level,
-                    market_data.resistance_level
-                )
-                
-                analysis = "\n=== CANDLESTICK ANALYSIS ===\n"
-                
-                try:
-                    recent_trend = self._analyze_recent_trend(key_candles[:5])
-                    analysis += f"Recent Trend: {recent_trend}\n"
-                except Exception as e:
-                    analysis += f"Recent Trend: Analysis failed ({str(e)[:50]}...)\n"
-                
-                try:
-                    patterns = self._identify_patterns(key_candles)
-                    analysis += f"Patterns: {', '.join(patterns) if patterns else 'No significant patterns detected'}\n"
-                except Exception as e:
-                    analysis += f"Patterns: Pattern analysis failed ({str(e)[:50]}...)\n"
-                
-                try:
-                    if market_data.support_level is not None and market_data.resistance_level is not None:
-                        sr_tests = self._analyze_sr_tests(key_candles, market_data.support_level, market_data.resistance_level)
-                        analysis += f"S/R Tests: {sr_tests or 'No recent support/resistance tests'}\n"
-                    else:
-                        analysis += "S/R Tests: Support/resistance levels unavailable\n"
-                except Exception as e:
-                    analysis += f"S/R Tests: Analysis failed ({str(e)[:50]}...)\n"
-                
-                try:
-                    volume_analysis = self._analyze_volume_relationship(key_candles)
-                    analysis += f"Volume Analysis: {volume_analysis}\n"
-                except Exception as e:
-                    analysis += f"Volume Analysis: Analysis failed ({str(e)[:50]}...)\n"
-                
-                try:
-                    total_candles = len(market_data.daily_candles)
-                    analysis += f"Key Candles Analyzed: {len(key_candles)} of {total_candles} total"
-                except Exception:
-                    analysis += f"Key Candles Analyzed: {len(key_candles)} (total count unavailable)"
-                
-                return f"{basic_context}{analysis}"
-                
-            except Exception as e:
-                error_msg = f"\n=== CANDLESTICK ANALYSIS ===\n❌ Enhanced analysis unavailable: {str(e)[:100]}...\n"
-                error_msg += "Fallback: Basic market data provided above."
-                return f"{basic_context}{error_msg}"
-                
-        except (ValidationError, NetworkError, ProcessingError) as e:
-            return f"""
-MARKET DATA ANALYSIS FOR {symbol}
-Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+            # --- All analysis is now within a single try block ---
+            key_candles = self._select_key_candles(
+                market_data.daily_candles.values.tolist(),
+                market_data.support_level,
+                market_data.resistance_level
+            )
 
-❌ {type(e).__name__.upper()}: {str(e)[:200]}
-Trace ID: {trace_id}
-Operation: get_enhanced_context
+            analysis = f"--- Enhanced Analysis for {symbol} ---\n"
+            analysis += f"Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+            analysis += "=== CANDLESTICK ANALYSIS ===\n"
 
-Error Details:
-- Error Type: {type(e).__name__}
-- Context: Enhanced market data analysis
-- Symbol: {symbol}
+            recent_trend = self._analyze_recent_trend(key_candles[:5])
+            analysis += f"Recent Trend: {recent_trend}\n"
 
-Please check network, symbol, or data availability.
-"""
+            patterns = self._identify_patterns(key_candles)
+            analysis += f"Patterns: {', '.join(patterns) if patterns else 'No significant patterns detected'}\n"
+
+            if market_data.support_level is not None and market_data.resistance_level is not None:
+                sr_tests = self._analyze_sr_tests(key_candles, market_data.support_level, market_data.resistance_level)
+                analysis += f"S/R Tests: {sr_tests or 'No recent support/resistance tests'}\n"
+            else:
+                analysis += "S/R Tests: Support/resistance levels unavailable\n"
+
+            volume_analysis = self._analyze_volume_relationship(key_candles)
+            analysis += f"Volume Analysis: {volume_analysis}\n"
+
+            total_candles = len(market_data.daily_candles)
+            analysis += f"Key Candles Analyzed: {len(key_candles)} of {total_candles} total"
+
+            self._log_operation_success("get_enhanced_context", symbol=symbol, trace_id=trace_id)
+            return analysis
+
         except Exception as e:
-            return f"""
-CRITICAL ERROR: MARKET DATA ANALYSIS FOR {symbol}
-Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
-
-❌ Unable to fetch market data for {symbol}
-Error: {str(e)[:200]}
-Trace ID: {trace_id}
-Operation: get_enhanced_context
-
-Error Details:
-- Error Type: {type(e).__name__}
-- Context: Enhanced market data analysis
-- Symbol: {symbol}
-
-Please check system logs and contact support.
-"""
+            # If any part of the analysis fails, wrap it in ProcessingError and re-raise.
+            self._log_operation_error(
+                "get_enhanced_context", e, symbol=symbol, trace_id=trace_id, error_type="EnhancedAnalysisFailed"
+            )
+            raise ProcessingError(
+                message=f"Enhanced context analysis failed: {str(e)}",
+                operation="get_enhanced_context",
+                context=self._get_error_context("get_enhanced_context", trace_id),
+                processing_stage="candlestick_analysis",
+                error_details=str(e)
+            )
     
     
     def _calculate_rsi(self, symbol: str, df: pd.DataFrame, period: int = 14, trace_id: Optional[str] = None) -> Decimal:

@@ -511,34 +511,32 @@ class TestLoggingIntegrationPoints:
         assert True  # Test passes if no exceptions are raised
     
     def test_enhanced_context_error_handling_integration(self):
-        """Test enhanced context error handling with fallback to basic context."""
+        """Test enhanced context error handling with a 'Fail-Fast' policy."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
         mock_logger = MagicMock(spec=MarketDataLogger)
-        
+
         # Mock successful kline data
         mock_klines = [
             [1640995200000, "50000", "51000", "49000", "50500", "100", 1640995200000, "1", 50, "50000", "0.1", ""] for _ in range(50)
         ]
         mock_api_client.get_klines.return_value = mock_klines
-        
+
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
-        
-        # This should succeed and provide basic context even if enhanced analysis fails
-        try:
-            market_data = service.get_market_data("BTCUSDT", trace_id="test_trace_enh")
-            
-            # Now, simulate a failure within the enhanced context generation
-            with patch.object(service, '_analyze_volume_relationship', side_effect=Exception("Volume relationship failed")):
-                result = service.get_enhanced_context(market_data)
-                
-                assert isinstance(result, str)
-                assert "BTCUSDT" in result
-                # Should contain basic market data even if enhanced analysis fails
-                assert "MARKET DATA ANALYSIS" in result
-                assert "Volume Analysis: Analysis failed" in result # Check for graceful failure message
-        except Exception as e:
-            # If it fails completely, it should be a structured error
-            pytest.fail(f"Service should not have failed completely, but got {e}")
+
+        # This part should succeed
+        market_data = service.get_market_data("BTCUSDT", trace_id="test_trace_enh")
+
+        # Now, simulate a failure within the enhanced context generation
+        with patch.object(service, '_analyze_volume_relationship', side_effect=Exception("Volume relationship failed")):
+            # With the 'Fail-Fast' policy, this should raise a ProcessingError
+            with pytest.raises(ProcessingError) as exc_info:
+                service.get_enhanced_context(market_data)
+
+            error = exc_info.value
+            assert isinstance(error, ProcessingError)
+            assert "Enhanced context analysis failed" in str(error)
+            assert "Volume relationship failed" in str(error)
+            assert error.context.trace_id == "test_trace_enh"
 
 
 if __name__ == "__main__":

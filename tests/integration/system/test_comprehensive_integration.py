@@ -18,6 +18,7 @@ Consolidated from: tests/test_all_fixes_comprehensive.py (261 lines)
 import sys
 import os
 import pytest
+import json
 from decimal import Decimal
 from unittest.mock import patch, Mock, MagicMock
 
@@ -95,10 +96,17 @@ class TestSystemIntegrationComprehensive:
         self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
         result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         
-        basic_context = result.to_llm_context_basic()
-        assert len(basic_context) > 100
-        assert "Error" not in basic_context
-        assert "RSI" in basic_context and "MACD" in basic_context
+        json_context = result.to_json_context()
+        assert len(json_context) > 100
+        
+        # Validate the JSON structure
+        data = json.loads(json_context)
+        assert "symbol" in data
+        assert "primary_indicators" in data
+        assert "raw_candles" in data
+        assert "h1" in data["raw_candles"]
+        assert isinstance(data["raw_candles"]["h1"], list)
+        assert len(data["raw_candles"]["h1"]) > 0
 
     def test_symbol_validation_integration(self):
         """Test comprehensive symbol validation across system."""
@@ -130,24 +138,32 @@ class TestSystemIntegrationComprehensive:
         self.mock_api_client.get_klines.return_value = self._create_klines_data(100)
         result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
         enhanced_context = self.service.get_enhanced_context(result)
-        
+
         assert "CANDLESTICK ANALYSIS" in enhanced_context
-        assert len(enhanced_context) > len(result.to_llm_context_basic())
+        assert "Recent Trend" in enhanced_context
+        assert "Patterns" in enhanced_context
+        assert len(enhanced_context) > 100
 
     def test_end_to_end_workflow_with_mocked_api(self):
         """Test complete end-to-end workflow with mocked API responses."""
         self.mock_api_client.get_klines.return_value = self._create_klines_data(200)
-        
+
         result = self.service.get_market_data("BTCUSDT", trace_id="test_trace")
-        
+
         assert result.symbol == "BTCUSDT"
         assert isinstance(result.rsi_14, Decimal)
         assert result.macd_signal in ["bullish", "bearish", "neutral"]
-        
-        basic_context = result.to_llm_context_basic()
+
+        json_context = result.to_json_context()
+        data = json.loads(json_context)
+        assert data["symbol"] == "BTCUSDT"
+
         enhanced_context = self.service.get_enhanced_context(result)
-        assert len(enhanced_context) > len(basic_context)
-        
+        # Enhanced context is now a separate analysis, not a wrapper for JSON.
+        # We just check that it's a meaningful string.
+        assert "Enhanced Analysis" in enhanced_context
+        assert len(enhanced_context) > 50
+
         assert self.mock_api_client.get_klines.call_count >= 3
 
 

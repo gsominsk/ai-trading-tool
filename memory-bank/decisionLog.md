@@ -4,6 +4,12 @@
 Complete decision history with full details (approx. 242 lines) is archived in [`memory-bank/archive/20250811T231859Z/decisionLog.md`](memory-bank/archive/20250811T231859Z/decisionLog.md). The full, unabridged history is preserved there.
 
 ## Recent Decisions (Last 10 Entries)
+[2025-08-13 00:01:00] - **Architectural Decision: Adopt "Fail-Fast" for Enhanced Context Analysis**. Based on a requirement for absolute data integrity, the `get_enhanced_context` method was refactored from a "graceful degradation" model to a strict "Fail-Fast" policy. Any failure within the internal analysis pipeline (e.g., trend, pattern, or volume analysis) will now immediately raise a `ProcessingError`, halting the operation instead of returning a partial result. This ensures that the LLM never receives incomplete or potentially misleading analysis, prioritizing data reliability over operational continuity in this specific context.
+
+[2025-08-13 00:01:00] - **Architectural Decision: Switch LLM Context from String to Structured JSON**. The core data-passing mechanism to the LLM was refactored from a verbose, custom-formatted string to a structured JSON format via a new `to_json_context()` method in the `MarketDataSet` dataclass.
+    - **Rationale**: The previous string format was inefficient for LLM parsing, brittle to changes in the data structure, and prone to formatting errors. The new JSON format is robust, machine-readable, easily extensible, and significantly more token-efficient.
+    - **Impact**: This fundamental change improves system reliability, reduces LLM processing overhead, and simplifies debugging and future development. All relevant tests were updated to validate the new JSON output, and a "Fail-Fast" error handling policy was enforced to guarantee data integrity.
+
 [2025-08-10 22:10:00] - **Architectural Decision: Stricter Workflow for Refactoring**. Added a mandatory testing policy to `workflowChecks.md`. Any change to existing code (refactoring, bug fix) must be immediately followed by a full test suite run within the same phase to ensure no regressions are introduced. This enforces a higher standard of quality and prevents breaking changes from being committed.
 
 
