@@ -26,7 +26,7 @@ class TestMarketDataServiceIntegration:
     def setup_method(self):
         """Setup test environment."""
         self.mock_api_client = MagicMock(spec=BinanceApiClient)
-        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.mock_logger = MagicMock()
         self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
     
     def _create_valid_klines_data(self, count=50, base_price=50000):

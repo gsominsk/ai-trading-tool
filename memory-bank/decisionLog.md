@@ -146,3 +146,5 @@ Complete decision history with full details (approx. 242 lines) is archived in [
 
 ---
 *Optimized on 2025-08-11: Reduced from 242 lines to optimized version + archive reference*
+
+[2025-08-13 19:43:31] - Implemented a time-based in-memory cache for BTC data to optimize correlation calculations. Added a new `log_cache_event` method to `MarketDataLogger` for semantic logging of cache events, avoiding the use of a generic `.info()` method and maintaining the logger's specialized interface.

@@ -41,7 +41,7 @@ class TestSymbolValidationErrorIntegration:
     def test_invalid_symbol_format_integration(self):
         """Test that invalid symbol formats raise SymbolValidationError with proper context."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         with pytest.raises(SymbolValidationError) as exc_info:
@@ -72,7 +72,7 @@ class TestSymbolValidationErrorIntegration:
     def test_empty_symbol_integration(self):
         """Test empty symbol handling with proper error context."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         with pytest.raises(SymbolValidationError) as exc_info:
@@ -86,7 +86,7 @@ class TestSymbolValidationErrorIntegration:
     def test_multiple_usdt_occurrences_integration(self):
         """Test symbol with multiple USDT occurrences."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         with pytest.raises(SymbolValidationError) as exc_info:
@@ -99,7 +99,7 @@ class TestSymbolValidationErrorIntegration:
     def test_symbol_too_long_integration(self):
         """Test symbol validation for overly long symbols."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         with pytest.raises(SymbolValidationError) as exc_info:
@@ -112,7 +112,7 @@ class TestSymbolValidationErrorIntegration:
     def test_base_currency_validation_integration(self):
         """Test base currency validation integration."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         test_cases = [
             "12USDT",      # Numbers in base currency
@@ -132,7 +132,7 @@ class TestSymbolValidationErrorIntegration:
     def test_existing_test_pattern_compatibility(self):
         """Test that our exceptions work with existing test patterns."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Test the pattern from test_symbol_validation_comprehensive.py
@@ -157,7 +157,7 @@ class TestNetworkErrorIntegration:
     def test_api_timeout_integration(self):
         """Test API timeout handling with proper NetworkError context."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         # Configure the mock client to raise the exception
         mock_api_client.get_klines.side_effect = APIConnectionError(
@@ -192,7 +192,7 @@ class TestNetworkErrorIntegration:
     def test_connection_error_integration(self):
         """Test connection error handling with structured context."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         mock_api_client.get_klines.side_effect = APIConnectionError(
             "Failed to connect to endpoint",
@@ -217,7 +217,7 @@ class TestNetworkErrorIntegration:
     def test_rate_limit_error_integration(self):
         """Test rate limiting error with retry context."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         mock_api_client.get_klines.side_effect = RateLimitError(
             "API rate limit exceeded",
@@ -246,7 +246,7 @@ class TestNetworkErrorIntegration:
     def test_api_server_error_integration(self):
         """Test API server error (5xx) handling."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         mock_api_client.get_klines.side_effect = APIConnectionError(
             "API server error: 503",
@@ -269,7 +269,7 @@ class TestNetworkErrorIntegration:
     def test_invalid_symbol_api_error_integration(self):
         """Test 404 error for invalid symbol."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         mock_api_client.get_klines.side_effect = APIResponseError(
             "Symbol not found",
@@ -294,7 +294,7 @@ class TestNetworkErrorIntegration:
     def test_malformed_api_response_integration(self):
         """Test malformed API response handling."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         # Simulate the client raising an error due to bad response format
         mock_api_client.get_klines.side_effect = APIResponseError(
@@ -322,7 +322,7 @@ class TestProcessingErrorIntegration:
     def test_btc_correlation_processing_error(self):
         """Test direct BTC correlation calculation with insufficient data raises DataInsufficientError."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
 
         # Mock data for the main symbol (ETHUSDT) - must be sufficient to pass validation
@@ -361,7 +361,7 @@ class TestProcessingErrorIntegration:
     def test_unexpected_processing_error_wrapping(self):
         """Test that unexpected errors are wrapped in ProcessingError."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         # This data will cause a ValueError when converting to a DataFrame due to "invalid"
         malformed_kline_data = [
@@ -452,7 +452,7 @@ class TestErrorContextIntegration:
         """Test trace ID generation and propagation across operations."""
         from src.logging_system.trace_generator import get_trace_id
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Generate trace ID using new system
@@ -464,7 +464,7 @@ class TestErrorContextIntegration:
     def test_trace_id_propagation_through_operations(self):
         """Test trace ID propagation through multiple operation calls."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         
         # Setup the mock to raise an error with a specific trace_id
         error_to_raise = APIConnectionError("Timeout")
@@ -498,7 +498,7 @@ class TestLoggingIntegrationPoints:
     def test_operation_metrics_tracking(self):
         """Test operation metrics tracking for future logging integration."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
         service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
         
         # Test that logging methods are called (they should pass silently with current implementation)
@@ -513,7 +513,7 @@ class TestLoggingIntegrationPoints:
     def test_enhanced_context_error_handling_integration(self):
         """Test enhanced context error handling with a 'Fail-Fast' policy."""
         mock_api_client = MagicMock(spec=BinanceApiClient)
-        mock_logger = MagicMock(spec=MarketDataLogger)
+        mock_logger = MagicMock()
 
         # Mock successful kline data
         mock_klines = [

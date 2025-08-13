@@ -36,7 +36,7 @@ class TestSystemIntegrationComprehensive:
     def setup_method(self):
         """Setup a mock API client and service for each test."""
         self.mock_api_client = MagicMock(spec=BinanceApiClient)
-        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.mock_logger = MagicMock()
         self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
 
     def _create_klines_data(self, count=50, base_price=50000, direction=1):
@@ -173,7 +173,7 @@ class TestSystemResilience:
     def setup_method(self):
         """Setup a mock API client and service for each test."""
         self.mock_api_client = MagicMock(spec=BinanceApiClient)
-        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.mock_logger = MagicMock()
         self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
 
     def _create_klines_data(self, count=50, base_price=50000):

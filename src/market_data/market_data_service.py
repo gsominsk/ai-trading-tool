@@ -349,6 +349,10 @@ class MarketDataService:
         self._degradation_history: List[Dict[str, Any]] = []
         self._current_trace_id: Optional[str] = None
         
+        # BTC data cache
+        self._btc_cache: Optional[pd.DataFrame] = None
+        self._btc_cache_timestamp: Optional[datetime] = None
+        
     def _should_log(self, level: str) -> bool:
         """Check if message should be logged based on current log level."""
         log_levels = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
@@ -877,9 +881,31 @@ class MarketDataService:
         error_context = self._get_error_context("btc_correlation", trace_id)
 
         try:
-            # Fetch BTC data for correlation calculation, passing the trace_id
-            btc_data_raw = self.api_client.get_klines("BTCUSDT", "1h", len(df), trace_id=trace_id)
-            btc_data = self._create_dataframe_from_klines(btc_data_raw)
+            now = datetime.now(timezone.utc)
+            # Check cache first
+            if (self._btc_cache is not None and
+                    self._btc_cache_timestamp is not None and
+                    now - self._btc_cache_timestamp < timedelta(minutes=5) and
+                    len(self._btc_cache) >= len(df)):
+                
+                btc_data = self._btc_cache
+                if self.logger:
+                    self.logger.log_cache_event(
+                        cache_name="btc_data",
+                        event_type="hit",
+                        context={"cache_age_seconds": (now - self._btc_cache_timestamp).total_seconds()},
+                        trace_id=trace_id
+                    )
+            else:
+                if self.logger:
+                    self.logger.log_cache_event(cache_name="btc_data", event_type="miss", trace_id=trace_id)
+                # Fetch BTC data for correlation calculation, passing the trace_id
+                btc_data_raw = self.api_client.get_klines("BTCUSDT", "1h", len(df), trace_id=trace_id)
+                btc_data = self._create_dataframe_from_klines(btc_data_raw)
+                
+                # Update cache
+                self._btc_cache = btc_data
+                self._btc_cache_timestamp = now
 
             # Ensure we have enough data points for meaningful correlation
             if len(btc_data) < 10 or len(df) < 10:

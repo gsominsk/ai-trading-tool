@@ -67,3 +67,5 @@ Complete progress history (approx. 167 lines) is archived in [`memory-bank/archi
 
 ---
 *Optimized on 2025-08-11: Reduced from 167 lines to optimized version + archive reference*
+
+[2025-08-13 19:43:20] - Phase 1 (BTC Correlation Caching) of task 'enrich_market_data' completed. Implemented caching for BTC data in `MarketDataService` and added a new logging method `log_cache_event`. All tests passed.

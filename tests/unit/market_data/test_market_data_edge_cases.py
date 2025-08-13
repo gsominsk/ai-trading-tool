@@ -26,7 +26,7 @@ class TestMarketDataServiceEdgeCases:
     def setup_method(self):
         """Setup test environment."""
         self.mock_api_client = MagicMock(spec=BinanceApiClient)
-        self.mock_logger = MagicMock(spec=MarketDataLogger)
+        self.mock_logger = MagicMock()
         self.service = MarketDataService(api_client=self.mock_api_client, logger=self.mock_logger)
     
     def _generate_edge_case_klines(self, scenario: str, count: int = 180) -> list:

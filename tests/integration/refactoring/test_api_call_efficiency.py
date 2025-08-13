@@ -12,7 +12,7 @@ def test_get_enhanced_context_avoids_redundant_api_calls():
     and does not trigger new API calls.
     """
     mock_api_client = MagicMock(spec=BinanceApiClient)
-    mock_logger = MagicMock(spec=MarketDataLogger)
+    mock_logger = MagicMock()
     service = MarketDataService(api_client=mock_api_client, logger=mock_logger)
 
     # Configure the mock API client to return valid kline data (list of lists)

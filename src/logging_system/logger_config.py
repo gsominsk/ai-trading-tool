@@ -419,6 +419,23 @@ class MarketDataLogger:
             trace_id=trace_id
         )
 
+    def log_cache_event(self, cache_name: str, event_type: str,
+                        context: Optional[Dict[str, Any]] = None,
+                        trace_id: Optional[str] = None):
+        """Log cache-related events like hit, miss, or update."""
+        ctx = context or {}
+        ctx["cache_name"] = cache_name
+        ctx["event_type"] = event_type
+        
+        self.logger.debug(
+            f"Cache event for {cache_name}: {event_type}",
+            operation="cache_event",
+            context=ctx,
+            tags=["cache", cache_name.lower(), event_type.lower()],
+            flow=get_flow_summary(),
+            trace_id=trace_id
+        )
+
 
 def reset_logging_state():
     """Reset global logging state for testing."""

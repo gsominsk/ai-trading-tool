@@ -42,7 +42,7 @@ class TestRawDataLogging:
         
         # Create service with logging enabled
         # Mock for the MarketDataService logger
-        self.mock_market_data_logger = MagicMock(spec=MarketDataLogger)
+        self.mock_market_data_logger = MagicMock()
         
         # Mock for the BinanceApiClient logger (now a StructuredLogger)
         self.mock_api_client_logger = MagicMock(spec=StructuredLogger)
