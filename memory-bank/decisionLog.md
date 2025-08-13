@@ -154,3 +154,5 @@ Complete decision history with full details (approx. 242 lines) is archived in [
 [2025-08-13 20:48:31] - **Architectural Refactoring:** Parameterized `TradingCycle.run_cycle` to accept a `symbol` argument instead of using a hardcoded value. This significantly improves flexibility and testability, allowing the same cycle instance to process different assets by passing the symbol at runtime.
 
 [2025-08-13 20:49:26] - **Feature Complete:** Implemented and verified time-based in-memory caching for BTC correlation data in `MarketDataService`. This feature is now stable and confirmed via unit tests and live demo runs.
+
+[2025-08-13 20:55:24] - **New Component:** Created `SentimentApiClient` to fetch the Fear & Greed Index from `api.alternative.me`. The client includes error handling for network/HTTP issues and semantic logging. Unit tests confirm its stability.

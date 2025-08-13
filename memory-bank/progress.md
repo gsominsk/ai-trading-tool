@@ -75,3 +75,5 @@ Complete progress history (approx. 167 lines) is archived in [`memory-bank/archi
 [2025-08-13 20:48:31] - **Phase 1.5 Complete:** Successfully refactored `TradingCycle` to be symbol-agnostic. All tests passed, confirming the change is stable.
 
 [2025-08-13 20:49:26] - **Phase 1 Complete:** Finished implementation of BTC correlation caching. The feature is stable and all related tests are passing.
+
+[2025-08-13 20:55:24] - **Phase 2 Complete:** Successfully created and tested the new `SentimentApiClient`.
